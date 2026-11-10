@@ -824,6 +824,8 @@ namespace GovPortalsApp
         private System.Windows.Shapes.Ellipse dotPortalFSZN;
         private TextBlock statusPortalVAT;
         private System.Windows.Shapes.Ellipse dotPortalVAT;
+        private string _lastCertHash = null;
+        private bool _isRefreshing = false;
 
         public MainWindow()
         {
@@ -838,13 +840,13 @@ namespace GovPortalsApp
             BuildUI();
             RefreshStatuses();
 
-            // Background live auto-refresh timer (every 2.5 seconds)
-            autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2500) };
+            // Background live auto-refresh timer (every 5 seconds, offloaded to thread pool)
+            autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
             autoRefreshTimer.Tick += delegate { RefreshStatuses(); };
             autoRefreshTimer.Start();
 
-            // Live Portal Online Check Timer (every 20 seconds, and immediate first check)
-            portalOnlineTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+            // Live Portal Online Check Timer (every 25 seconds, and immediate first check)
+            portalOnlineTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(25) };
             portalOnlineTimer.Tick += delegate { CheckAllPortalsOnline(); };
             portalOnlineTimer.Start();
             CheckAllPortalsOnline();
@@ -1438,9 +1440,15 @@ namespace GovPortalsApp
             {
                 statusNTClient.Text = "Перезапуск и проверка...";
                 dotNTClient.Fill = GetBrush("#FF9500");
-                SystemDiagnoser.RepairAll();
-                RefreshStatuses();
-                ShowToast("✓ Службы перезапущены, порт проверен, туннель активен!");
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    SystemDiagnoser.RepairAll();
+                    Dispatcher.Invoke(new Action(delegate
+                    {
+                        RefreshStatuses();
+                        ShowToast("✓ Службы перезапущены, порт проверен, туннель активен!");
+                    }));
+                });
             });
 
             var detailsBtn = CreateIOSButton("🔍  Отчет", "#8E8E93", delegate
@@ -1744,42 +1752,83 @@ namespace GovPortalsApp
 
         private void RefreshStatuses()
         {
-            // Certificates Card: show ONLY physically inserted tokens!
-            var certs = SystemDiagnoser.GetConnectedGovCertificates();
-            RenderCertificateCard(certs);
+            if (_isRefreshing) return;
+            _isRefreshing = true;
 
-            // NTClient
-            bool ntInstalled = SystemDiagnoser.FindNTClientPath() != null;
-            if (!ntInstalled)
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                dotNTClient.Fill = GetBrush("#FF9500");
-                statusNTClient.Text = "Не установлена";
-            }
-            else
-            {
-                bool ntOk = SystemDiagnoser.IsPort8084Healthy();
-                dotNTClient.Fill = ntOk ? GetBrush("#34C759") : GetBrush("#FF3B30");
-                statusNTClient.Text = ntOk ? "Активен (порт 8084)" : "Не отвечает / Сбой";
-            }
+                try
+                {
+                    // 1. Hardware USB token & crypto checks (in background thread!)
+                    var certs = SystemDiagnoser.GetConnectedGovCertificates();
+                    bool avestOk = SystemDiagnoser.IsAvestInstalled();
 
-            // AvTunProxy
-            bool avInstalled = SystemDiagnoser.FindAvTunProxyPath() != null;
-            if (!avInstalled)
-            {
-                dotAvTun.Fill = GetBrush("#FF9500");
-                statusAvTun.Text = "Не установлена";
-            }
-            else
-            {
-                bool avOk = SystemDiagnoser.IsAvTunProxyRunning();
-                dotAvTun.Fill = avOk ? GetBrush("#34C759") : GetBrush("#FF9500");
-                statusAvTun.Text = avOk ? "Запущен" : "Остановлен";
-            }
+                    // 2. Heavy network HTTP/socket ping for NTClient 8084 (in background thread!)
+                    bool ntInstalled = SystemDiagnoser.FindNTClientPath() != null;
+                    bool ntOk = ntInstalled && SystemDiagnoser.IsPort8084Healthy();
 
-            // PAC
-            bool pacOk = SystemDiagnoser.IsPacEnabled();
-            dotPac.Fill = pacOk ? GetBrush("#34C759") : GetBrush("#FF3B30");
-            statusPac.Text = pacOk ? "Включен (10224)" : "Отключен";
+                    // 3. Process & service detection (in background thread!)
+                    bool avInstalled = SystemDiagnoser.FindAvTunProxyPath() != null;
+                    bool avOk = avInstalled && SystemDiagnoser.IsAvTunProxyRunning();
+
+                    // 4. Registry check (in background thread!)
+                    bool pacOk = SystemDiagnoser.IsPacEnabled();
+
+                    // Signature to prevent unnecessary UI rebuilds
+                    var sb = new StringBuilder();
+                    sb.Append(avestOk).Append("|").Append(certs.Count);
+                    foreach (var c in certs)
+                    {
+                        sb.Append("|").Append(c.OrgName).Append(";").Append(c.DaysRemaining);
+                    }
+                    string certKey = sb.ToString();
+
+                    // 5. Apply to UI swiftly in a single layout pass
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        try
+                        {
+                            if (certKey != _lastCertHash)
+                            {
+                                _lastCertHash = certKey;
+                                RenderCertificateCard(certs);
+                            }
+
+                            // NTClient
+                            string newNtText = !ntInstalled ? "Не установлена" : (ntOk ? "Активен (порт 8084)" : "Не отвечает / Сбой");
+                            if (statusNTClient.Text != newNtText)
+                            {
+                                statusNTClient.Text = newNtText;
+                                dotNTClient.Fill = !ntInstalled ? GetBrush("#FF9500") : (ntOk ? GetBrush("#34C759") : GetBrush("#FF3B30"));
+                            }
+
+                            // AvTunProxy
+                            string newAvText = !avInstalled ? "Не установлена" : (avOk ? "Запущен" : "Остановлен");
+                            if (statusAvTun.Text != newAvText)
+                            {
+                                statusAvTun.Text = newAvText;
+                                dotAvTun.Fill = !avInstalled ? GetBrush("#FF9500") : (avOk ? GetBrush("#34C759") : GetBrush("#FF9500"));
+                            }
+
+                            // PAC
+                            string newPacText = pacOk ? "Включен (10224)" : "Отключен";
+                            if (statusPac.Text != newPacText)
+                            {
+                                statusPac.Text = newPacText;
+                                dotPac.Fill = pacOk ? GetBrush("#34C759") : GetBrush("#FF3B30");
+                            }
+                        }
+                        finally
+                        {
+                            _isRefreshing = false;
+                        }
+                    }));
+                }
+                catch
+                {
+                    _isRefreshing = false;
+                }
+            });
         }
 
         private void ShowDetailedReportWindow()
@@ -1931,62 +1980,82 @@ namespace GovPortalsApp
 
         private void OpenMNS()
         {
-            if (!SystemDiagnoser.IsPort8084Healthy())
+            ShowToast("🏛️ Подключение к личному кабинету МНС...");
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                SystemDiagnoser.RepairAll();
-            }
-            OpenBrowser("https://lkfl.portal.nalog.gov.by/esifuyl");
-            RefreshStatuses();
+                if (!SystemDiagnoser.IsPort8084Healthy())
+                {
+                    SystemDiagnoser.RepairAll();
+                }
+                OpenBrowser("https://lkfl.portal.nalog.gov.by/esifuyl");
+                Dispatcher.Invoke(new Action(delegate { RefreshStatuses(); }));
+            });
         }
 
         private void OpenFSZN()
         {
-            WinINetHelper.EnablePac("http://127.0.0.1:10224/proxy.pac");
-            if (!SystemDiagnoser.IsAvTunProxyRunning())
+            ShowToast("📑 Подключение к порталу ФСЗН 2.0...");
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                SystemDiagnoser.RepairAll();
-            }
-            OpenBrowser("https://portal2.ssf.gov.by/mainPage/");
-            RefreshStatuses();
+                WinINetHelper.EnablePac("http://127.0.0.1:10224/proxy.pac");
+                if (!SystemDiagnoser.IsAvTunProxyRunning())
+                {
+                    SystemDiagnoser.RepairAll();
+                }
+                OpenBrowser("https://portal2.ssf.gov.by/mainPage/");
+                Dispatcher.Invoke(new Action(delegate { RefreshStatuses(); }));
+            });
         }
 
         private void OpenVAT()
         {
-            // 1-Click Launch: Auto-configures Edge IE Mode & opens seamlessly
-            try
+            ShowToast("🚀 Подготовка и запуск ЭСЧФ в Microsoft Edge...");
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                EdgeHelper.EnsureVatInEdgeIEMode();
+                try
+                {
+                    EdgeHelper.EnsureVatInEdgeIEMode();
 
-                var edgeCandidates = new string[]
-                {
-                    @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-                    @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
-                };
-                foreach (var edge in edgeCandidates)
-                {
-                    if (File.Exists(edge))
+                    var edgeCandidates = new string[]
                     {
-                        Process.Start(edge, "http://vat.gov.by/mainPage/");
-                        ShowToast("🚀 Запускаем ЭСЧФ в Microsoft Edge (режим IE)...");
-                        RefreshStatuses();
-                        return;
+                        @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                        @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+                    };
+                    foreach (var edge in edgeCandidates)
+                    {
+                        if (File.Exists(edge))
+                        {
+                            Process.Start(edge, "http://vat.gov.by/mainPage/");
+                            Dispatcher.Invoke(new Action(delegate
+                            {
+                                ShowToast("🚀 ЭСЧФ запущен в Microsoft Edge (режим IE)!");
+                                RefreshStatuses();
+                            }));
+                            return;
+                        }
                     }
-                }
 
-                // Fallback to Internet Explorer via VBScript
-                var vbsPath = Path.Combine(Path.GetTempPath(), "Open-VAT.vbs");
-                if (!File.Exists(vbsPath))
-                {
-                    File.WriteAllText(vbsPath, "Set objIE = CreateObject(\"InternetExplorer.Application\")\r\nobjIE.Navigate \"http://vat.gov.by/mainPage/\"\r\nobjIE.Visible = 1\r\n", Encoding.ASCII);
+                    // Fallback to Internet Explorer via VBScript
+                    var vbsPath = Path.Combine(Path.GetTempPath(), "Open-VAT.vbs");
+                    if (!File.Exists(vbsPath))
+                    {
+                        File.WriteAllText(vbsPath, "Set objIE = CreateObject(\"InternetExplorer.Application\")\r\nobjIE.Navigate \"http://vat.gov.by/mainPage/\"\r\nobjIE.Visible = 1\r\n", Encoding.ASCII);
+                    }
+                    Process.Start("wscript.exe", "\"" + vbsPath + "\"");
+                    Dispatcher.Invoke(new Action(delegate
+                    {
+                        ShowToast("🚀 Запускаем ЭСЧФ в Internet Explorer...");
+                        RefreshStatuses();
+                    }));
                 }
-                Process.Start("wscript.exe", "\"" + vbsPath + "\"");
-                ShowToast("🚀 Запускаем ЭСЧФ в Internet Explorer...");
-            }
-            catch (Exception ex)
-            {
-                ShowToast("Ошибка запуска: " + ex.Message);
-            }
-            RefreshStatuses();
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(new Action(delegate
+                    {
+                        ShowToast("Ошибка запуска: " + ex.Message);
+                    }));
+                }
+            });
         }
 
         private void OpenBrowser(string url)
