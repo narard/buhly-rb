@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buhly — Вход на госпорталы Беларуси в 1 клик (МНС, ФСЗН, ЭСЧФ)</title>
+  <meta name="description" content="Бесплатная легковесная программа для предпринимателей и бухгалтеров Беларуси. Вход в 1 клик на vat.gov.by, nalog.gov.by и portal2.ssf.gov.by без ошибок и сложных настроек.">
+  <meta name="keywords" content="vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, эсчф вход, err_ssl_protocol_error vat gov by, avtunproxy фсзн, ntclient 8084, бухучет беларусь, эцп авест">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Buhly — ГосПорталы Беларуси в 1 клик">
+  <meta property="og:description" content="Ультралегкий пульт управления для МНС, ФСЗН и ЭСЧФ. Работает локально, открытый код, 0 сторонних браузеров.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://narard.github.io/buhly-rb/">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); }
+  </style>
+
+  <!-- Schema.org for AI & Google Rich Snippets -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Buhly",
+        "operatingSystem": "Windows 10, Windows 11",
+        "applicationCategory": "BusinessApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "BYN"
+        },
+        "description": "Легковесный пульт управления для входа в 1 клик на государственные порталы Республики Беларусь (МНС, ФСЗН 2.0, ЭСЧФ vat.gov.by).",
+        "downloadUrl": "https://github.com/narard/buhly-rb/raw/main/Buhly.exe"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Как исправить ошибку ERR_SSL_PROTOCOL_ERROR на vat.gov.by?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Ошибка ERR_SSL_PROTOCOL_ERROR на vat.gov.by возникает из-за попытки открыть устаревший портал в обычном режиме Chromium, не поддерживающем национальные стандарты СТБ/ActiveX. Buhly автоматически настраивает режим Internet Explorer в Microsoft Edge бессрочно."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Почему служба NTClientSoftware выдает ошибку на порту 8084?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "NTClient может зависнуть в памяти и удерживать порт 8084. Buhly находит зависшие процессы, освобождает порт и перезапускает службу за 1 секунду."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Navigation -->
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+        B
+      </div>
+      <div>
+        <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
+        <span class="text-xs text-neutral-500 block font-medium">ГосПорталы Беларуси</span>
+      </div>
+    </div>
+    <div class="flex items-center space-x-3">
+      <a href="https://github.com/narard/buhly-rb" target="_blank" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        GitHub
+      </a>
+      <a href="https://t.me/buhly_by" target="_blank" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+        Telegram-чат
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <main class="max-w-4xl mx-auto w-full px-6 pt-10 pb-16 text-center">
+    
+    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
+      <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+      <span>Релиз v1.0 • Бесплатно и без установки</span>
+    </div>
+
+    <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-neutral-900 max-w-3xl mx-auto leading-tight md:leading-none">
+      Вход на госпорталы РБ <br class="hidden sm:inline">
+      <span class="text-blue-600">в 1 клик</span> без танцев с бубном
+    </h1>
+
+    <p class="text-lg md:text-xl text-neutral-600 max-w-2xl mx-auto mt-6 font-normal">
+      Забудьте про ошибку <code class="text-sm bg-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded font-mono">ERR_SSL_PROTOCOL_ERROR</code>, зависшие порты 8084 и 140 страниц инструкций. Легковесный пульт управления для ваших родных браузеров.
+    </p>
+
+    <!-- Download CTA -->
+    <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="https://github.com/narard/buhly-rb/raw/main/Buhly.exe" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <span>Скачать Buhly (55 КБ)</span>
+      </a>
+      <a href="https://t.me/buhly_by" target="_blank" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
+        <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+        <span>Сообщество @buhly_by</span>
+      </a>
+    </div>
+
+    <!-- Badges -->
+    <div class="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-neutral-500">
+      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> Без установки (Portable)</span>
+      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> 100% Локально и безопасно</span>
+      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> Windows 10 / Windows 11</span>
+      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> Открытый код</span>
+    </div>
+
+    <!-- UI Mockup Card -->
+    <div class="mt-14 max-w-md mx-auto bg-white rounded-3xl p-6 shadow-xl border border-neutral-200/80 text-left">
+      <div class="flex items-center justify-between pb-4 border-b border-neutral-100">
+        <div>
+          <span class="font-extrabold text-lg text-blue-600">Buhly</span>
+          <span class="font-bold text-lg text-neutral-900"> • ГосПорталы</span>
+        </div>
+        <span class="text-xs bg-emerald-50 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">v1.0 Live</span>
+      </div>
+
+      <!-- Key Badge -->
+      <div class="mt-4 p-3 bg-neutral-50 rounded-2xl border border-neutral-200/60">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-neutral-800 flex items-center">
+            🔑 Активный ключ USB
+          </span>
+          <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">Вставлен ✓</span>
+        </div>
+        <div class="text-xs font-semibold text-neutral-900 mt-1">ООО «Ресмарт» (Директор: Репин М. Д.)</div>
+        <div class="text-[11px] text-neutral-500">Действует до 16.12.2027 • Осталось 401 дн.</div>
+      </div>
+
+      <!-- Portal Buttons Preview -->
+      <div class="mt-4 space-y-2.5">
+        <div class="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-neutral-900">🏛️ Личный кабинет МНС</div>
+            <div class="text-[10px] text-emerald-600 font-medium">● в сети (92 мс)</div>
+          </div>
+          <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">Войти →</span>
+        </div>
+        <div class="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-neutral-900">📑 Портал Фонда (ФСЗН 2.0)</div>
+            <div class="text-[10px] text-emerald-600 font-medium">● в сети (278 мс)</div>
+          </div>
+          <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">Войти →</span>
+        </div>
+        <div class="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-neutral-900">🧾 Портал ЭСЧФ (vat.gov.by)</div>
+            <div class="text-[10px] text-emerald-600 font-medium">● в сети (17 мс)</div>
+          </div>
+          <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">Режим IE →</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Feature Grid -->
+  <section class="bg-white py-16 border-t border-neutral-200">
+    <div class="max-w-5xl mx-auto px-6">
+      <h2 class="text-3xl font-extrabold text-center text-neutral-900 mb-12">
+        Почему Buhly в разы удобнее стандартных инструкций?
+      </h2>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg mb-4">IE</div>
+          <h3 class="font-bold text-lg text-neutral-900 mb-2">ЭСЧФ (vat.gov.by) навсегда</h3>
+          <p class="text-sm text-neutral-600">Больше не нужно раз в 30 дней вручную добавлять сайт в список режима Internet Explorer в Microsoft Edge. Buhly прописывает настройку бессрочно.</p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg mb-4">8084</div>
+          <h3 class="font-bold text-lg text-neutral-900 mb-2">Авторемонт NTClient (МНС)</h3>
+          <p class="text-sm text-neutral-600">Служба часто зависает с ошибкой 429 Too Many Requests. Buhly на лету проверяет здоровье локального порта 8084 и перезапускает службу.</p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg mb-4">🔒</div>
+          <h3 class="font-bold text-lg text-neutral-900 mb-2">100% Доверие и Безопасность</h3>
+          <p class="text-sm text-neutral-600">Buhly — не чужой браузер. Он настраивает ваши родные Edge и Chrome. Никаких прокси-серверов, трафик идет напрямую в министерства.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section (SEO/GEO) -->
+  <section class="max-w-3xl mx-auto px-6 py-16 w-full">
+    <h2 class="text-2xl md:text-3xl font-extrabold text-neutral-900 text-center mb-8">
+      Частые вопросы и ошибки при входе
+    </h2>
+
+    <div class="space-y-4">
+      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+        <summary class="font-bold text-neutral-900 text-base">Почему на vat.gov.by возникает ошибка ERR_SSL_PROTOCOL_ERROR?</summary>
+        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
+          Портал ЭСЧФ жестко привязан к старому модулю ActiveX и белорусским криптоалгоритмам СТБ. Современный браузер Google Chrome и Edge в обычном режиме их не поддерживают. Чтобы зайти, сайт должен быть загружен в режиме Internet Explorer (IE Mode). Buhly выполняет эту настройку автоматически за 1 клик.
+        </p>
+      </details>
+
+      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+        <summary class="font-bold text-neutral-900 text-base">Почему не заходит в МНС, если запущена EDeclaration (АРМ «Плательщик»)?</summary>
+        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
+          Программа EDeclaration монопольно блокирует USB-токен Avest на аппаратном уровне. Пока открыта EDeclaration или менеджер сертификатов MngCert, браузер не может получить доступ к ключу. Buhly автоматически завершает фоновые блокирующие процессы перед входом.
+        </p>
+      </details>
+
+      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+        <summary class="font-bold text-neutral-900 text-base">Нужно ли устанавливать Buhly на компьютер?</summary>
+        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
+          Нет. Buhly поставляется как единый файл (Portable) размером около 50 КБ. Вы можете запускать его прямо с рабочего стола или флешки.
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <span class="text-white font-bold text-base">Buhly</span> • Создано для предпринимателей и бухгалтеров Беларуси
+      </div>
+      <div class="flex items-center space-x-6">
+        <a href="https://github.com/narard/buhly-rb" target="_blank" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" class="hover:text-white transition">Telegram-чат (@buhly_by)</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
