@@ -23,6 +23,9 @@ namespace GovPortalsApp
         {
             try
             {
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
                 File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - Main started\r\n");
                 var app = new Application();
                 var mainWindow = new MainWindow();
@@ -1334,9 +1337,12 @@ namespace GovPortalsApp
                 long ms = 0;
                 try
                 {
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                    ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
                     var req = (HttpWebRequest)WebRequest.Create(url);
                     req.Method = "GET";
-                    req.Timeout = 3000;
+                    req.Timeout = 3500;
                     req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
                     using (var resp = (HttpWebResponse)req.GetResponse())
                     {
