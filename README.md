@@ -42,3 +42,9 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32ico
 - ОС: Windows 10 или Windows 11 (64-bit)
 - Установленный комплект абонента АВЕСТ (ГосСУОК)
 - Браузер Microsoft Edge (встроен в Windows) или Google Chrome
+
+---
+
+## Сообщество
+
+- Telegram-канал и чат: [@buhly_by](https://t.me/buhly_by)

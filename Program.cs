@@ -747,7 +747,7 @@ namespace GovPortalsApp
             tgBtn.Template = tgTemplate;
             tgBtn.Click += delegate
             {
-                try { Process.Start("https://t.me/buhly_rb"); } catch { }
+                try { Process.Start("https://t.me/buhly_by"); } catch { }
             };
             mainStack.Children.Add(tgBtn);
 
