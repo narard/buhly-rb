@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
@@ -26,16 +27,19 @@ namespace GovPortalsApp
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
                 ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
 
-                File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - Main started\r\n");
                 var app = new Application();
                 var mainWindow = new MainWindow();
-                File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - Running app\r\n");
                 app.Run(mainWindow);
-                File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - App exited cleanly\r\n");
             }
             catch (Exception ex)
             {
-                File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - EXCEPTION: " + ex.ToString() + "\r\n");
+                try
+                {
+                    var logPath = Path.Combine(Path.GetTempPath(), "Buhly_error.log");
+                    File.AppendAllText(logPath, DateTime.Now + " - EXCEPTION: " + ex.ToString() + "\r\n");
+                }
+                catch { }
+                MessageBox.Show("Ошибка запуска Buhly:\n" + ex.Message, "Buhly", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
@@ -295,16 +299,29 @@ namespace GovPortalsApp
 
         public static bool IsAvestInstalled()
         {
-            var paths = new string[]
+            try
             {
-                @"C:\Program Files (x86)\Avest",
-                @"C:\Program Files\Avest",
-                @"C:\ProgramData\Avest"
-            };
-            foreach (var p in paths)
-            {
-                if (Directory.Exists(p)) return true;
+                var paths = new string[]
+                {
+                    @"C:\Program Files (x86)\Avest",
+                    @"C:\Program Files\Avest",
+                    @"C:\ProgramData\Avest"
+                };
+                foreach (var p in paths)
+                {
+                    if (Directory.Exists(p)) return true;
+                }
+
+                using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Avest\Avest CSP"))
+                {
+                    if (k != null) return true;
+                }
+                using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Avest\Avest CSP"))
+                {
+                    if (k != null) return true;
+                }
             }
+            catch { }
             return false;
         }
 
@@ -593,6 +610,200 @@ namespace GovPortalsApp
         }
     }
 
+    public static class ComponentInstaller
+    {
+        public static void DownloadAndInstallGossuok(Action<string, int> onProgress, Action<bool, string> onCompleted)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    var tempDir = Path.Combine(Path.GetTempPath(), "Buhly");
+                    if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                    var zipPath = Path.Combine(tempDir, "AvPKISetup_bel.zip");
+                    var extractPath = Path.Combine(tempDir, "AvPKISetup");
+
+                    var url = "https://nces.by/wp-content/uploads/gossuok/2026/AvPKISetup(bel).zip";
+
+                    if (onProgress != null) onProgress("Подключение к серверу nces.by...", 5);
+
+                    using (var wc = new WebClient())
+                    {
+                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                        ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
+                        var autoReset = new AutoResetEvent(false);
+                        Exception downloadError = null;
+
+                        wc.DownloadProgressChanged += delegate(object s, DownloadProgressChangedEventArgs e)
+                        {
+                            if (onProgress != null)
+                            {
+                                long mbRec = e.BytesReceived / (1024 * 1024);
+                                long mbTot = e.TotalBytesToReceive / (1024 * 1024);
+                                string msg = string.Format("Загрузка ПО ГосСУОК: {0}% ({1} из {2} МБ)", e.ProgressPercentage, mbRec, mbTot > 0 ? mbTot : 38);
+                                onProgress(msg, e.ProgressPercentage);
+                            }
+                        };
+
+                        wc.DownloadFileCompleted += delegate(object s, System.ComponentModel.AsyncCompletedEventArgs e)
+                        {
+                            if (e.Error != null) downloadError = e.Error;
+                            autoReset.Set();
+                        };
+
+                        wc.DownloadFileAsync(new Uri(url), zipPath);
+                        autoReset.WaitOne();
+
+                        if (downloadError != null)
+                        {
+                            if (onCompleted != null) onCompleted(false, "Ошибка загрузки: " + downloadError.Message);
+                            return;
+                        }
+                    }
+
+                    if (onProgress != null) onProgress("Распаковка установочного пакета...", 90);
+
+                    if (Directory.Exists(extractPath))
+                    {
+                        try { Directory.Delete(extractPath, true); } catch { }
+                    }
+
+                    ZipFile.ExtractToDirectory(zipPath, extractPath);
+
+                    var exeFiles = Directory.GetFiles(extractPath, "AvPKISetup*.exe", SearchOption.AllDirectories);
+                    string targetExe = exeFiles.Length > 0 ? exeFiles[0] : null;
+
+                    if (targetExe == null)
+                    {
+                        var anyExe = Directory.GetFiles(extractPath, "*.exe", SearchOption.AllDirectories);
+                        if (anyExe.Length > 0) targetExe = anyExe[0];
+                    }
+
+                    if (targetExe != null && File.Exists(targetExe))
+                    {
+                        if (onProgress != null) onProgress("Запуск мастера установки ГосСУОК...", 100);
+                        var psi = new ProcessStartInfo(targetExe)
+                        {
+                            UseShellExecute = true,
+                            Verb = "runas"
+                        };
+                        Process.Start(psi);
+                        if (onCompleted != null) onCompleted(true, "Установщик запущен! Завершите установку на экране и вставьте ключ.");
+                    }
+                    else
+                    {
+                        if (onCompleted != null) onCompleted(false, "Файл установки не найден внутри архива.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (onCompleted != null) onCompleted(false, "Сбой установки: " + ex.Message);
+                }
+            });
+        }
+
+        public static void DownloadAndInstallAvTunProxy(Action<string, int> onProgress, Action<bool, string> onCompleted)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    var tempDir = Path.Combine(Path.GetTempPath(), "Buhly");
+                    if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+                    var exePath = Path.Combine(tempDir, "AvTunProxy-latest.exe");
+
+                    var url = "https://avtunproxy.by/download/AvTunProxy-latest.exe";
+
+                    if (onProgress != null) onProgress("Подключение к avtunproxy.by...", 5);
+
+                    using (var wc = new WebClient())
+                    {
+                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                        ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
+                        var autoReset = new AutoResetEvent(false);
+                        Exception downloadError = null;
+
+                        wc.DownloadProgressChanged += delegate(object s, DownloadProgressChangedEventArgs e)
+                        {
+                            if (onProgress != null)
+                            {
+                                long mbRec = e.BytesReceived / (1024 * 1024);
+                                long mbTot = e.TotalBytesToReceive / (1024 * 1024);
+                                string msg = string.Format("Загрузка AvTunProxy: {0}% ({1} из {2} МБ)", e.ProgressPercentage, mbRec, mbTot > 0 ? mbTot : 8);
+                                onProgress(msg, e.ProgressPercentage);
+                            }
+                        };
+
+                        wc.DownloadFileCompleted += delegate(object s, System.ComponentModel.AsyncCompletedEventArgs e)
+                        {
+                            if (e.Error != null) downloadError = e.Error;
+                            autoReset.Set();
+                        };
+
+                        wc.DownloadFileAsync(new Uri(url), exePath);
+                        autoReset.WaitOne();
+
+                        if (downloadError != null)
+                        {
+                            if (onCompleted != null) onCompleted(false, "Ошибка загрузки: " + downloadError.Message);
+                            return;
+                        }
+                    }
+
+                    if (onProgress != null) onProgress("Запуск установщика AvTunProxy...", 100);
+                    var psi = new ProcessStartInfo(exePath)
+                    {
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+                    Process.Start(psi);
+                    if (onCompleted != null) onCompleted(true, "Установщик AvTunProxy запущен! Завершите установку.");
+                }
+                catch (Exception ex)
+                {
+                    if (onCompleted != null) onCompleted(false, "Сбой установки: " + ex.Message);
+                }
+            });
+        }
+
+        public static string FindLocalNTClientInstaller()
+        {
+            var dirs = new List<string>();
+            var dl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            if (Directory.Exists(dl)) dirs.Add(dl);
+            var desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            if (Directory.Exists(desk)) dirs.Add(desk);
+
+            try
+            {
+                foreach (var d in DriveInfo.GetDrives())
+                {
+                    if (d.IsReady && (d.DriveType == DriveType.Removable || d.DriveType == DriveType.Fixed))
+                    {
+                        dirs.Add(d.RootDirectory.FullName);
+                    }
+                }
+            }
+            catch { }
+
+            foreach (var dir in dirs)
+            {
+                try
+                {
+                    if (!Directory.Exists(dir)) continue;
+                    var files = Directory.GetFiles(dir, "*NTClient*.exe", SearchOption.TopDirectoryOnly);
+                    if (files.Length > 0) return files[0];
+                    var kp = Directory.GetFiles(dir, "*КП*.exe", SearchOption.TopDirectoryOnly);
+                    if (kp.Length > 0) return kp[0];
+                }
+                catch { }
+            }
+            return null;
+        }
+    }
+
     public class MainWindow : Window
     {
         private StackPanel certCardsContainer;
@@ -616,7 +827,6 @@ namespace GovPortalsApp
 
         public MainWindow()
         {
-            File.AppendAllText(@"d:\ПРоекты ИИ\Бухгалтерия\GovPortalsApp\app.log", DateTime.Now + " - MainWindow ctor\r\n");
             Title = "Buhly • ГосПорталы РБ";
             Width = 490;
             Height = 820;
@@ -833,24 +1043,126 @@ namespace GovPortalsApp
 
             if (certs.Count == 0)
             {
-                var warnBox = new Border
+                bool avestOk = SystemDiagnoser.IsAvestInstalled();
+                if (!avestOk)
                 {
-                    Background = GetBrush("#FFF8EB"),
-                    CornerRadius = new CornerRadius(10),
-                    Padding = new Thickness(12),
-                    BorderBrush = GetBrush("#FFE0B2"),
-                    BorderThickness = new Thickness(1)
-                };
-                var warnText = new TextBlock
+                    var warnBox = new Border
+                    {
+                        Background = GetBrush("#FFFBEB"),
+                        CornerRadius = new CornerRadius(12),
+                        Padding = new Thickness(14),
+                        BorderBrush = GetBrush("#FDE68A"),
+                        BorderThickness = new Thickness(1)
+                    };
+                    var boxStack = new StackPanel();
+
+                    var titleBlock = new TextBlock
+                    {
+                        Text = "⚠️  На этом ПК не настроена ЭЦП (ПО ГосСУОК)",
+                        FontSize = 13,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = GetBrush("#B45309"),
+                        Margin = new Thickness(0, 0, 0, 4)
+                    };
+                    boxStack.Children.Add(titleBlock);
+
+                    var descBlock = new TextBlock
+                    {
+                        Text = "Криптопровайдер Avest CSP не обнаружен. Без него система не может прочитать USB-ключ и зайти на госпорталы.",
+                        FontSize = 11,
+                        Foreground = GetBrush("#78350F"),
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 0, 0, 10)
+                    };
+                    boxStack.Children.Add(descBlock);
+
+                    var progressBar = new ProgressBar
+                    {
+                        Height = 6,
+                        Minimum = 0,
+                        Maximum = 100,
+                        Value = 0,
+                        Visibility = Visibility.Collapsed,
+                        Margin = new Thickness(0, 0, 0, 8),
+                        Foreground = GetBrush("#007AFF")
+                    };
+                    boxStack.Children.Add(progressBar);
+
+                    var statusLabel = new TextBlock
+                    {
+                        Text = "",
+                        FontSize = 11,
+                        Foreground = GetBrush("#007AFF"),
+                        FontWeight = FontWeights.Medium,
+                        Visibility = Visibility.Collapsed,
+                        Margin = new Thickness(0, 0, 0, 8)
+                    };
+                    boxStack.Children.Add(statusLabel);
+
+                    Button btnInstall = null;
+                    btnInstall = CreateIOSButton("📥  Скачать и установить ПО ГосСУОК (38 МБ)", "#007AFF", delegate
+                    {
+                        btnInstall.IsEnabled = false;
+                        progressBar.Visibility = Visibility.Visible;
+                        statusLabel.Visibility = Visibility.Visible;
+                        statusLabel.Text = "Подключение к nces.by...";
+
+                        ComponentInstaller.DownloadAndInstallGossuok(
+                            delegate(string status, int pct)
+                            {
+                                Dispatcher.Invoke(new Action(delegate
+                                {
+                                    progressBar.Value = pct;
+                                    statusLabel.Text = status;
+                                }));
+                            },
+                            delegate(bool success, string msg)
+                            {
+                                Dispatcher.Invoke(new Action(delegate
+                                {
+                                    btnInstall.IsEnabled = true;
+                                    if (success)
+                                    {
+                                        btnInstall.Content = "🔄  Проверить установку";
+                                        statusLabel.Text = "✓ " + msg;
+                                        statusLabel.Foreground = GetBrush("#34C759");
+                                        RefreshStatuses();
+                                    }
+                                    else
+                                    {
+                                        statusLabel.Text = "⚠️ " + msg;
+                                        statusLabel.Foreground = GetBrush("#FF3B30");
+                                    }
+                                }));
+                            }
+                        );
+                    });
+                    boxStack.Children.Add(btnInstall);
+
+                    warnBox.Child = boxStack;
+                    stack.Children.Add(warnBox);
+                }
+                else
                 {
-                    Text = "⚠️ Вставьте USB-токен Avest в компьютер\nКлюч не обнаружен в USB-порте.",
-                    FontSize = 12,
-                    FontWeight = FontWeights.Medium,
-                    Foreground = GetBrush("#D97706"),
-                    TextWrapping = TextWrapping.Wrap
-                };
-                warnBox.Child = warnText;
-                stack.Children.Add(warnBox);
+                    var warnBox = new Border
+                    {
+                        Background = GetBrush("#FFF8EB"),
+                        CornerRadius = new CornerRadius(10),
+                        Padding = new Thickness(12),
+                        BorderBrush = GetBrush("#FFE0B2"),
+                        BorderThickness = new Thickness(1)
+                    };
+                    var warnText = new TextBlock
+                    {
+                        Text = "⚠️ Вставьте USB-токен Avest в компьютер\nКлюч не обнаружен в USB-порте (криптопровайдер Avest активен ✓).",
+                        FontSize = 12,
+                        FontWeight = FontWeights.Medium,
+                        Foreground = GetBrush("#D97706"),
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    warnBox.Child = warnText;
+                    stack.Children.Add(warnBox);
+                }
             }
             else
             {
@@ -1181,31 +1493,80 @@ namespace GovPortalsApp
             // Step 1: Avest
             bool avestOk = SystemDiagnoser.IsAvestInstalled();
             stack.Children.Add(CreateWizardStep("1. ПО «Авест» (ГосСУОК):",
-                avestOk ? "Установлено ✓" : "Не найдено — Скачать",
+                avestOk ? "Установлено ✓" : "Скачать и установить (38 МБ)",
                 avestOk,
-                "https://nces.by/service/pki/"));
+                delegate
+                {
+                    if (avestOk) return;
+                    ShowToast("📥 Загрузка ПО ГосСУОК с официального сервера nces.by...");
+                    ComponentInstaller.DownloadAndInstallGossuok(
+                        delegate(string s, int p) { },
+                        delegate(bool ok, string m)
+                        {
+                            Dispatcher.Invoke(new Action(delegate
+                            {
+                                ShowToast(ok ? "✓ " + m : "⚠️ " + m);
+                                RefreshStatuses();
+                            }));
+                        }
+                    );
+                }));
 
             // Step 2: NTClient
             string ntVer = SystemDiagnoser.GetNTClientVersion();
             bool ntInstalled = ntVer != "Не установлена";
-            stack.Children.Add(CreateWizardStep("2. NTClientSoftware:",
-                ntInstalled ? ntVer + " ✓" : "Не найдено — Скачать",
+            string localNT = ntInstalled ? null : ComponentInstaller.FindLocalNTClientInstaller();
+            string ntActionText = ntInstalled ? ntVer + " ✓" : (localNT != null ? "Запустить с диска ⚡" : "Инструкция и сайт НЦЭУ");
+            stack.Children.Add(CreateWizardStep("2. NTClientSoftware (МНС):",
+                ntActionText,
                 ntInstalled,
-                "https://nces.by/service/po/"));
+                delegate
+                {
+                    if (ntInstalled) return;
+                    if (localNT != null)
+                    {
+                        try
+                        {
+                            Process.Start(localNT);
+                            ShowToast("⚡ Запуск найденного установщика: " + Path.GetFileName(localNT));
+                        }
+                        catch (Exception ex) { ShowToast("Ошибка запуска: " + ex.Message); }
+                    }
+                    else
+                    {
+                        OpenBrowser("https://nces.by/service/po/");
+                        ShowToast("🌐 Открыт сайт НЦЭУ. Для загрузки укажите телефон для получения СМС.");
+                    }
+                }));
 
             // Step 3: AvTunProxy
             string avVer = SystemDiagnoser.GetAvTunProxyVersion();
             bool avInstalled = avVer != "Не установлена";
             stack.Children.Add(CreateWizardStep("3. AvTunProxy (ФСЗН):",
-                avInstalled ? avVer + " ✓" : "Не найдено — Скачать",
+                avInstalled ? avVer + " ✓" : "Скачать и установить (8 МБ)",
                 avInstalled,
-                "https://avtunproxy.by/"));
+                delegate
+                {
+                    if (avInstalled) return;
+                    ShowToast("📥 Загрузка AvTunProxy с avtunproxy.by...");
+                    ComponentInstaller.DownloadAndInstallAvTunProxy(
+                        delegate(string s, int p) { },
+                        delegate(bool ok, string m)
+                        {
+                            Dispatcher.Invoke(new Action(delegate
+                            {
+                                ShowToast(ok ? "✓ " + m : "⚠️ " + m);
+                                RefreshStatuses();
+                            }));
+                        }
+                    );
+                }));
 
             border.Child = stack;
             return border;
         }
 
-        private Grid CreateWizardStep(string label, string actionText, bool isOk, string downloadUrl)
+        private Grid CreateWizardStep(string label, string actionText, bool isOk, Action onClick)
         {
             var g = new Grid { Margin = new Thickness(0, 4, 0, 4) };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1230,12 +1591,9 @@ namespace GovPortalsApp
                 Cursor = isOk ? Cursors.Arrow : Cursors.Hand,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            if (!isOk)
+            if (onClick != null)
             {
-                btn.Click += delegate
-                {
-                    try { Process.Start(downloadUrl); } catch { }
-                };
+                btn.Click += delegate { onClick(); };
             }
 
             Grid.SetColumn(lbl, 0);
@@ -1391,14 +1749,32 @@ namespace GovPortalsApp
             RenderCertificateCard(certs);
 
             // NTClient
-            bool ntOk = SystemDiagnoser.IsPort8084Healthy();
-            dotNTClient.Fill = ntOk ? GetBrush("#34C759") : GetBrush("#FF3B30");
-            statusNTClient.Text = ntOk ? "Активен (порт 8084)" : "Не отвечает / Сбой";
+            bool ntInstalled = SystemDiagnoser.FindNTClientPath() != null;
+            if (!ntInstalled)
+            {
+                dotNTClient.Fill = GetBrush("#FF9500");
+                statusNTClient.Text = "Не установлена";
+            }
+            else
+            {
+                bool ntOk = SystemDiagnoser.IsPort8084Healthy();
+                dotNTClient.Fill = ntOk ? GetBrush("#34C759") : GetBrush("#FF3B30");
+                statusNTClient.Text = ntOk ? "Активен (порт 8084)" : "Не отвечает / Сбой";
+            }
 
             // AvTunProxy
-            bool avOk = SystemDiagnoser.IsAvTunProxyRunning();
-            dotAvTun.Fill = avOk ? GetBrush("#34C759") : GetBrush("#FF9500");
-            statusAvTun.Text = avOk ? "Запущен" : "Остановлен";
+            bool avInstalled = SystemDiagnoser.FindAvTunProxyPath() != null;
+            if (!avInstalled)
+            {
+                dotAvTun.Fill = GetBrush("#FF9500");
+                statusAvTun.Text = "Не установлена";
+            }
+            else
+            {
+                bool avOk = SystemDiagnoser.IsAvTunProxyRunning();
+                dotAvTun.Fill = avOk ? GetBrush("#34C759") : GetBrush("#FF9500");
+                statusAvTun.Text = avOk ? "Запущен" : "Остановлен";
+            }
 
             // PAC
             bool pacOk = SystemDiagnoser.IsPacEnabled();
@@ -1598,7 +1974,7 @@ namespace GovPortalsApp
                 }
 
                 // Fallback to Internet Explorer via VBScript
-                var vbsPath = @"C:\Users\sveta\GovPortals\Open-VAT.vbs";
+                var vbsPath = Path.Combine(Path.GetTempPath(), "Open-VAT.vbs");
                 if (!File.Exists(vbsPath))
                 {
                     File.WriteAllText(vbsPath, "Set objIE = CreateObject(\"InternetExplorer.Application\")\r\nobjIE.Navigate \"http://vat.gov.by/mainPage/\"\r\nobjIE.Visible = 1\r\n", Encoding.ASCII);
@@ -1617,19 +1993,28 @@ namespace GovPortalsApp
         {
             try
             {
-                var chrome = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
-                if (File.Exists(chrome))
+                var chromeCandidates = new string[]
                 {
-                    Process.Start(chrome, url);
-                    return;
-                }
-                var edge = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
-                if (File.Exists(edge))
+                    @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Google\Chrome\Application\chrome.exe")
+                };
+                foreach (var c in chromeCandidates)
                 {
-                    Process.Start(edge, url);
-                    return;
+                    if (File.Exists(c)) { Process.Start(c, url); return; }
                 }
-                Process.Start(url);
+
+                var edgeCandidates = new string[]
+                {
+                    @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                    @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+                };
+                foreach (var e in edgeCandidates)
+                {
+                    if (File.Exists(e)) { Process.Start(e, url); return; }
+                }
+
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex)
             {

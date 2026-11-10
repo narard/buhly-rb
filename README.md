@@ -1,6 +1,6 @@
 # Buhly • ГосПорталы Республики Беларусь
 
-Легковесный пульт управления (~47 КБ) для входа в 1 клик на государственные порталы Республики Беларусь:
+Легковесный пульт управления (~65 КБ) для входа в 1 клик на государственные порталы Республики Беларусь:
 - **МНС (Налоговая)** — `nalog.gov.by` (ЕС ИФЮЛ)
 - **ФСЗН (Фонд)** — `portal2.ssf.gov.by` (Корпоративный портал 2.0)
 - **ЭСЧФ (НДС)** — `vat.gov.by` (с нативной поддержкой ActiveX через режим IE)
@@ -10,9 +10,10 @@
 ## Возможности
 
 - **Аппаратное определение USB-токена:** Программа проверяет физическое присутствие ключа Avest в USB-порте и выводит карточку активной организации (ООО/ИП), директора и срок действия сертификата.
+- **Умная настройка нового ПК (1-клик установка):** Если на компьютере еще не настроена ЭЦП, Buhly определяет отсутствие криптопровайдера и позволяет в 1 клик загрузить официальный установочный комплект ГосСУОК (`nces.by`) и шлюз AvTunProxy (`avtunproxy.by`).
 - **Вход в 1 клик на ЭСЧФ:** Настройка режима совместимости в браузере Microsoft Edge выполняется автоматически, без необходимости вручную обновлять список каждые 30 дней.
 - **Мониторинг доступности серверов:** Проверка сетевого отклика порталов в реальном времени (`🟢 в сети` / `🔴 сбой сервера`).
-- **Автоматическое устранение конфликтов:** Корректное завершение блокирующих процессов (например, фоновые сессии EDeclaration), мешающих доступу к ключу.
+- **Автоматическое устранение конфликтов:** Корректное завершение блокирующих процессов (например, фоновые сессии EDeclaration, MngCert), мешающих доступу к ключу.
 - **Диагностика рабочего места:** Проверка точности системного времени, целостности файла `hosts` и доступности локальных портов (8084).
 
 ---
@@ -32,7 +33,7 @@
 Для сборки достаточно запустить файл `build.bat` или выполнить команду:
 
 ```cmd
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32icon:Buhly.ico /out:Buhly.exe /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationFramework.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationCore.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xaml.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Drawing.dll" Program.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32icon:Buhly.ico /out:Buhly.exe /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationFramework.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationCore.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xaml.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Drawing.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.IO.Compression.FileSystem.dll" Program.cs
 ```
 
 ---
@@ -40,7 +41,6 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32ico
 ## Системные требования
 
 - ОС: Windows 10 или Windows 11 (64-bit)
-- Установленный комплект абонента АВЕСТ (ГосСУОК)
 - Браузер Microsoft Edge (встроен в Windows) или Google Chrome
 
 ---
