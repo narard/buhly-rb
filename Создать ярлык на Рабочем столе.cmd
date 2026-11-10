@@ -1,0 +1,2 @@
+@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -Command  = New-Object -ComObject WScript.Shell; = [Environment]::GetFolderPath([Environment+SpecialFolder]::Desktop); = .CreateShortcut( + " \Buhly - ГосПорталы РБ.lnk\); .TargetPath = \\%~dp0Buhly.exe\\; .WorkingDirectory = \\%~dp0\\; .IconLocation = \\%~dp0Buhly.ico,0\\; .Save(); Write-Host \Ярлык Buhly успешно создан на рабочем столе!\ -ForegroundColor Green; Start-Sleep -Seconds 2
