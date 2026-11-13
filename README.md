@@ -1,20 +1,23 @@
-# Buhly • ГосПорталы Республики Беларусь
+# Buhly v2.0 • ГосПорталы Республики Беларусь
 
-Легковесный пульт управления (~65 КБ) для входа в 1 клик на государственные порталы Республики Беларусь:
+Легковесный пульт управления (~80 КБ) для входа в 1 клик на государственные порталы Республики Беларусь:
 - **МНС (Налоговая)** — `nalog.gov.by` (ЕС ИФЮЛ)
 - **ФСЗН (Фонд)** — `portal2.ssf.gov.by` (Корпоративный портал 2.0)
-- **ЭСЧФ (НДС)** — `vat.gov.by` (с нативной поддержкой ActiveX через режим IE)
+- **ЭСЧФ (НДС)** — `vat.gov.by` (автонастройка режима IE + ActiveX + Надежные сайты)
+- **Е-Паслуга (НЦЭУ)** — `e-pasluga.by`
 
 ---
 
-## Возможности
+## Возможности v2.0
 
 - **Аппаратное определение USB-токена:** Программа проверяет физическое присутствие ключа Avest в USB-порте и выводит карточку активной организации (ООО/ИП), директора и срок действия сертификата.
-- **Умная настройка нового ПК (1-клик установка):** Если на компьютере еще не настроена ЭЦП, Buhly определяет отсутствие криптопровайдера и позволяет в 1 клик загрузить официальный установочный комплект ГосСУОК (`nces.by`) и шлюз AvTunProxy (`avtunproxy.by`).
-- **Вход в 1 клик на ЭСЧФ:** Настройка режима совместимости в браузере Microsoft Edge выполняется автоматически, без необходимости вручную обновлять список каждые 30 дней.
-- **Мониторинг доступности серверов:** Проверка сетевого отклика порталов в реальном времени (`🟢 в сети` / `🔴 сбой сервера`).
-- **Автоматическое устранение конфликтов:** Корректное завершение блокирующих процессов (например, фоновые сессии EDeclaration, MngCert), мешающих доступу к ключу.
-- **Диагностика рабочего места:** Проверка точности системного времени, целостности файла `hosts` и доступности локальных портов (8084).
+- **Реестр всех ключей ЭЦП (Новое!):** Buhly запоминает каждый вставленный ключ и умеет подтягивать все сертификаты ГосСУОК из хранилища Windows. Вы видите сроки окончания по всем компаниям и ИП, даже когда флешки не вставлены, и можете в 1 клик скопировать сводку сроков.
+- **Проверка контрагента по УНП (Новое!):** Встроенный поиск по базе ГРП МНС РБ (`portal.nalog.gov.by/grp`) — статус компании (действует / ликвидирован), адрес, ИМНС и копирование реквизитов.
+- **Курсы НБРБ в шапке (Новое!):** Актуальные курсы USD и 100 RUB на сегодня.
+- **Безопасная настройка ЭСЧФ в 1 клик:** Включение режима Internet Explorer через официальные политики Edge (`HKCU\Software\Policies\Microsoft\Edge` + XML-список) и автонастройка ActiveX в зоне «Надежные сайты» **без принудительного закрытия вашего браузера**.
+- **Мониторинг доступности серверов:** Проверка сетевого отклика МНС, ФСЗН, ЭСЧФ и Е-Паслуга в реальном времени (`🟢 в сети` / `🔴 сбой сервера`).
+- **Обнаружение и автоочистка заблокированных госдоменов в `hosts` (Новое!):** Проверка файла `C:\Windows\System32\drivers\etc\hosts` на паразитные записи (`account.gov.by`, `nalog.gov.by`, `portal2.ssf.gov.by`, `vat.gov.by`, `e-pasluga.by` и др.) и очистка в 1 клик со сбросом DNS-кеша (`ipconfig /flushdns`).
+- **Мастер настройки нового ПК и авторемонт:** Диагностика порта 8084, PAC-туннеля `10224`, мягкое снятие блокировки с токена и помощь с установкой ПО ГосСУОК / AvTunProxy.
 
 ---
 
@@ -33,7 +36,7 @@
 Для сборки достаточно запустить файл `build.bat` или выполнить команду:
 
 ```cmd
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /win32icon:Buhly.ico /out:Buhly.exe /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationFramework.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationCore.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xaml.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Drawing.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.IO.Compression.FileSystem.dll" Program.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /optimize+ /win32manifest:app.manifest /win32icon:Buhly.ico /out:Buhly.exe /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationFramework.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\PresentationCore.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xaml.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Drawing.dll" /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.IO.Compression.FileSystem.dll" Program.cs
 ```
 
 ---

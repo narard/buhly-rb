@@ -60,6 +60,14 @@
               "@type": "Answer",
               "text": "NTClient может зависнуть в памяти и удерживать порт 8084. Buhly находит зависшие процессы, освобождает порт и перезапускает службу за 1 секунду."
             }
+          },
+          {
+            "@type": "Question",
+            "name": "Почему не открывается account.gov.by, e-pasluga.by или nalog.gov.by (ERR_CONNECTION_REFUSED)?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Иногда старые программы для туннелирования или настройки ЭЦП оставляют в системном файле C:\\Windows\\System32\\drivers\\etc\\hosts записи 127.0.0.1 для account.gov.by и других доменов .gov.by, из-за чего браузер не может достучаться до реального сервера. Buhly v2.0 автоматически находит такие записи и очищает hosts в 1 клик со сбросом DNS-кеша."
+            }
           }
         ]
       }
@@ -95,7 +103,7 @@
     
     <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
       <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-      <span>Релиз v1.0 • Бесплатно и без установки</span>
+      <span>Релиз v2.0 • МНС, ФСЗН, ЭСЧФ, Е-Паслуга + Реестр ЭЦП + УНП</span>
     </div>
 
     <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-neutral-900 max-w-3xl mx-auto leading-tight md:leading-none">
@@ -109,15 +117,19 @@
 
     <!-- Download CTA -->
     <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-      <a href="https://github.com/narard/buhly-rb/raw/main/Buhly.exe" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
+      <a href="https://github.com/narard/buhly-rb/raw/main/Release/Buhly_v2.0.zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        <span>Скачать Buhly (55 КБ)</span>
+        <span>Скачать Buhly v2.0 (ZIP, ~38 КБ)</span>
       </a>
       <a href="https://t.me/buhly_by" target="_blank" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
         <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
         <span>Сообщество @buhly_by</span>
       </a>
     </div>
+    <p class="mt-3 text-xs text-neutral-500">
+      Внутри архива: <b>Buhly.exe</b> (~90 КБ) + <b>Запустить Buhly.cmd</b> (автосоздание ярлыка без предупреждений SmartScreen).
+      <a href="https://github.com/narard/buhly-rb/raw/main/Buhly.exe" class="text-blue-600 hover:underline ml-1">Прямая ссылка на .exe</a>
+    </p>
 
     <!-- Badges -->
     <div class="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-neutral-500">
@@ -134,7 +146,7 @@
           <span class="font-extrabold text-lg text-blue-600">Buhly</span>
           <span class="font-bold text-lg text-neutral-900"> • ГосПорталы</span>
         </div>
-        <span class="text-xs bg-emerald-50 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">v1.0 Live</span>
+        <span class="text-xs bg-emerald-50 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">v2.0 Live</span>
       </div>
 
       <!-- Key Badge -->
@@ -172,6 +184,13 @@
           </div>
           <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">Режим IE →</span>
         </div>
+        <div class="p-3 bg-white rounded-xl border border-neutral-200 shadow-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-neutral-900">🌐 Е-Паслуга (e-pasluga.by)</div>
+            <div class="text-[10px] text-emerald-600 font-medium">● в сети (31 мс)</div>
+          </div>
+          <span class="text-xs font-semibold text-sky-600 bg-sky-50 px-3 py-1 rounded-lg">Войти →</span>
+        </div>
       </div>
     </div>
 
@@ -181,26 +200,26 @@
   <section class="bg-white py-16 border-t border-neutral-200">
     <div class="max-w-5xl mx-auto px-6">
       <h2 class="text-3xl font-extrabold text-center text-neutral-900 mb-12">
-        Почему Buhly в разы удобнее стандартных инструкций?
+        Почему Buhly v2.0 в разы удобнее стандартных инструкций?
       </h2>
 
       <div class="grid md:grid-cols-3 gap-8">
         <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
           <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg mb-4">IE</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">ЭСЧФ (vat.gov.by) навсегда</h3>
-          <p class="text-sm text-neutral-600">Больше не нужно раз в 30 дней вручную добавлять сайт в список режима Internet Explorer в Microsoft Edge. Buhly прописывает настройку бессрочно.</p>
+          <h3 class="font-bold text-lg text-neutral-900 mb-2">ЭСЧФ + ActiveX навсегда</h3>
+          <p class="text-sm text-neutral-600">Настраивает политику IE-режима Edge и «Надежные сайты» для ActiveX в 1 клик, не закрывая ваши открытые вкладки.</p>
         </div>
 
         <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg mb-4">8084</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">Авторемонт NTClient (МНС)</h3>
-          <p class="text-sm text-neutral-600">Служба часто зависает с ошибкой 429 Too Many Requests. Buhly на лету проверяет здоровье локального порта 8084 и перезапускает службу.</p>
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg mb-4">🔑</div>
+          <h3 class="font-bold text-lg text-neutral-900 mb-2">Реестр всех ЭЦП и УНП</h3>
+          <p class="text-sm text-neutral-600">Запоминает сроки действия ключей всех ваших фирм и ИП, а также мгновенно проверяет контрагентов по базе ГРП МНС.</p>
         </div>
 
         <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
           <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg mb-4">🔒</div>
           <h3 class="font-bold text-lg text-neutral-900 mb-2">100% Доверие и Безопасность</h3>
-          <p class="text-sm text-neutral-600">Buhly — не чужой браузер. Он настраивает ваши родные Edge и Chrome. Никаких прокси-серверов, трафик идет напрямую в министерства.</p>
+          <p class="text-sm text-neutral-600">Buhly — не чужой браузер. Он работает с родными Edge и Chrome. Никаких прокси-серверов, трафик идет напрямую в министерства.</p>
         </div>
       </div>
     </div>
@@ -230,7 +249,14 @@
       <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
         <summary class="font-bold text-neutral-900 text-base">Нужно ли устанавливать Buhly на компьютер?</summary>
         <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
-          Нет. Buhly поставляется как единый файл (Portable) размером около 50 КБ. Вы можете запускать его прямо с рабочего стола или флешки.
+          Нет. Buhly поставляется как единый файл (Portable) размером около 90 КБ. Вы можете запускать его прямо с рабочего стола или флешки.
+        </p>
+      </details>
+
+      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+        <summary class="font-bold text-neutral-900 text-base">Почему не открывается account.gov.by, e-pasluga.by или nalog.gov.by (ERR_CONNECTION_REFUSED)?</summary>
+        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
+          Иногда старые программы для туннелирования или настройки ЭЦП оставляют в системном файле <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">C:\Windows\System32\drivers\etc\hosts</code> перенаправления <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">127.0.0.1</code> на <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">account.gov.by</code> и другие домены <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">.gov.by</code>. Из-за этого браузер не может достучаться до реального сервера. Buhly v2.0 автоматически находит такие записи, очищает <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">hosts</code> в 1 клик и сбрасывает DNS-кеш.
         </p>
       </details>
     </div>
