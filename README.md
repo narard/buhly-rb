@@ -50,4 +50,6 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /optimize
 
 ## Сообщество
 
-- Telegram-канал и чат: [@buhly_by](https://t.me/buhly_by)
+- Официальный сайт: [buhly.by](https://buhly.by)
+- Telegram-канал: [@buhly_by](https://t.me/buhly_by)
+- Чат поддержки: [@buhly_by_chat](https://t.me/buhly_by_chat)
