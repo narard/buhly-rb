@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Как проверить срок действия ЭЦП Авест (ГосСУОК) для ИП и ООО в Беларуси | Buhly</title>
+  <meta name="description" content="Как узнать, когда заканчивается электронная подпись ЭЦП Авест, не перебирая десятки USB-флешек по очереди. Бесплатный реестр ЭЦП для бухгалтеров и ИП.">
+  <meta name="keywords" content="как проверить срок действия эцп авест, когда заканчивается эцп госсуок, реестр эцп беларусь, проверить сертификат авест windows, сколько дней осталось эцп">
+  <link rel="canonical" href="https://buhly.by/avest-srok-ecp.html">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Как проверить срок действия ЭЦП Авест (ГосСУОК) для ИП и ООО в Беларуси | Buhly">
+  <meta property="og:description" content="Как узнать, когда заканчивается электронная подпись ЭЦП Авест, не перебирая десятки USB-флешек по очереди. Бесплатный реестр ЭЦП для бухгалтеров и ИП.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://buhly.by/avest-srok-ecp.html">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    code { background: #e5e5ea; color: #1f2937; padding: 0.1rem 0.35rem; border-radius: 0.35rem; font-size: 0.875em; }
+  </style>
+
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Куда сохраняется реестр ключей ЭЦП?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Только локально на ваш компьютер. Buhly не передает данные сертификатов, УНП и списки организаций на сторонние серверы."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Работает ли проверка сроков, если флешка сейчас не вставлена в USB?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Да. Если вы уже вставляли флешку при запущенном Buhly или нажали подтянуть сертификаты из хранилища Windows, срок действия сохраняется в таблице реестра."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Сколько стоит программа?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Программа полностью бесплатна для ИП, ООО и бухгалтеров Беларуси. Скачать можно напрямую с сайта buhly.by без регистрации и Telegram."
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Navigation -->
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
+    <a href="https://buhly.by/" class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+        B
+      </div>
+      <div>
+        <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
+        <span class="text-xs text-neutral-500 block font-medium">ГосПорталы Беларуси</span>
+      </div>
+    </a>
+    <div class="flex items-center space-x-3">
+      <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Главная
+      </a>
+      <a href="https://t.me/buhly_by_chat" target="_blank" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+        Чат помощи
+      </a>
+    </div>
+  </nav>
+
+  <!-- Article Main -->
+  <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
+    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+      <span>Реестр ЭЦП • Авест / ГосСУОК</span>
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight">
+      Как проверить срок действия <span class="text-blue-600">ЭЦП Авест</span> по всем ООО и ИП без перебора флешек
+    </h1>
+
+    <p class="text-base md:text-lg text-neutral-600 mt-4 leading-relaxed">
+      Как посмотреть дату окончания сертификата ГосСУОК в Windows и как вести единый список сроков всех ключей на компьютере бухгалтера.
+    </p>
+
+    <!-- Download CTA Banner -->
+    <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v2.0</div>
+        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~90 КБ, без установки. Работает с вашими родными Edge и Chrome.</div>
+      </div>
+      <a href="https://buhly.by/Release/Buhly_v2.0.zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
+        Скачать Buhly v2.0 (ZIP)
+      </a>
+    </div>
+
+    <!-- Why Section -->
+    <section class="mt-10 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900">В чем проблема при работе с несколькими ЭЦП</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">Обычному ИП достаточно помнить дату продления одного ключа раз в 1–3 года. Но бухгалтер на аутсорсе или директор нескольких фирм держит на столе целый стакан одинаковых синих флешек Авест. Вспомнить, у кого сертификат сгорает через 5 дней, сложно — приходится доставать и втыкать каждую флешку по очереди.</p>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">Кроме того, на одну организацию часто записаны ключи на разных сотрудников (директор, главный бухгалтер), и у каждого свой срок действия.</p>
+    </section>
+
+    <!-- Manual Steps -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как посмотреть срок действия ключа вручную</h2>
+      <ol class="list-decimal pl-5 space-y-3 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>Откройте «Персональный менеджер сертификатов Авест» при вставленном USB-токене и посмотрите поле «Действителен по».</li>
+        <li>Либо нажмите <code>Win + R</code> → введите <code>certmgr.msc</code> → откройте раздел «Личное» → «Сертификаты» (там видны сертификаты, которые уже импортированы в хранилище Windows).</li>
+      </ol>
+    </section>
+
+    <!-- Auto Solution -->
+    <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Вкладка «Реестр ЭЦП» в бесплатной программе Buhly v2.0</h2>
+      <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
+        <li>✓ <b>Определяет вставленный ключ мгновенно:</b> как только вы вставляете флешку Авест, в шапке Buhly появляется название ООО/ИП, ФИО владельца и точное количество оставшихся дней.</li>
+        <li>✓ <b>Запоминает все ключи в локальном реестре:</b> один раз вставили флешку (или подтянули сертификаты из хранилища Windows) — программа сохраняет дату окончания. Можно смотреть сроки по всем компаниям, даже когда флешки лежат в столе.</li>
+        <li>✓ <b>Сводка в 1 клик + проверка УНП:</b> можно скопировать список сроков для отчета руководителю, а во встроенной проверке УНП сразу узнать статус любого контрагента по базе МНС.</li>
+      </ul>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://buhly.by/Release/Buhly_v2.0.zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
+          Скачать архив Buhly_v2.0.zip
+        </a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
+          Задать вопрос в Telegram-чате
+        </a>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mt-10">
+      <h2 class="text-2xl font-extrabold text-neutral-900 mb-5">Частые вопросы</h2>
+      <div class="space-y-3">
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Куда сохраняется реестр ключей ЭЦП?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Только локально на ваш компьютер. Buhly не передает данные сертификатов, УНП и списки организаций на сторонние серверы.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Работает ли проверка сроков, если флешка сейчас не вставлена в USB?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Да. Если вы уже вставляли флешку при запущенном Buhly или нажали подтянуть сертификаты из хранилища Windows, срок действия сохраняется в таблице реестра.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Сколько стоит программа?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Программа полностью бесплатна для ИП, ООО и бухгалтеров Беларуси. Скачать можно напрямую с сайта buhly.by без регистрации и Telegram.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Other Guides -->
+    <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+      <h3 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h3>
+      <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
+        <a href="vat-err-ssl.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🧾 Ошибка ERR_SSL_PROTOCOL_ERROR на ЭСЧФ (vat.gov.by) →</a>
+        <a href="fszn-8084.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📑 Портал ФСЗН 2.0 (portal2.ssf.gov.by): порт 8084 и AvTunProxy →</a>
+        <a href="mns-nalog-avest.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏛️ Не заходит в МНС (nalog.gov.by / account.gov.by) с ЭЦП →</a>
+        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v2.0 →</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly</a> • Создано для предпринимателей и бухгалтеров Беларуси
+      </div>
+      <div class="flex items-center space-x-6">
+        <a href="https://github.com/narard/buhly-rb" target="_blank" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" class="hover:text-white transition">Канал @buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" class="hover:text-white transition">Чат помощи</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

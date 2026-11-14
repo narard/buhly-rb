@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Не открывается ЭСЧФ (vat.gov.by) — ошибка ERR_SSL_PROTOCOL_ERROR и режим IE в Edge | Buhly</title>
+  <meta name="description" content="Как быстро исправить ошибку ERR_SSL_PROTOCOL_ERROR на портале ЭСЧФ vat.gov.by в Windows 10 и 11. Настройка режима Internet Explorer в Edge и ActiveX в 1 клик через Buhly.">
+  <meta name="keywords" content="vat.gov.by не открывается, ERR_SSL_PROTOCOL_ERROR vat.gov.by, эсчф вход edge, режим ie для эсчф, activex эсчф, настройка эсчф windows 11">
+  <link rel="canonical" href="https://buhly.by/vat-err-ssl.html">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Не открывается ЭСЧФ (vat.gov.by) — ошибка ERR_SSL_PROTOCOL_ERROR и режим IE в Edge | Buhly">
+  <meta property="og:description" content="Как быстро исправить ошибку ERR_SSL_PROTOCOL_ERROR на портале ЭСЧФ vat.gov.by в Windows 10 и 11. Настройка режима Internet Explorer в Edge и ActiveX в 1 клик через Buhly.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://buhly.by/vat-err-ssl.html">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    code { background: #e5e5ea; color: #1f2937; padding: 0.1rem 0.35rem; border-radius: 0.35rem; font-size: 0.875em; }
+  </style>
+
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Можно ли зайти на vat.gov.by через Google Chrome?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Напрямую в современном Google Chrome портал ЭСЧФ не работает, так как Chrome не поддерживает ActiveX и режим IE. В Windows 10 и Windows 11 для vat.gov.by используется встроенный режим Internet Explorer в Microsoft Edge."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Почему через месяц ЭСЧФ снова перестал открываться в Edge?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Встроенный пользовательский список сайтов для режима IE в Edge действует ровно 30 дней, после чего очищается автоматически. Buhly настраивает список через групповую политику Edge без ограничения срока."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Безопасно ли настраивать ЭСЧФ через Buhly?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Да. Buhly весит около 90 КБ, не запрашивает пин-код ЭЦП, не является сторонним браузером и не отправляет ваши данные наружу. Исходный код полностью открыт на GitHub."
+      }
+    }
+  ]
+}
+  </script>
+</head>
+<body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Navigation -->
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
+    <a href="https://buhly.by/" class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+        B
+      </div>
+      <div>
+        <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
+        <span class="text-xs text-neutral-500 block font-medium">ГосПорталы Беларуси</span>
+      </div>
+    </a>
+    <div class="flex items-center space-x-3">
+      <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Главная
+      </a>
+      <a href="https://t.me/buhly_by_chat" target="_blank" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+        Чат помощи
+      </a>
+    </div>
+  </nav>
+
+  <!-- Article Main -->
+  <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
+    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+      <span>Инструкция ЭСЧФ • vat.gov.by</span>
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight">
+      Не открывается ЭСЧФ (<span class="text-blue-600">vat.gov.by</span>): как исправить ERR_SSL_PROTOCOL_ERROR
+    </h1>
+
+    <p class="text-base md:text-lg text-neutral-600 mt-4 leading-relaxed">
+      Почему современные Chrome и Microsoft Edge выдают ошибку SSL или ругаются на ActiveX при входе в ЭСЧФ, и как включить режим Internet Explorer навсегда — вручную или в 1 клик.
+    </p>
+
+    <!-- Download CTA Banner -->
+    <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v2.0</div>
+        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~90 КБ, без установки. Работает с вашими родными Edge и Chrome.</div>
+      </div>
+      <a href="https://buhly.by/Release/Buhly_v2.0.zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
+        Скачать Buhly v2.0 (ZIP)
+      </a>
+    </div>
+
+    <!-- Why Section -->
+    <section class="mt-10 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900">Почему появляется ERR_SSL_PROTOCOL_ERROR на vat.gov.by?</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">Портал электронных счетов-фактур (<code>vat.gov.by</code>) использует белорусские криптоалгоритмы СТБ и устаревший компонент <strong>ActiveX</strong>. Обычный движок Chromium в Google Chrome и Microsoft Edge эти технологии не поддерживает, поэтому при попытке открыть сайт напрямую браузер сбрасывает соединение с ошибкой <code>ERR_SSL_PROTOCOL_ERROR</code> или не видит ключ Авест.</p>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">Чтобы портал заработал, его нужно открывать строго в <strong>режиме Internet Explorer (IE Mode)</strong> внутри Microsoft Edge и с включенными параметрами ActiveX в зоне «Надежные сайты».</p>
+    </section>
+
+    <!-- Manual Steps -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как настроить вручную (и почему это слетает)</h2>
+      <ol class="list-decimal pl-5 space-y-3 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>Откройте Microsoft Edge → «Настройки» → «Браузер по умолчанию» и разрешите перезагрузку сайтов в режиме Internet Explorer.</li>
+        <li>Добавьте <code>http://vat.gov.by</code> и <code>https://vat.gov.by</code> в список страниц IE. <b>Минус:</b> вручную Edge удаляет сайт из этого списка ровно через 30 дней.</li>
+        <li>Откройте «Свойства браузера» Windows (<code>inetcpl.cpl</code>) → вкладка «Безопасность» → «Надежные сайты», добавьте адреса <code>vat.gov.by</code> и включите запуск неподписанных и безопасных элементов ActiveX.</li>
+        <li>Перезапустите браузер и убедитесь, что USB-токен Авест не заблокирован программой EDeclaration.</li>
+      </ol>
+    </section>
+
+    <!-- Auto Solution -->
+    <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Решение в 1 клик через Buhly v2.0 (без сброса каждые 30 дней)</h2>
+      <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
+        <li>✓ Прописывает официальную корпоративную политику режима IE в Edge (<code>HKCU\Software\Policies\Microsoft\Edge</code> + локальный XML-список) — правило не сбрасывается через 30 дней.</li>
+        <li>✓ Автоматически добавляет портал в зону «Надежные сайты» и включает нужные флаги ActiveX.</li>
+        <li>✓ <b>Не закрывает ваши открытые вкладки</b> в браузере и перед запуском проверяет, свободен ли USB-ключ ЭЦП.</li>
+      </ul>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://buhly.by/Release/Buhly_v2.0.zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
+          Скачать архив Buhly_v2.0.zip
+        </a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
+          Задать вопрос в Telegram-чате
+        </a>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mt-10">
+      <h2 class="text-2xl font-extrabold text-neutral-900 mb-5">Частые вопросы</h2>
+      <div class="space-y-3">
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Можно ли зайти на vat.gov.by через Google Chrome?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Напрямую в современном Google Chrome портал ЭСЧФ не работает, так как Chrome не поддерживает ActiveX и режим IE. В Windows 10 и Windows 11 для vat.gov.by используется встроенный режим Internet Explorer в Microsoft Edge.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Почему через месяц ЭСЧФ снова перестал открываться в Edge?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Встроенный пользовательский список сайтов для режима IE в Edge действует ровно 30 дней, после чего очищается автоматически. Buhly настраивает список через групповую политику Edge без ограничения срока.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Безопасно ли настраивать ЭСЧФ через Buhly?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Да. Buhly весит около 90 КБ, не запрашивает пин-код ЭЦП, не является сторонним браузером и не отправляет ваши данные наружу. Исходный код полностью открыт на GitHub.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Other Guides -->
+    <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+      <h3 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h3>
+      <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
+        <a href="fszn-8084.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📑 Портал ФСЗН 2.0 (portal2.ssf.gov.by): порт 8084 и AvTunProxy →</a>
+        <a href="mns-nalog-avest.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏛️ Не заходит в МНС (nalog.gov.by / account.gov.by) с ЭЦП →</a>
+        <a href="avest-srok-ecp.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🔑 Как проверить срок действия ЭЦП Авест для всех фирм →</a>
+        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v2.0 →</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly</a> • Создано для предпринимателей и бухгалтеров Беларуси
+      </div>
+      <div class="flex items-center space-x-6">
+        <a href="https://github.com/narard/buhly-rb" target="_blank" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" class="hover:text-white transition">Канал @buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" class="hover:text-white transition">Чат помощи</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
