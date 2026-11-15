@@ -22,11 +22,11 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Buhly — ГосПорталы РБ")]
 [assembly: AssemblyDescription("Локальный помощник входа на госпорталы Республики Беларусь (МНС, ФСЗН, ЭСЧФ)")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyCompany("Buhly Open Source (ООО Ресмарт)")]
+[assembly: AssemblyCompany("Buhly Open Source")]
 [assembly: AssemblyProduct("Buhly Desktop Assistant")]
 [assembly: AssemblyCopyright("Copyright © 2026 Buhly (github.com/narard/buhly-rb)")]
-[assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyVersion("2.1.0.0")]
+[assembly: AssemblyFileVersion("2.1.0.0")]
 
 namespace GovPortalsApp
 {
@@ -34,21 +34,7 @@ namespace GovPortalsApp
     {
         public static void ConfigureSafeTls()
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-            ServicePointManager.ServerCertificateValidationCallback = delegate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
-            {
-                if (sslPolicyErrors == SslPolicyErrors.None) return true;
-                var req = sender as HttpWebRequest;
-                if (req != null && req.RequestUri != null)
-                {
-                    string host = req.RequestUri.Host.ToLowerInvariant();
-                    if (host.EndsWith(".gov.by") || host.EndsWith(".nces.by") || host.EndsWith(".by") || host == "127.0.0.1" || host == "localhost")
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            };
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         [STAThread]
@@ -91,6 +77,18 @@ namespace GovPortalsApp
                 {
                     if (key != null)
                     {
+                        var existingPac = key.GetValue("AutoConfigURL") as string;
+                        if (!string.IsNullOrEmpty(existingPac) && !existingPac.Contains("127.0.0.1:10224"))
+                        {
+                            try
+                            {
+                                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
+                                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                                var bak = Path.Combine(dir, "proxy_backup.txt");
+                                if (!File.Exists(bak)) File.WriteAllText(bak, existingPac, Encoding.UTF8);
+                            }
+                            catch { }
+                        }
                         key.SetValue("AutoConfigURL", pacUrl, RegistryValueKind.String);
                     }
                 }
@@ -190,14 +188,13 @@ namespace GovPortalsApp
         {
             try
             {
-                var domains = new string[] { "vat.gov.by", "ssf.gov.by", "nalog.gov.by", "e-pasluga.by" };
+                var domains = new string[] { "vat.gov.by", "ssf.gov.by", "nalog.gov.by", "e-pasluga.by", "nces.by" };
                 foreach (var domain in domains)
                 {
                     using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\" + domain))
                     {
                         if (key != null)
                         {
-                            key.SetValue("http", 2, RegistryValueKind.DWord);
                             key.SetValue("https", 2, RegistryValueKind.DWord);
                         }
                     }
@@ -207,11 +204,14 @@ namespace GovPortalsApp
                 {
                     if (zone2 != null)
                     {
-                        var flags = new string[] { "1001", "1004", "1200", "1201", "1405", "2201" };
-                        foreach (var flag in flags)
+                        // Allow signed ActiveX controls needed by BelPKI/AvCSP without lowering unsafe/unsigned protections
+                        var signedFlags = new string[] { "1001", "1200", "1405", "2201" };
+                        foreach (var flag in signedFlags)
                         {
                             zone2.SetValue(flag, 0, RegistryValueKind.DWord);
                         }
+                        // Prompt for unsigned ActiveX rather than silent allow
+                        zone2.SetValue("1004", 1, RegistryValueKind.DWord);
                     }
                 }
             }
@@ -228,9 +228,12 @@ namespace GovPortalsApp
                     {
                         var level = key.GetValue("InternetExplorerIntegrationLevel");
                         var siteList = key.GetValue("InternetExplorerIntegrationSiteList") as string;
-                        if (level is int && (int)level == 1 && !string.IsNullOrEmpty(siteList) && File.Exists(siteList))
+                        if (level is int && (int)level == 1 && !string.IsNullOrEmpty(siteList))
                         {
-                            return true;
+                            string localSiteList = siteList.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)
+                                ? siteList.Substring(8).Replace('/', '\\')
+                                : siteList;
+                            if (File.Exists(localSiteList)) return true;
                         }
                     }
                 }
@@ -254,8 +257,8 @@ namespace GovPortalsApp
                     "<site-list version=\"1\">\r\n" +
                     "  <created-by>\r\n" +
                     "    <tool>Buhly</tool>\r\n" +
-                    "    <version>2.0.0.0</version>\r\n" +
-                    "    <date-created>20261113</date-created>\r\n" +
+                    "    <version>2.1.0.0</version>\r\n" +
+                    "    <date-created>20261115</date-created>\r\n" +
                     "  </created-by>\r\n" +
                     "  <site url=\"vat.gov.by\">\r\n" +
                     "    <compat-mode>IE11</compat-mode>\r\n" +
@@ -264,12 +267,13 @@ namespace GovPortalsApp
                     "</site-list>\r\n";
                 File.WriteAllText(xmlPath, xmlContent, Encoding.UTF8);
 
+                string fileUri = "file:///" + xmlPath.Replace("\\", "/");
                 using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge"))
                 {
                     if (key != null)
                     {
                         key.SetValue("InternetExplorerIntegrationLevel", 1, RegistryValueKind.DWord);
-                        key.SetValue("InternetExplorerIntegrationSiteList", xmlPath, RegistryValueKind.String);
+                        key.SetValue("InternetExplorerIntegrationSiteList", fileUri, RegistryValueKind.String);
                         key.SetValue("InternetExplorerIntegrationReloadInIEModeAllowed", 1, RegistryValueKind.DWord);
                     }
                 }
@@ -284,33 +288,51 @@ namespace GovPortalsApp
                         bool alreadyConfigured = text.Contains("vat.gov.by/mainPage") && text.Contains("vat.gov.by/eInvoice");
                         if (!alreadyConfigured)
                         {
-                            if (text.Contains("\"consumer_mode\":{\"enabled_state\":0}"))
+                            string bakPath = prefPath + ".buhly.bak";
+                            if (!File.Exists(bakPath))
                             {
-                                text = text.Replace("\"consumer_mode\":{\"enabled_state\":0}", "\"consumer_mode\":{\"enabled_state\":1}");
-                            }
-                            else if (!text.Contains("\"consumer_mode\"") && text.Contains("\"dual_engine\":{"))
-                            {
-                                text = text.Replace("\"dual_engine\":{", "\"dual_engine\":{\"consumer_mode\":{\"enabled_state\":1},");
+                                try { File.Copy(prefPath, bakPath, false); } catch { }
                             }
 
-                            var injection = "\"user_list_data_1\":{" +
+                            string updated = text;
+                            if (updated.Contains("\"consumer_mode\":{\"enabled_state\":0}"))
+                            {
+                                updated = updated.Replace("\"consumer_mode\":{\"enabled_state\":0}", "\"consumer_mode\":{\"enabled_state\":1}");
+                            }
+                            else if (!updated.Contains("\"consumer_mode\"") && updated.Contains("\"dual_engine\":{"))
+                            {
+                                updated = updated.Replace("\"dual_engine\":{", "\"dual_engine\":{\"consumer_mode\":{\"enabled_state\":1},");
+                            }
+
+                            var entries =
                                 "\"http://vat.gov.by/mainPage/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}," +
                                 "\"http://vat.gov.by/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}," +
                                 "\"https://vat.gov.by/mainPage/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}," +
                                 "\"https://vat.gov.by/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}," +
                                 "\"https://vat.gov.by/eInvoice\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}," +
-                                "\"https://vat.gov.by/eInvoice/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0},";
+                                "\"https://vat.gov.by/eInvoice/\":{\"date_added\":\"13600000000000000\",\"engine\":2,\"source\":3,\"visit_state\":false,\"visits_after_expiration\":0}";
 
-                            if (text.Contains("\"user_list_data_1\":{"))
+                            if (updated.Contains("\"user_list_data_1\":{}"))
                             {
-                                text = text.Replace("\"user_list_data_1\":{", injection);
+                                updated = updated.Replace("\"user_list_data_1\":{}", "\"user_list_data_1\":{" + entries + "}");
                             }
-                            else if (text.Contains("\"dual_engine\":{"))
+                            else if (updated.Contains("\"user_list_data_1\":{"))
                             {
-                                text = text.Replace("\"dual_engine\":{", "\"dual_engine\":{" + injection + "},");
+                                updated = updated.Replace("\"user_list_data_1\":{", "\"user_list_data_1\":{" + entries + ",");
+                            }
+                            else if (updated.Contains("\"dual_engine\":{}"))
+                            {
+                                updated = updated.Replace("\"dual_engine\":{}", "\"dual_engine\":{\"user_list_data_1\":{" + entries + "}}");
+                            }
+                            else if (updated.Contains("\"dual_engine\":{"))
+                            {
+                                updated = updated.Replace("\"dual_engine\":{", "\"dual_engine\":{\"user_list_data_1\":{" + entries + "},");
                             }
 
-                            File.WriteAllText(prefPath, text, Encoding.UTF8);
+                            if (!updated.Contains(",}") && !updated.Contains(",]"))
+                            {
+                                File.WriteAllText(prefPath, updated, Encoding.UTF8);
+                            }
                         }
                     }
                 }
@@ -360,7 +382,7 @@ namespace GovPortalsApp
                 if (!string.IsNullOrEmpty(vi.FileVersion) && vi.FileVersion != "0.0.0.0") return "v" + vi.FileVersion;
             }
             catch { }
-            return "v1.0.0 (актуальна)";
+            return "Установлена (версия не определена)";
         }
 
         public static string FindAvTunProxyPath()
@@ -394,7 +416,7 @@ namespace GovPortalsApp
                 if (!string.IsNullOrEmpty(vi.FileVersion)) return "v" + vi.FileVersion;
             }
             catch { }
-            return "v5.10 (актуальна)";
+            return "Установлена (версия не определена)";
         }
 
         public static bool IsAvestInstalled()
@@ -493,6 +515,11 @@ namespace GovPortalsApp
 
                 var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                var hostsBak = Path.Combine(dir, "hosts.buhly.bak");
+                if (!File.Exists(hostsBak))
+                {
+                    try { File.Copy(hostsPath, hostsBak, false); } catch { }
+                }
                 var cleanPath = Path.Combine(dir, "hosts.clean");
                 File.WriteAllLines(cleanPath, cleanLines.ToArray(), new UTF8Encoding(false));
 
@@ -689,45 +716,43 @@ namespace GovPortalsApp
             return list;
         }
 
-        public static void CheckAndResolveProcessConflicts()
+        public static string GetRunningConflictingApps()
         {
+            var found = new List<string>();
             var conflictingNames = new string[] { "EDeclaration", "MngCert" };
             foreach (var name in conflictingNames)
             {
-                var procs = Process.GetProcessesByName(name);
-                if (procs.Length > 0)
+                try
                 {
-                    foreach (var p in procs)
-                    {
-                        try
-                        {
-                            if (!p.CloseMainWindow() || !p.WaitForExit(300))
-                            {
-                                p.Kill();
-                            }
-                        }
-                        catch { }
-                    }
+                    if (Process.GetProcessesByName(name).Length > 0)
+                        found.Add(name == "EDeclaration" ? "АРМ Плательщик" : name);
                 }
+                catch { }
             }
+            return string.Join(", ", found.ToArray());
+        }
+
+        public static void CheckAndResolveProcessConflicts()
+        {
+            // Intentionally non-destructive: never call Process.Kill() on EDeclaration/MngCert
+            // so unsaved declarations are never lost.
         }
 
         public static void RepairAll()
         {
-            // 1. Gracefully close or restart NTClient & conflicting apps
-            CheckAndResolveProcessConflicts();
+            // Gracefully restart only NTClientSoftware (never kill EDeclaration)
             foreach (var p in Process.GetProcessesByName("NTClientSoftware"))
             {
                 try
                 {
-                    if (!p.CloseMainWindow() || !p.WaitForExit(300))
+                    if (p.CloseMainWindow())
                     {
-                        p.Kill();
+                        p.WaitForExit(1200);
                     }
                 }
                 catch { }
             }
-            Thread.Sleep(500);
+            Thread.Sleep(400);
 
             // 2. Start NTClient
             var ntPath = FindNTClientPath();
@@ -846,8 +871,8 @@ namespace GovPortalsApp
                             targetExe = exeFiles.Length > 0 ? exeFiles[0] : null;
                             if (targetExe == null)
                             {
-                                var anyExe = Directory.GetFiles(extractPath, "*.exe", SearchOption.AllDirectories);
-                                if (anyExe.Length > 0) targetExe = anyExe[0];
+                                var setupExe = Directory.GetFiles(extractPath, "setup*.exe", SearchOption.AllDirectories);
+                                if (setupExe.Length > 0) targetExe = setupExe[0];
                             }
                         }
 
@@ -920,33 +945,13 @@ namespace GovPortalsApp
 
         public static string FindLocalNTClientInstaller()
         {
-            var dirs = new List<string>();
-            var dl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            if (Directory.Exists(dl)) dirs.Add(dl);
-            var desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            if (Directory.Exists(desk)) dirs.Add(desk);
-
-            try
-            {
-                foreach (var d in DriveInfo.GetDrives())
-                {
-                    if (d.IsReady && (d.DriveType == DriveType.Removable || d.DriveType == DriveType.Fixed))
-                    {
-                        dirs.Add(d.RootDirectory.FullName);
-                    }
-                }
-            }
-            catch { }
-
-            foreach (var dir in dirs)
+            foreach (var dir in GetUserSearchDirs())
             {
                 try
                 {
                     if (!Directory.Exists(dir)) continue;
                     var files = Directory.GetFiles(dir, "*NTClient*.exe", SearchOption.TopDirectoryOnly);
                     if (files.Length > 0) return files[0];
-                    var kp = Directory.GetFiles(dir, "*КП*.exe", SearchOption.TopDirectoryOnly);
-                    if (kp.Length > 0) return kp[0];
                 }
                 catch { }
             }
@@ -956,6 +961,8 @@ namespace GovPortalsApp
 
     public static class CertRegistryManager
     {
+        private static readonly object _syncLock = new object();
+
         private static string GetRegistryFilePath()
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
@@ -965,93 +972,102 @@ namespace GovPortalsApp
 
         public static List<CertInfo> LoadRegistry()
         {
-            var result = new List<CertInfo>();
-            try
+            lock (_syncLock)
             {
-                var path = GetRegistryFilePath();
-                if (!File.Exists(path)) return result;
-                var lines = File.ReadAllLines(path, Encoding.UTF8);
-                foreach (var line in lines)
+                var result = new List<CertInfo>();
+                try
                 {
-                    if (string.IsNullOrEmpty(line)) continue;
-                    var parts = line.Split('\t');
-                    if (parts.Length < 6) continue;
-                    long ticks;
-                    if (!long.TryParse(parts[3], out ticks)) continue;
-                    var validTo = new DateTime(ticks);
-                    var days = (validTo - DateTime.Now).Days;
-                    result.Add(new CertInfo
+                    var path = GetRegistryFilePath();
+                    if (!File.Exists(path)) return result;
+                    var lines = File.ReadAllLines(path, Encoding.UTF8);
+                    foreach (var line in lines)
                     {
-                        Thumbprint = parts[0],
-                        OrgName = parts[1],
-                        PersonName = parts[2],
-                        ValidTo = validTo,
-                        DaysRemaining = days,
-                        IsValid = days > 0,
-                        IsCompany = parts[4] == "1",
-                        IsPhysicallyConnected = false,
-                        LastSeen = parts[5]
-                    });
+                        if (string.IsNullOrEmpty(line)) continue;
+                        var parts = line.Split('\t');
+                        if (parts.Length < 6) continue;
+                        long ticks;
+                        if (!long.TryParse(parts[3], out ticks)) continue;
+                        var validTo = new DateTime(ticks);
+                        var days = (validTo - DateTime.Now).Days;
+                        result.Add(new CertInfo
+                        {
+                            Thumbprint = parts[0],
+                            OrgName = parts[1],
+                            PersonName = parts[2],
+                            ValidTo = validTo,
+                            DaysRemaining = days,
+                            IsValid = days > 0,
+                            IsCompany = parts[4] == "1",
+                            IsPhysicallyConnected = false,
+                            LastSeen = parts[5]
+                        });
+                    }
                 }
+                catch { }
+                return result;
             }
-            catch { }
-            return result;
         }
 
         public static void SaveRegistry(List<CertInfo> items)
         {
-            try
+            lock (_syncLock)
             {
-                var sb = new StringBuilder();
-                foreach (var c in items)
+                try
                 {
-                    var thumb = (c.Thumbprint ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
-                    var org = (c.OrgName ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
-                    var person = (c.PersonName ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
-                    var lastSeen = (c.LastSeen ?? "").Replace("\t", " ");
-                    sb.AppendFormat("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\r\n",
-                        thumb, org, person, c.ValidTo.Ticks, c.IsCompany ? "1" : "0", lastSeen);
+                    var sb = new StringBuilder();
+                    foreach (var c in items)
+                    {
+                        var thumb = (c.Thumbprint ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
+                        var org = (c.OrgName ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
+                        var person = (c.PersonName ?? "").Replace("\t", " ").Replace("\r", "").Replace("\n", "");
+                        var lastSeen = (c.LastSeen ?? "").Replace("\t", " ");
+                        sb.AppendFormat("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\r\n",
+                            thumb, org, person, c.ValidTo.Ticks, c.IsCompany ? "1" : "0", lastSeen);
+                    }
+                    File.WriteAllText(GetRegistryFilePath(), sb.ToString(), Encoding.UTF8);
                 }
-                File.WriteAllText(GetRegistryFilePath(), sb.ToString(), Encoding.UTF8);
+                catch { }
             }
-            catch { }
         }
 
         public static List<CertInfo> MergeAndGetAll(List<CertInfo> freshCerts)
         {
-            var map = new Dictionary<string, CertInfo>(StringComparer.OrdinalIgnoreCase);
-            var saved = LoadRegistry();
-            foreach (var s in saved)
+            lock (_syncLock)
             {
-                if (!string.IsNullOrEmpty(s.Thumbprint))
+                var map = new Dictionary<string, CertInfo>(StringComparer.OrdinalIgnoreCase);
+                var saved = LoadRegistry();
+                foreach (var s in saved)
                 {
-                    s.IsPhysicallyConnected = false;
-                    map[s.Thumbprint] = s;
+                    if (!string.IsNullOrEmpty(s.Thumbprint))
+                    {
+                        s.IsPhysicallyConnected = false;
+                        map[s.Thumbprint] = s;
+                    }
                 }
+
+                if (freshCerts != null)
+                {
+                    foreach (var f in freshCerts)
+                    {
+                        var key = !string.IsNullOrEmpty(f.Thumbprint) ? f.Thumbprint : (f.OrgName + "_" + f.ValidTo.Ticks);
+                        f.Thumbprint = key;
+                        map[key] = f;
+                    }
+                }
+
+                var merged = new List<CertInfo>(map.Values);
+                merged.Sort(delegate(CertInfo a, CertInfo b)
+                {
+                    if (a.IsPhysicallyConnected != b.IsPhysicallyConnected)
+                    {
+                        return a.IsPhysicallyConnected ? -1 : 1;
+                    }
+                    return a.DaysRemaining.CompareTo(b.DaysRemaining);
+                });
+
+                SaveRegistry(merged);
+                return merged;
             }
-
-            if (freshCerts != null)
-            {
-                foreach (var f in freshCerts)
-                {
-                    var key = !string.IsNullOrEmpty(f.Thumbprint) ? f.Thumbprint : (f.OrgName + "_" + f.ValidTo.Ticks);
-                    f.Thumbprint = key;
-                    map[key] = f;
-                }
-            }
-
-            var merged = new List<CertInfo>(map.Values);
-            merged.Sort(delegate(CertInfo a, CertInfo b)
-            {
-                if (a.IsPhysicallyConnected != b.IsPhysicallyConnected)
-                {
-                    return a.IsPhysicallyConnected ? -1 : 1;
-                }
-                return a.DaysRemaining.CompareTo(b.DaysRemaining);
-            });
-
-            SaveRegistry(merged);
-            return merged;
         }
     }
 
@@ -1181,12 +1197,13 @@ namespace GovPortalsApp
         }
     }
 
-    public class MainWindow : Window
+    public partial class MainWindow : Window
     {
         private StackPanel certCardsContainer;
         private StackPanel tabPortalsPanel;
         private StackPanel tabRegistryPanel;
         private StackPanel tabToolsPanel;
+        private StackPanel tabWaybillsPanel;
         private StackPanel registryListContainer;
         private TextBlock registrySummaryText;
         private Border unpResultCard;
@@ -1196,6 +1213,7 @@ namespace GovPortalsApp
         private Button segBtnPortals;
         private Button segBtnRegistry;
         private Button segBtnTools;
+        private Button segBtnWaybills;
 
         private TextBlock statusNTClient;
         private TextBlock statusAvTun;
@@ -1224,9 +1242,9 @@ namespace GovPortalsApp
         public MainWindow()
         {
             Title = "Buhly • ГосПорталы РБ";
-            Width = 510;
+            Width = 530;
             Height = 850;
-            MinWidth = 470;
+            MinWidth = 490;
             MinHeight = 680;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(242, 242, 247)); // iOS system Gray 6
@@ -1248,8 +1266,8 @@ namespace GovPortalsApp
                 }));
             });
 
-            // Background live auto-refresh timer (every 5 seconds, offloaded to thread pool)
-            autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            // Background live auto-refresh timer (every 15 seconds to minimize USB token contention)
+            autoRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
             autoRefreshTimer.Tick += delegate { RefreshStatuses(); };
             autoRefreshTimer.Start();
 
@@ -1300,7 +1318,7 @@ namespace GovPortalsApp
             };
             versionBadge.Child = new TextBlock
             {
-                Text = "v2.0",
+                Text = "v2.1",
                 FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#007AFF")
@@ -1351,17 +1369,21 @@ namespace GovPortalsApp
             segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.12, GridUnitType.Star) });
 
             segBtnPortals = CreateSegmentButton("🚀 Порталы", 0);
             segBtnRegistry = CreateSegmentButton("🔑 Реестр ЭЦП", 1);
             segBtnTools = CreateSegmentButton("🔎 УНП и ПК", 2);
+            segBtnWaybills = CreateSegmentButton("📦 Накладные", 3);
 
             Grid.SetColumn(segBtnPortals, 0);
             Grid.SetColumn(segBtnRegistry, 1);
             Grid.SetColumn(segBtnTools, 2);
+            Grid.SetColumn(segBtnWaybills, 3);
             segGrid.Children.Add(segBtnPortals);
             segGrid.Children.Add(segBtnRegistry);
             segGrid.Children.Add(segBtnTools);
+            segGrid.Children.Add(segBtnWaybills);
             segBorder.Child = segGrid;
             mainStack.Children.Add(segBorder);
 
@@ -1375,9 +1397,11 @@ namespace GovPortalsApp
                 "Авторизация юрлиц и ИП через ЕС ИФЮЛ (nalog.gov.by)",
                 "Войти по ЭЦП в МНС", "#007AFF", delegate
                 {
-                    SystemDiagnoser.CheckAndResolveProcessConflicts();
+                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenMNS();
-                    ShowToast("🚀 Открываем Личный кабинет МНС...");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем Личный кабинет МНС..."
+                        : "🚀 Открываем МНС (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalMNS, out dotPortalMNS);
             tabPortalsPanel.Children.Add(cardMNS);
 
@@ -1386,9 +1410,11 @@ namespace GovPortalsApp
                 "Отчеты ПУ-3, 4-Фонд и извещения (portal2.ssf.gov.by)",
                 "Войти по ЭЦП в ФСЗН", "#34C759", delegate
                 {
-                    SystemDiagnoser.CheckAndResolveProcessConflicts();
+                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenFSZN();
-                    ShowToast("🚀 Открываем Корпоративный портал ФСЗН...");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем Корпоративный портал ФСЗН..."
+                        : "🚀 Открываем ФСЗН (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalFSZN, out dotPortalFSZN);
             tabPortalsPanel.Children.Add(cardFSZN);
 
@@ -1397,9 +1423,11 @@ namespace GovPortalsApp
                 "Электронные счета-фактуры по НДС (режим IE + ActiveX в 1 клик)",
                 "Войти на портал ЭСЧФ", "#5856D6", delegate
                 {
-                    SystemDiagnoser.CheckAndResolveProcessConflicts();
+                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenVAT();
-                    ShowToast("🚀 Запускаем портал ЭСЧФ (с поддержкой ActiveX)...");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Запускаем портал ЭСЧФ (с поддержкой ActiveX)..."
+                        : "🚀 Запускаем ЭСЧФ (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalVAT, out dotPortalVAT);
             tabPortalsPanel.Children.Add(cardVAT);
 
@@ -1408,9 +1436,11 @@ namespace GovPortalsApp
                 "Электронные услуги НЦЭУ и справки для бизнеса по ЭЦП",
                 "Войти на Е-Паслуга", "#0A84FF", delegate
                 {
-                    SystemDiagnoser.CheckAndResolveProcessConflicts();
+                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenEpasluga();
-                    ShowToast("🚀 Открываем портал Е-Паслуга...");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем портал Е-Паслуга..."
+                        : "🚀 Открываем Е-Паслуга (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalEpasluga, out dotPortalEpasluga);
             tabPortalsPanel.Children.Add(cardEpasluga);
 
@@ -1429,6 +1459,11 @@ namespace GovPortalsApp
             tabToolsPanel.Children.Add(CreateUnpCheckerCard());
             tabToolsPanel.Children.Add(CreateFirstRunWizardCard());
             mainStack.Children.Add(tabToolsPanel);
+
+            // TAB 3: WAYBILLS (TN-2 GENERATOR)
+            tabWaybillsPanel = new StackPanel { Visibility = Visibility.Collapsed };
+            BuildWaybillsTab(tabWaybillsPanel);
+            mainStack.Children.Add(tabWaybillsPanel);
 
             SwitchTab(0);
 
@@ -2204,7 +2239,7 @@ namespace GovPortalsApp
             {
                 Content = title,
                 Height = 32,
-                FontSize = 12,
+                FontSize = 11.5,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("#1C1C1E"),
                 Background = System.Windows.Media.Brushes.Transparent,
@@ -2232,8 +2267,9 @@ namespace GovPortalsApp
             tabPortalsPanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
             tabRegistryPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
             tabToolsPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+            tabWaybillsPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
 
-            var btns = new Button[] { segBtnPortals, segBtnRegistry, segBtnTools };
+            var btns = new Button[] { segBtnPortals, segBtnRegistry, segBtnTools, segBtnWaybills };
             for (int i = 0; i < btns.Length; i++)
             {
                 bool active = (i == index);
@@ -2677,7 +2713,7 @@ namespace GovPortalsApp
                     {
                         sw.Stop();
                         ms = sw.ElapsedMilliseconds;
-                        ok = ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 500);
+                        ok = ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 400);
                     }
                 }
                 catch (WebException wex)
@@ -2685,7 +2721,7 @@ namespace GovPortalsApp
                     sw.Stop();
                     ms = sw.ElapsedMilliseconds;
                     var resp = wex.Response as HttpWebResponse;
-                    if (resp != null && (int)resp.StatusCode < 500)
+                    if (resp != null && (int)resp.StatusCode >= 200 && (int)resp.StatusCode < 400)
                     {
                         ok = true;
                     }
@@ -2716,6 +2752,7 @@ namespace GovPortalsApp
         private void RefreshStatuses()
         {
             if (_isRefreshing) return;
+            if (tabWaybillsPanel != null && tabWaybillsPanel.Visibility == Visibility.Visible) return;
             _isRefreshing = true;
 
             ThreadPool.QueueUserWorkItem(delegate
@@ -2846,83 +2883,81 @@ namespace GovPortalsApp
                 BorderThickness = new Thickness(1)
             };
             var cardStack = new StackPanel();
-
-            // 1. Time sync
-            string timeDetails;
-            bool timeOk = SystemDiagnoser.CheckTimeSync(out timeDetails);
-            cardStack.Children.Add(CreateReportItem("🕒 Системное время:", timeDetails, timeOk));
-
-            // 2. Hosts file
-            string hostsDetails;
-            bool hostsOk = SystemDiagnoser.CheckHostsFile(out hostsDetails);
-            cardStack.Children.Add(CreateReportItem("🛡️ Файл hosts:", hostsDetails, hostsOk));
-
-            // 3. NTClient
-            string ntVer = SystemDiagnoser.GetNTClientVersion();
-            bool ntPort = SystemDiagnoser.IsPort8084Healthy();
-            cardStack.Children.Add(CreateReportItem("🏛️ NTClientSoftware (МНС):",
-                ntVer + (ntPort ? " (порт 8084 активен) ✓" : " (порт недоступен) ⚠️"), ntPort));
-
-            // 4. AvTunProxy
-            string avVer = SystemDiagnoser.GetAvTunProxyVersion();
-            bool avRun = SystemDiagnoser.IsAvTunProxyRunning();
-            cardStack.Children.Add(CreateReportItem("📑 AvTunProxy (ФСЗН):",
-                avVer + (avRun ? " (работает) ✓" : " (не запущен) ⚠️"), avRun));
-
-            // 5. PAC
-            bool pac = SystemDiagnoser.IsPacEnabled();
-            cardStack.Children.Add(CreateReportItem("🌐 Сетевой туннель:",
-                pac ? "proxy.pac активен ✓" : "proxy.pac выключен ⚠️", pac));
-
-            // 6. Portals live online
-            string mnsOnline = statusPortalMNS != null ? statusPortalMNS.Text : "в сети";
-            cardStack.Children.Add(CreateReportItem("🏛️ Сервер МНС (nalog.gov.by):", mnsOnline, !mnsOnline.Contains("сбой")));
-
-            string fsznOnline = statusPortalFSZN != null ? statusPortalFSZN.Text : "в сети";
-            cardStack.Children.Add(CreateReportItem("📑 Сервер ФСЗН (ssf.gov.by):", fsznOnline, !fsznOnline.Contains("сбой")));
-
-            string vatOnline = statusPortalVAT != null ? statusPortalVAT.Text : "в сети";
-            cardStack.Children.Add(CreateReportItem("🧾 Сервер ЭСЧФ (vat.gov.by):", vatOnline, !vatOnline.Contains("сбой")));
-
-            string epaslugaOnline = statusPortalEpasluga != null ? statusPortalEpasluga.Text : "в сети";
-            cardStack.Children.Add(CreateReportItem("🌐 Сервер Е-Паслуга (e-pasluga.by):", epaslugaOnline, !epaslugaOnline.Contains("сбой")));
-
-            // 7. Certificates (Inserted only)
-            var certs = SystemDiagnoser.GetConnectedGovCertificates();
-            var certHeader = new TextBlock
+            cardStack.Children.Add(new TextBlock
             {
-                Text = "🔑 Подключенный ключ ГосСУОК:",
+                Text = "⏳ Сбор диагностики системы и ЭЦП...",
                 FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = GetBrush("#1C1C1E"),
-                Margin = new Thickness(0, 10, 0, 4)
-            };
-            cardStack.Children.Add(certHeader);
+                Foreground = GetBrush("#636366")
+            });
 
-            if (certs.Count == 0)
+            string mnsOnline = statusPortalMNS != null ? statusPortalMNS.Text : "—";
+            string fsznOnline = statusPortalFSZN != null ? statusPortalFSZN.Text : "—";
+            string vatOnline = statusPortalVAT != null ? statusPortalVAT.Text : "—";
+            string epaslugaOnline = statusPortalEpasluga != null ? statusPortalEpasluga.Text : "—";
+
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                cardStack.Children.Add(new TextBlock
+                string timeDetails;
+                bool timeOk = SystemDiagnoser.CheckTimeSync(out timeDetails);
+                string hostsDetails;
+                bool hostsOk = SystemDiagnoser.CheckHostsFile(out hostsDetails);
+                string ntVer = SystemDiagnoser.GetNTClientVersion();
+                bool ntPort = SystemDiagnoser.IsPort8084Healthy();
+                string avVer = SystemDiagnoser.GetAvTunProxyVersion();
+                bool avRun = SystemDiagnoser.IsAvTunProxyRunning();
+                bool pac = SystemDiagnoser.IsPacEnabled();
+                var certs = SystemDiagnoser.GetConnectedGovCertificates();
+
+                Dispatcher.BeginInvoke(new Action(delegate
                 {
-                    Text = "Вставьте USB-токен Avest в компьютер",
-                    FontSize = 12,
-                    Foreground = GetBrush("#FF9500"),
-                    Margin = new Thickness(10, 0, 0, 6)
-                });
-            }
-            else
-            {
-                foreach (var c in certs)
-                {
-                    var cText = new TextBlock
+                    cardStack.Children.Clear();
+                    cardStack.Children.Add(CreateReportItem("🕒 Системное время:", timeDetails, timeOk));
+                    cardStack.Children.Add(CreateReportItem("🛡️ Файл hosts:", hostsDetails, hostsOk));
+                    cardStack.Children.Add(CreateReportItem("🏛️ NTClientSoftware (МНС):",
+                        ntVer + (ntPort ? " (порт 8084 активен) ✓" : " (порт недоступен) ⚠️"), ntPort));
+                    cardStack.Children.Add(CreateReportItem("📑 AvTunProxy (ФСЗН):",
+                        avVer + (avRun ? " (работает) ✓" : " (не запущен) ⚠️"), avRun));
+                    cardStack.Children.Add(CreateReportItem("🌐 Сетевой туннель:",
+                        pac ? "proxy.pac активен ✓" : "proxy.pac выключен ⚠️", pac));
+                    cardStack.Children.Add(CreateReportItem("🏛️ Сервер МНС (nalog.gov.by):", mnsOnline, !mnsOnline.Contains("сбой")));
+                    cardStack.Children.Add(CreateReportItem("📑 Сервер ФСЗН (ssf.gov.by):", fsznOnline, !fsznOnline.Contains("сбой")));
+                    cardStack.Children.Add(CreateReportItem("🧾 Сервер ЭСЧФ (vat.gov.by):", vatOnline, !vatOnline.Contains("сбой")));
+                    cardStack.Children.Add(CreateReportItem("🌐 Сервер Е-Паслуга (e-pasluga.by):", epaslugaOnline, !epaslugaOnline.Contains("сбой")));
+
+                    cardStack.Children.Add(new TextBlock
                     {
-                        Text = string.Format("• {0} ({1})\n   Действует до: {2} (осталось {3} дн.)", c.OrgName, c.PersonName, c.ValidTo.ToString("dd.MM.yyyy"), c.DaysRemaining),
-                        FontSize = 12,
-                        Foreground = c.IsValid ? GetBrush("#34C759") : GetBrush("#FF3B30"),
-                        Margin = new Thickness(10, 2, 0, 6)
-                    };
-                    cardStack.Children.Add(cText);
-                }
-            }
+                        Text = "🔑 Подключенный ключ ГосСУОК:",
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = GetBrush("#1C1C1E"),
+                        Margin = new Thickness(0, 10, 0, 4)
+                    });
+
+                    if (certs.Count == 0)
+                    {
+                        cardStack.Children.Add(new TextBlock
+                        {
+                            Text = "Вставьте USB-токен Avest в компьютер",
+                            FontSize = 12,
+                            Foreground = GetBrush("#FF9500"),
+                            Margin = new Thickness(10, 0, 0, 6)
+                        });
+                    }
+                    else
+                    {
+                        foreach (var c in certs)
+                        {
+                            cardStack.Children.Add(new TextBlock
+                            {
+                                Text = string.Format("• {0} ({1})\n   Действует до: {2} (осталось {3} дн.)", c.OrgName, c.PersonName, c.ValidTo.ToString("dd.MM.yyyy"), c.DaysRemaining),
+                                FontSize = 12,
+                                Foreground = c.IsValid ? GetBrush("#34C759") : GetBrush("#FF3B30"),
+                                Margin = new Thickness(10, 2, 0, 6)
+                            });
+                        }
+                    }
+                }));
+            });
 
             card.Child = cardStack;
             stack.Children.Add(card);
