@@ -25,8 +25,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("Buhly Open Source")]
 [assembly: AssemblyProduct("Buhly Desktop Assistant")]
 [assembly: AssemblyCopyright("Copyright © 2026 Buhly (github.com/narard/buhly-rb)")]
-[assembly: AssemblyVersion("2.1.0.0")]
-[assembly: AssemblyFileVersion("2.1.0.0")]
+[assembly: AssemblyVersion("2.2.0.0")]
+[assembly: AssemblyFileVersion("2.2.0.0")]
 
 namespace GovPortalsApp
 {
@@ -1204,6 +1204,7 @@ namespace GovPortalsApp
         private StackPanel tabRegistryPanel;
         private StackPanel tabToolsPanel;
         private StackPanel tabWaybillsPanel;
+        private StackPanel tabAnalyticsPanel;
         private StackPanel registryListContainer;
         private TextBlock registrySummaryText;
         private Border unpResultCard;
@@ -1214,6 +1215,7 @@ namespace GovPortalsApp
         private Button segBtnRegistry;
         private Button segBtnTools;
         private Button segBtnWaybills;
+        private Button segBtnAnalytics;
 
         private TextBlock statusNTClient;
         private TextBlock statusAvTun;
@@ -1242,9 +1244,9 @@ namespace GovPortalsApp
         public MainWindow()
         {
             Title = "Buhly • ГосПорталы РБ";
-            Width = 530;
+            Width = 600;
             Height = 850;
-            MinWidth = 490;
+            MinWidth = 550;
             MinHeight = 680;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(242, 242, 247)); // iOS system Gray 6
@@ -1318,7 +1320,7 @@ namespace GovPortalsApp
             };
             versionBadge.Child = new TextBlock
             {
-                Text = "v2.1",
+                Text = "v2.2",
                 FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#007AFF")
@@ -1367,23 +1369,27 @@ namespace GovPortalsApp
             };
             var segGrid = new Grid();
             segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
             segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.12, GridUnitType.Star) });
+            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.08, GridUnitType.Star) });
+            segGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.02, GridUnitType.Star) });
 
             segBtnPortals = CreateSegmentButton("🚀 Порталы", 0);
             segBtnRegistry = CreateSegmentButton("🔑 Реестр ЭЦП", 1);
             segBtnTools = CreateSegmentButton("🔎 УНП и ПК", 2);
             segBtnWaybills = CreateSegmentButton("📦 Накладные", 3);
+            segBtnAnalytics = CreateSegmentButton("📊 WB и 1С", 4);
 
             Grid.SetColumn(segBtnPortals, 0);
             Grid.SetColumn(segBtnRegistry, 1);
             Grid.SetColumn(segBtnTools, 2);
             Grid.SetColumn(segBtnWaybills, 3);
+            Grid.SetColumn(segBtnAnalytics, 4);
             segGrid.Children.Add(segBtnPortals);
             segGrid.Children.Add(segBtnRegistry);
             segGrid.Children.Add(segBtnTools);
             segGrid.Children.Add(segBtnWaybills);
+            segGrid.Children.Add(segBtnAnalytics);
             segBorder.Child = segGrid;
             mainStack.Children.Add(segBorder);
 
@@ -1464,6 +1470,11 @@ namespace GovPortalsApp
             tabWaybillsPanel = new StackPanel { Visibility = Visibility.Collapsed };
             BuildWaybillsTab(tabWaybillsPanel);
             mainStack.Children.Add(tabWaybillsPanel);
+
+            // TAB 4: WB ANALYTICS & 1C EXPORT
+            tabAnalyticsPanel = new StackPanel { Visibility = Visibility.Collapsed };
+            BuildAnalyticsTab(tabAnalyticsPanel);
+            mainStack.Children.Add(tabAnalyticsPanel);
 
             SwitchTab(0);
 
@@ -2268,8 +2279,9 @@ namespace GovPortalsApp
             tabRegistryPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
             tabToolsPanel.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
             tabWaybillsPanel.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+            if (tabAnalyticsPanel != null) tabAnalyticsPanel.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
 
-            var btns = new Button[] { segBtnPortals, segBtnRegistry, segBtnTools, segBtnWaybills };
+            var btns = new Button[] { segBtnPortals, segBtnRegistry, segBtnTools, segBtnWaybills, segBtnAnalytics };
             for (int i = 0; i < btns.Length; i++)
             {
                 bool active = (i == index);
@@ -2752,7 +2764,8 @@ namespace GovPortalsApp
         private void RefreshStatuses()
         {
             if (_isRefreshing) return;
-            if (tabWaybillsPanel != null && tabWaybillsPanel.Visibility == Visibility.Visible) return;
+            if ((tabWaybillsPanel != null && tabWaybillsPanel.Visibility == Visibility.Visible) ||
+                (tabAnalyticsPanel != null && tabAnalyticsPanel.Visibility == Visibility.Visible)) return;
             _isRefreshing = true;
 
             ThreadPool.QueueUserWorkItem(delegate
