@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity version="2.0.0.0" processorArchitecture="*" name="Resmart.Buhly.Desktop" type="win32"/>
-  <description>Buhly — Локальный помощник входа на госпорталы Республики Беларусь</description>
+  <assemblyIdentity version="3.0.0.0" processorArchitecture="*" name="BuhlyOpenSource.Buhly.Desktop" type="win32"/>
+  <description>Buhly — Локальный помощник селлера и малого бизнеса РБ</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">

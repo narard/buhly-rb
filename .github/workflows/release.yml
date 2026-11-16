@@ -1,0 +1,130 @@
+name: Build & Release Buhly
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (for example v3.0.0) when triggered manually'
+        required: false
+        default: 'v3.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Buhly.exe & Package
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify C# compiler (.NET Framework 4.8)
+        shell: cmd
+        run: |
+          if not exist "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" (
+            echo [ERROR] csc.exe not found!
+            exit /b 1
+          )
+
+      - name: Build Buhly.exe via build.bat
+        shell: cmd
+        run: |
+          call build.bat
+          if errorlevel 1 exit /b 1
+          if not exist "Buhly.exe" (
+            echo [ERROR] Buhly.exe was not produced!
+            exit /b 1
+          )
+
+      - name: Package clean Release/Buhly.zip (without .cmd scripts)
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP "buhly-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "Buhly.exe", "README.md", "LICENSE" -Destination $stage -Force
+          New-Item -ItemType Directory -Force -Path "Release" | Out-Null
+          $zipPath = "Release/Buhly.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path "$stage/*" -DestinationPath $zipPath -CompressionLevel Optimal
+          Write-Host "Packaged $zipPath"
+
+      - name: Generate SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $exeHash = (Get-FileHash -Path "Buhly.exe" -Algorithm SHA256).Hash
+          $zipHash = (Get-FileHash -Path "Release/Buhly.zip" -Algorithm SHA256).Hash
+          $lines = @(
+            "$exeHash  Buhly.exe",
+            "$zipHash  Buhly.zip"
+          )
+          $lines | Out-File -FilePath "Release/SHA256SUMS.txt" -Encoding ascii
+          Get-Content "Release/SHA256SUMS.txt"
+
+      - name: Upload build artifacts
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: buhly-unsigned
+          path: |
+            Buhly.exe
+            Release/Buhly.zip
+            Release/SHA256SUMS.txt
+          retention-days: 30
+
+      # ========================================================================
+      # ПОДКЛЮЧЕНИЕ БЕСПЛАТНОЙ OPEN-SOURCE ПОДПИСИ SIGNPATH FOUNDATION (3 шага):
+      # 1. Зарегистрируйте проект на https://signpath.io/open-source (лицензия MIT уже в корне)
+      #    и получите Organization ID, Project Slug и Signing Policy Slug.
+      # 2. Добавьте токен в GitHub: Settings -> Secrets -> Actions -> SIGNPATH_API_TOKEN.
+      # 3. Раскомментируйте шаг ниже, подставьте свои ID/slug и запустите релиз по тегу v*.
+      # ========================================================================
+      # - name: Submit signing request to SignPath Foundation
+      #   if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      #   uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+      #     organization-id: '<YOUR_SIGNPATH_ORGANIZATION_ID>'
+      #     project-slug: 'buhly'
+      #     signing-policy-slug: 'release-signing'
+      #     artifact-configuration-slug: 'buhly-exe'
+      #     github-artifact-id: '${{ steps.upload.outputs.artifact-id }}'
+      #     wait-for-completion: true
+      #     output-artifact-directory: 'Release/signed'
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: buhly-unsigned
+          path: dist
+
+      - name: Flatten release files
+        run: |
+          mkdir -p upload
+          cp dist/Buhly.exe upload/Buhly.exe
+          cp dist/Release/Buhly.zip upload/Buhly.zip
+          cp dist/Release/SHA256SUMS.txt upload/SHA256SUMS.txt
+          ls -la upload
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.tag_name }}
+          name: Buhly ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.tag_name }}
+          generate_release_notes: true
+          files: |
+            upload/Buhly.exe
+            upload/Buhly.zip
+            upload/SHA256SUMS.txt
