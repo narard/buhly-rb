@@ -48,7 +48,7 @@
      ```
    - Актуальный SHA-256 `Buhly.exe` (v3.0.0.0):  
      `EAEC888200DC7555AE86ABF67D9F052E060527906E403C7AB9DEE4550C466F19`
-   - См. также файл `Release/SHA256SUMS.txt` (генерируется автоматически в GitHub Actions `.github/workflows/release.yml`).
+   - Примечание: `EAEC8882...` — контрольная сумма опубликованного бинарника с `buhly.by`. При локальной пересборке через `csc.exe` (C# 5) или в GitHub Actions хеш пересчитывается на каждый билд (для релизов GitHub Actions он публикуется в `SHA256SUMS.txt` и [Release/SHA256SUMS.txt](Release/SHA256SUMS.txt)).
 
 3. **Гигиена безопасности и предсказуемость:**
    - В релизах распространяется только чистый `Buhly.exe` / `Buhly.zip` (без `.cmd` и PowerShell-обёрток `ExecutionPolicy Bypass`).

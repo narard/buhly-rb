@@ -294,7 +294,10 @@ build.bat</pre>
             <button type="button" onclick="copyHash()" id="copy-hash-btn" class="shrink-0 text-[11px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition">Копировать</button>
           </div>
           <p class="text-[11px] text-neutral-500 mb-2">
-            SHA-256 архива <b>Release/Buhly.zip</b>: <code class="font-mono break-all">4EFC1440F99F98CCB509BA94E41862250B232F7C865E64D572EB02DEA4ECC329</code>
+            SHA-256 архива <b>Release/Buhly.zip</b>: <code class="font-mono break-all">A74E1EEF6E169FCB1BE5CCEB16A60FE4653D2E121A6AA5E4FEF0B89D7E24AF4E</code>
+          </p>
+          <p class="text-[11px] text-neutral-500 mb-2.5 leading-relaxed">
+            Примечание: <code class="font-mono">EAEC8882...</code> — контрольная сумма опубликованного бинарника с <code class="font-mono">buhly.by</code>. При локальной пересборке через <code class="font-mono">csc.exe</code> (C# 5) или в GitHub Actions хеш пересчитывается на каждый билд (для релизов GitHub Actions публикуется в <code class="font-mono">SHA256SUMS.txt</code>).
           </p>
           <code class="block bg-neutral-900 text-neutral-100 text-[11px] p-2.5 rounded-xl font-mono overflow-x-auto">Get-FileHash .\Buhly.exe -Algorithm SHA256</code>
         </div>
