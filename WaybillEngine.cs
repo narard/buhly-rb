@@ -772,6 +772,15 @@ namespace GovPortalsApp
                 SetCellString(rowsByNum, 205, "R", (profile.Signer ?? "").Trim());
                 SetCellString(rowsByNum, 207, "V", (profile.Signer ?? "").Trim());
 
+                // Ensure all mc:Ignorable prefixes remain declared on root
+                if (doc.Root != null)
+                {
+                    if (doc.Root.Attribute(XNamespace.Xmlns + "xr2") == null)
+                        doc.Root.SetAttributeValue(XNamespace.Xmlns + "xr2", "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2");
+                    if (doc.Root.Attribute(XNamespace.Xmlns + "xr3") == null)
+                        doc.Root.SetAttributeValue(XNamespace.Xmlns + "xr3", "http://schemas.microsoft.com/office/spreadsheetml/2016/revision3");
+                }
+
                 sheetEntry.Delete();
                 var newEntry = zip.CreateEntry("xl/worksheets/sheet1.xml", CompressionLevel.Optimal);
                 using (var sw = new StreamWriter(newEntry.Open(), new UTF8Encoding(false)))
@@ -832,15 +841,34 @@ namespace GovPortalsApp
             if (!rows.TryGetValue(rowNum, out rowEl))
                 throw new InvalidOperationException("Строка " + rowNum + " отсутствует в шаблоне.");
             string targetRef = col + rowNum;
+            int targetCol = ColumnLettersToIndex(targetRef);
+            XElement insertBefore = null;
             foreach (var c in rowEl.Elements(MainNs + "c"))
             {
                 var rAttr = c.Attribute("r");
-                if (rAttr != null && rAttr.Value == targetRef)
-                    return c;
+                if (rAttr == null) continue;
+                if (rAttr.Value == targetRef) return c;
+                if (insertBefore == null && ColumnLettersToIndex(rAttr.Value) > targetCol)
+                    insertBefore = c;
             }
             var newCell = new XElement(MainNs + "c", new XAttribute("r", targetRef));
-            rowEl.Add(newCell);
+            if (insertBefore != null)
+                insertBefore.AddBeforeSelf(newCell);
+            else
+                rowEl.Add(newCell);
             return newCell;
+        }
+
+        private static string StripInvalidXmlChars(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s)
+            {
+                if (ch == 0x9 || ch == 0xA || ch == 0xD || (ch >= 0x20 && ch <= 0xD7FF) || (ch >= 0xE000 && ch <= 0xFFFD))
+                    sb.Append(ch);
+            }
+            return sb.ToString();
         }
 
         private static void ClearCellValue(XElement c)
@@ -855,9 +883,10 @@ namespace GovPortalsApp
         {
             var c = EnsureCell(rows, rowNum, col);
             ClearCellValue(c);
+            string clean = StripInvalidXmlChars(text);
             c.SetAttributeValue("t", "inlineStr");
-            var tEl = new XElement(MainNs + "t", text ?? "");
-            if (!string.IsNullOrEmpty(text) && (text.StartsWith(" ") || text.EndsWith(" ")))
+            var tEl = new XElement(MainNs + "t", clean);
+            if (!string.IsNullOrEmpty(clean) && (clean.StartsWith(" ") || clean.EndsWith(" ")))
                 tEl.SetAttributeValue(XmlNs + "space", "preserve");
             c.Add(new XElement(MainNs + "is", tEl));
         }
@@ -1085,8 +1114,9 @@ namespace GovPortalsApp
 
         private static string EscapeXml(string s)
         {
-            if (string.IsNullOrEmpty(s)) return "";
-            return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
+            string clean = StripInvalidXmlChars(s);
+            if (clean.Length == 0) return "";
+            return clean.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
         }
 
         private static string InlineCell(string refCoord, int styleIdx, string val)

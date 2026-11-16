@@ -1243,11 +1243,14 @@ namespace GovPortalsApp
 
         public MainWindow()
         {
-            Title = "Buhly • ГосПорталы РБ";
+            Title = "Buhly";
             Width = 600;
-            Height = 850;
-            MinWidth = 550;
-            MinHeight = 680;
+            Height = 800;
+            MinWidth = 500;
+            MinHeight = 600;
+            SizeToContent = SizeToContent.Manual;
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(242, 242, 247)); // iOS system Gray 6
             FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI");
@@ -1320,7 +1323,7 @@ namespace GovPortalsApp
             };
             versionBadge.Child = new TextBlock
             {
-                Text = "v2.2",
+                Text = "BY",
                 FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#007AFF")

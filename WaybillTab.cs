@@ -115,21 +115,43 @@ namespace GovPortalsApp
 
             stack.Children.Add(wbDropZone);
 
-            // File action row (Choose / Clear)
+            // File action row (Choose / Clear / Folder)
             var fileBtnRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var btnSelectFiles = CreateCompactActionButton("📂  Выбрать Excel (.xlsx)", "#EBF3FF", "#007AFF");
+            var btnSelectFiles = CreateCompactActionButton("📂  Выбрать", "#EBF5FF", "#007AFF");
             btnSelectFiles.Click += delegate { SelectSupplyFilesDialog(); };
             Grid.SetColumn(btnSelectFiles, 0);
             fileBtnRow.Children.Add(btnSelectFiles);
 
+            var btnOpenFolder = CreateCompactActionButton("📁 Папка с ТН", "#F2F2F7", "#1C1C1E");
+            btnOpenFolder.Padding = new Thickness(12, 0, 12, 0);
+            btnOpenFolder.Click += delegate
+            {
+                try
+                {
+                    string folder = !string.IsNullOrWhiteSpace(wbProfile.OutputFolder)
+                        ? wbProfile.OutputFolder
+                        : new WaybillProfile().OutputFolder;
+                    Directory.CreateDirectory(folder);
+                    Process.Start("explorer.exe", "\"" + folder + "\"");
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("Ошибка открытия папки: " + ex.Message);
+                }
+            };
+            Grid.SetColumn(btnOpenFolder, 2);
+            fileBtnRow.Children.Add(btnOpenFolder);
+
             var btnClearFiles = CreateCompactActionButton("✕ Очистить", "#F2F2F7", "#636366");
             btnClearFiles.Padding = new Thickness(12, 0, 12, 0);
             btnClearFiles.Click += delegate { ClearSupplyFiles(); };
-            Grid.SetColumn(btnClearFiles, 2);
+            Grid.SetColumn(btnClearFiles, 4);
             fileBtnRow.Children.Add(btnClearFiles);
             stack.Children.Add(fileBtnRow);
 
