@@ -629,7 +629,7 @@ namespace GovPortalsApp
 
     public static class UpdateChecker
     {
-        private const string WorkerVersionApiUrl = "https://buhly.by/api/version";
+        private const string WorkerVersionApiUrl = "https://buhly-stats.repinm911.workers.dev/api/version";
         private const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
 
         public static string GetCacheFilePath()
