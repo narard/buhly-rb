@@ -3510,7 +3510,7 @@ namespace GovPortalsApp
             Directory.CreateDirectory(tempRoot);
 
             int passed = 0;
-            int total = 7;
+            int total = 8;
 
             try
             {
@@ -3808,6 +3808,21 @@ namespace GovPortalsApp
                     loadedSimple.UiMode = "";
                     CompanyProfilesManager.NormalizeStore(loadedSimple);
                     AssertTrue(string.Equals(loadedSimple.UiMode, "Simple", StringComparison.Ordinal) && !loadedSimple.IsProMode(), "Empty UiMode normalized to Simple");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "8. UpdateChecker Minsk calendar day & Worker JSON parsing", delegate
+                {
+                    var d1 = new DateTime(2026, 11, 17, 18, 0, 0, DateTimeKind.Utc); // 21:00 Minsk (Nov 17)
+                    var d2 = new DateTime(2026, 11, 17, 20, 50, 0, DateTimeKind.Utc); // 23:50 Minsk (Nov 17)
+                    var d3 = new DateTime(2026, 11, 17, 21, 5, 0, DateTimeKind.Utc); // 00:05 Minsk (Nov 18)
+                    AssertTrue(UpdateChecker.IsSameMinskCalendarDay(d1, d2), "Same Minsk day at 21:00 and 23:50");
+                    AssertTrue(!UpdateChecker.IsSameMinskCalendarDay(d2, d3), "New Minsk day after 00:00 UTC+3");
+
+                    string sampleWorkerJson = "{\"tag_name\":\"v3.2.0\",\"html_url\":\"https://github.com/narard/buhly-rb/releases/tag/v3.2.0\"}";
+                    AssertTrue(UpdateChecker.ExtractJsonField(sampleWorkerJson, "tag_name") == "v3.2.0", "Extract tag_name");
+                    AssertTrue(UpdateChecker.IsValidReleaseUrl(UpdateChecker.ExtractJsonField(sampleWorkerJson, "html_url")), "Valid GitHub release URL");
+                    AssertTrue(!UpdateChecker.IsValidReleaseUrl("https://evil.example.com/release"), "Reject untrusted release URL");
+                    AssertTrue(UpdateChecker.IsRemoteNewer("v3.2.0", new Version(3, 1, 0, 0)), "Remote newer v3.2.0 > 3.1.0");
                 })) passed++;
             }
             finally

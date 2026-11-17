@@ -629,6 +629,7 @@ namespace GovPortalsApp
 
     public static class UpdateChecker
     {
+        private const string WorkerVersionApiUrl = "https://buhly.by/api/version";
         private const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
 
         public static string GetCacheFilePath()
@@ -638,7 +639,7 @@ namespace GovPortalsApp
             return Path.Combine(dir, "update_check.txt");
         }
 
-        private static string ExtractJsonField(string json, string key)
+        public static string ExtractJsonField(string json, string key)
         {
             if (string.IsNullOrEmpty(json)) return "";
             var m = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
@@ -685,10 +686,32 @@ namespace GovPortalsApp
             return remoteVer > normCurrent;
         }
 
-        private static bool IsValidReleaseUrl(string url)
+        public static bool IsValidReleaseUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
             return url.StartsWith("https://github.com/narard/buhly-rb/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool IsSameMinskCalendarDay(DateTime lastUtc, DateTime nowUtc)
+        {
+            return lastUtc.AddHours(3).Date == nowUtc.AddHours(3).Date;
+        }
+
+        private static string HttpGetJson(string url, int timeoutMs)
+        {
+            Program.ConfigureSafeTls();
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.Method = "GET";
+            req.Timeout = timeoutMs;
+            req.ReadWriteTimeout = timeoutMs;
+            req.UserAgent = "Buhly-Desktop";
+            req.Accept = "application/vnd.github+json";
+
+            using (var resp = (HttpWebResponse)req.GetResponse())
+            using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+            {
+                return sr.ReadToEnd();
+            }
         }
 
         private static void SaveCache(string path, string tagName, string htmlUrl)
@@ -730,7 +753,7 @@ namespace GovPortalsApp
                                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
                                     out lastCheck))
                                 {
-                                    if ((DateTime.UtcNow - lastCheck) < TimeSpan.FromHours(24))
+                                    if (IsSameMinskCalendarDay(lastCheck, DateTime.UtcNow))
                                     {
                                         string cachedTag = lines.Length >= 2 ? lines[1].Trim() : "";
                                         string cachedUrl = lines.Length >= 3 ? lines[2].Trim() : "";
@@ -746,23 +769,23 @@ namespace GovPortalsApp
                         catch { }
                     }
 
-                    Program.ConfigureSafeTls();
-                    var req = (HttpWebRequest)WebRequest.Create(LatestReleaseApiUrl);
-                    req.Method = "GET";
-                    req.Timeout = 5000;
-                    req.ReadWriteTimeout = 5000;
-                    req.UserAgent = "Buhly-Desktop";
-                    req.Accept = "application/vnd.github+json";
+                    string tagName = "";
+                    string htmlUrl = "";
 
-                    string json = "";
-                    using (var resp = (HttpWebResponse)req.GetResponse())
-                    using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    try
                     {
-                        json = sr.ReadToEnd();
+                        string workerJson = HttpGetJson(WorkerVersionApiUrl, 4000);
+                        tagName = ExtractJsonField(workerJson, "tag_name");
+                        htmlUrl = ExtractJsonField(workerJson, "html_url");
                     }
+                    catch { }
 
-                    string tagName = ExtractJsonField(json, "tag_name");
-                    string htmlUrl = ExtractJsonField(json, "html_url");
+                    if (string.IsNullOrEmpty(tagName) || !IsValidReleaseUrl(htmlUrl))
+                    {
+                        string ghJson = HttpGetJson(LatestReleaseApiUrl, 5000);
+                        tagName = ExtractJsonField(ghJson, "tag_name");
+                        htmlUrl = ExtractJsonField(ghJson, "html_url");
+                    }
 
                     SaveCache(cachePath, tagName, htmlUrl);
 

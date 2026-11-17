@@ -1,0 +1,9 @@
+name = "buhly-stats-worker"
+main = "worker.js"
+compatibility_date = "2026-11-17"
+
+# 1. Create KV namespace in Cloudflare Dashboard -> Workers & Pages -> KV (or `npx wrangler kv namespace create STATS_KV`)
+# 2. Replace <YOUR_KV_NAMESPACE_ID> below and attach route: `buhly.by/api/*` (zone: buhly.by)
+[[kv_namespaces]]
+binding = "STATS_KV"
+id = "<YOUR_KV_NAMESPACE_ID>"
