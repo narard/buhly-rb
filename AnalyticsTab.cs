@@ -36,6 +36,10 @@ namespace GovPortalsApp
         private TextBlock anLoadingText;
         private Border anKpiCard;
         private StackPanel anKpiContent;
+        private ColumnDefinition anCol1CGap;
+        private ColumnDefinition anCol1C;
+        private Button anBtnExport1C;
+        private TextBlock anPro1CHint;
         private Border anSkuCard;
         private TextBox anSkuSearchBox;
         private TextBlock anSkuCountText;
@@ -152,6 +156,31 @@ namespace GovPortalsApp
             fileBtnRow.Children.Add(btnClear);
             stack.Children.Add(fileBtnRow);
 
+            // Support diagnostics row (anonymized structure dump without PII/amounts)
+            var diagRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            diagRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            diagRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            diagRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var btnDiag = CreateCompactActionButton("🛟 Диагностика файла (для поддержки)", "#F8FAFC", "#475569");
+            btnDiag.Padding = new Thickness(11, 0, 11, 0);
+            btnDiag.ToolTip = "Создаёт обезличенный отчёт о структуре файла (без сумм, УНП, IBAN и контрагентов)";
+            btnDiag.Click += delegate { RunAnonymizedFileDiagnostics(); };
+            Grid.SetColumn(btnDiag, 0);
+            diagRow.Children.Add(btnDiag);
+
+            var diagHint = new TextBlock
+            {
+                Text = "если файл не читается — создаст безопасный отчёт без сумм, УНП и названий",
+                FontSize = 10.5,
+                Foreground = GetBrush("#8E8E93"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            Grid.SetColumn(diagHint, 2);
+            diagRow.Children.Add(diagHint);
+            stack.Children.Add(diagRow);
+
             // Tax rate + SKU cost button row
             var configGrid = new Grid { Margin = new Thickness(0, 12, 0, 0) };
             configGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
@@ -218,6 +247,15 @@ namespace GovPortalsApp
             anRegimeBanner.Child = anRegimeBannerText;
             stack.Children.Add(anRegimeBanner);
             UpdateRegimeBanner();
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = "ℹ️ Налоговый расчёт исходит из стандартных договоров с резидентами РБ (ООО «ИМВБРБ» / ООО «ОЗОН Маркет Бел»).",
+                FontSize = 10.5,
+                Foreground = GetBrush("#8E8E93"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(2, 5, 2, 0)
+            });
 
             // Background loading indicator
             anLoadingBanner = new Border
@@ -323,8 +361,10 @@ namespace GovPortalsApp
             actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            anCol1CGap = new ColumnDefinition { Width = new GridLength(8) };
+            anCol1C = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+            actionsGrid.ColumnDefinitions.Add(anCol1CGap);
+            actionsGrid.ColumnDefinitions.Add(anCol1C);
             actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             actionsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -340,11 +380,11 @@ namespace GovPortalsApp
             Grid.SetColumn(btnExportKudir, 2);
             actionsGrid.Children.Add(btnExportKudir);
 
-            var btnExport1C = CreateSolidActionButton("📤  Выгрузка для 1С", "#5856D6", Brushes.White);
-            btnExport1C.ToolTip = "Чистый XML или табличный CSV без объединённых ячеек для загрузки в 1С";
-            btnExport1C.Click += delegate { Export1CReport(); };
-            Grid.SetColumn(btnExport1C, 4);
-            actionsGrid.Children.Add(btnExport1C);
+            anBtnExport1C = CreateSolidActionButton("📤  Выгрузка для 1С", "#5856D6", Brushes.White);
+            anBtnExport1C.ToolTip = "Чистый XML или табличный CSV без объединённых ячеек для загрузки в 1С";
+            anBtnExport1C.Click += delegate { Export1CReport(); };
+            Grid.SetColumn(anBtnExport1C, 4);
+            actionsGrid.Children.Add(anBtnExport1C);
 
             var btnOpenFolder = CreateCompactActionButton("📁 Папка", "#F2F2F7", "#1C1C1E");
             btnOpenFolder.Height = 38;
@@ -354,11 +394,32 @@ namespace GovPortalsApp
             actionsGrid.Children.Add(btnOpenFolder);
 
             stack.Children.Add(actionsGrid);
+
+            anPro1CHint = new TextBlock
+            {
+                Text = "ℹ️ Выгрузка для 1С (XML / CSV) доступна в режиме «Бухгалтер PRO» (переключатель в меню слева).",
+                FontSize = 10.5,
+                Foreground = GetBrush("#8E8E93"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(2, 6, 2, 0)
+            };
+            stack.Children.Add(anPro1CHint);
+
             mainCard.Child = stack;
             container.Children.Add(mainCard);
 
             // CARD 2: BUILT-IN IMPORT VAT 20% CALCULATOR (EAEU / RF)
             container.Children.Add(BuildImportVatCalculatorCard());
+
+            RefreshAnalyticsUiMode(IsProUiMode());
+        }
+
+        private void RefreshAnalyticsUiMode(bool isPro)
+        {
+            if (anCol1CGap != null) anCol1CGap.Width = new GridLength(isPro ? 8 : 0);
+            if (anCol1C != null) anCol1C.Width = isPro ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            if (anBtnExport1C != null) anBtnExport1C.Visibility = isPro ? Visibility.Visible : Visibility.Collapsed;
+            if (anPro1CHint != null) anPro1CHint.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private Border BuildImportVatCalculatorCard()
@@ -494,6 +555,15 @@ namespace GovPortalsApp
             resGrid.Children.Add(anImpVatText);
             resBox.Child = resGrid;
             stack.Children.Add(resBox);
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = "📌 При импорте из РФ / ЕАЭС от 3 000 EUR по контракту/месяцу дополнительно подаётся статистическая декларация (статдекларация) — в течение 7 рабочих дней с даты поступления товара.",
+                FontSize = 11,
+                Foreground = GetBrush("#B45309"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
 
             card.Child = stack;
 
@@ -703,7 +773,7 @@ namespace GovPortalsApp
                 anRegimeBanner.Background = GetBrush("#FFFBEB");
                 anRegimeBanner.BorderBrush = GetBrush("#FDE68A");
                 anRegimeBannerText.Foreground = GetBrush("#92400E");
-                anRegimeBannerText.Text = "⚠️ УСН для ИП в РБ отменён с 2023 года. Расчёт ведётся по Подоходному налогу (20%, или 30% при доходе > 500 000 BYN) + ФСЗН 35% с автоматическим сравнением «докум. расходы vs стандартный вычет 20%».";
+                anRegimeBannerText.Text = "⚠️ УСН для ИП в РБ отменён с 2023 года. Расчёт ведётся по Подоходному налогу (20%, при доходе > 500 000 BYN — 30% и запрет ИП с 01.01 по Закону № 365-З) + ФСЗН 35% (потолок 12 МЗП = 10 296 BYN в 2026) с авто-сравнением «докум. расходы vs вычет 20%».";
             }
             else if (regime == CompanyProfilesManager.RegimeOsn20)
             {
@@ -981,15 +1051,31 @@ namespace GovPortalsApp
                 : string.Format("файлов загружено: {0} — нажмите, чтобы добавить ещё", anLoadedFiles.Count);
 
             anKpiContent.Children.Clear();
-            anKpiContent.Children.Add(new TextBlock
+            var kpiHdrGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            kpiHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            kpiHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            kpiHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var kpiHdrText = new TextBlock
             {
                 Text = "Ключевые показатели периода • " + s.TaxRegimeTitle,
                 FontSize = 12.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E"),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
-            });
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(kpiHdrText, 0);
+            kpiHdrGrid.Children.Add(kpiHdrText);
+
+            var btnExplainAudit = CreateSmallPillButton("❓ Как посчитано?", "#EBF3FF", "#007AFF");
+            btnExplainAudit.ToolTip = "Показать пошаговую расшифровку формул и чисел расчёта";
+            btnExplainAudit.VerticalAlignment = VerticalAlignment.Center;
+            btnExplainAudit.Click += delegate { OpenCalculationAuditWindow(s); };
+            Grid.SetColumn(btnExplainAudit, 2);
+            kpiHdrGrid.Children.Add(btnExplainAudit);
+
+            anKpiContent.Children.Add(kpiHdrGrid);
 
             if (s.Reports.Count > 0)
             {
@@ -1018,11 +1104,17 @@ namespace GovPortalsApp
             // Regime-specific Tax KPI rows (no hardcoded "УСН" for IP/OSN!)
             if (s.TaxRegime == CompanyProfilesManager.RegimeIpPn20)
             {
-                if (s.IpHighIncomeRateApplied)
+                if (s.IpHighIncomeRateApplied || s.IpGrossIncome > 500000m)
                 {
                     AddKpiPairRow(anKpiContent,
-                        "Повышенная ставка ИП (> 500 000 BYN)", "30%", "#DC2626",
-                        "Доход превысил 500 000 BYN — по НК РБ применяется ставка подоходного налога 30%");
+                        "Порог ИП превышен (> 500 000 BYN)", "30% + юрлицо", "#DC2626",
+                        "Доход > 500 000 BYN: применяется ставка подоходного налога 30%, а с 1 января следующего года работа в статусе ИП запрещена — обязателен переход в юрлицо (Закон № 365-З)");
+                }
+                else if (s.IpNear500kLimit)
+                {
+                    AddKpiPairRow(anKpiContent,
+                        "Приближение к порогу ИП (> 400 000 BYN)", FmtByn(s.IpGrossIncome), "#D97706",
+                        "Доход приближается к годовому лимиту ИП 500 000 BYN: при превышении применяется ставка 30% и с 1 января следующего года работа как ИП запрещена (переход в юрлицо, Закон № 365-З)");
                 }
 
                 AddKpiPairRow(anKpiContent,
@@ -1037,10 +1129,13 @@ namespace GovPortalsApp
                         FmtByn(s.IpTaxStandard20),
                         s.IpUsedStandardDeduction ? "вычет 20%" : "докум. расходы"));
 
+                string fsznHint = s.IpFsznCapped12Mzp
+                    ? "Достигнут потолок 12 МЗП (10 296 BYN в 2026 при МЗП 858 BYN → макс. 3 603.60 BYN/год, Закон № 90-З). ПУ-3 «за себя» отменена: ФСЗН считает по данным МНС, уплата до 31.03 след. года"
+                    : string.Format("35% от факт. чистого дохода {0} BYN (< 12 МЗП = 10 296 BYN в 2026 при МЗП 858 BYN, потолок 3 603.60 BYN/год, Закон № 90-З). ПУ-3 «за себя» отменена: ФСЗН считает по данным МНС, уплата до 31.03 след. года", FmtByn(s.IpFsznBase));
                 AddKpiPairRow(anKpiContent,
-                    "Взнос ФСЗН ИП 35% (ориентир от чистого дохода)",
+                    s.IpFsznCapped12Mzp ? "Взнос ФСЗН ИП 35% (потолок 12 МЗП)" : "Взнос ФСЗН ИП 35% (от фактического чистого дохода)",
                     FmtByn(s.IpFszn35), "#B45309",
-                    "35% от базы чистого дохода ИП (в году — не менее 35% от МЗП за месяцы деятельности)");
+                    fsznHint);
 
                 if (s.IpHasPotentialDoubleGoodsCost)
                 {
@@ -1325,6 +1420,46 @@ namespace GovPortalsApp
             }
         }
 
+        private void RunAnonymizedFileDiagnostics()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Выберите файл для обезличенной диагностики",
+                Filter = "Файлы отчётов и выписок (*.xlsx;*.zip;*.txt;*.csv)|*.xlsx;*.zip;*.txt;*.csv|Все файлы (*.*)|*.*",
+                Multiselect = false
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                string reportText = AnalyticsEngine.GenerateAnonymizedDiagReport(dlg.FileName);
+                string fileName = "Buhly_Diag_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".txt";
+
+                string targetDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                if (string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(targetDir))
+                    targetDir = Path.GetTempPath();
+
+                string outPath = Path.Combine(targetDir, fileName);
+                try
+                {
+                    File.WriteAllText(outPath, reportText, new System.Text.UTF8Encoding(false));
+                }
+                catch
+                {
+                    outPath = Path.Combine(Path.GetTempPath(), fileName);
+                    File.WriteAllText(outPath, reportText, new System.Text.UTF8Encoding(false));
+                }
+
+                try { WaybillEngine.OpenFileWithShell(outPath); } catch { }
+                ShowToast("🛟 Обезличенный отчёт сохранён: " + Path.GetFileName(outPath));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось создать диагностический отчёт:\n" + ex.Message,
+                    "Диагностика файла", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private string GetAnalyticsOutputDirectory()
         {
             return Path.Combine(
@@ -1498,6 +1633,104 @@ namespace GovPortalsApp
             footer.Children.Add(btnCancel);
 
             Grid.SetRow(footer, 3);
+            root.Children.Add(footer);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void OpenCalculationAuditWindow(AnalyticsSnapshot snap)
+        {
+            if (snap == null) return;
+
+            var win = new Window
+            {
+                Title = "Buhly • Как посчитано?",
+                Width = 680,
+                Height = 520,
+                MinWidth = 500,
+                MinHeight = 360,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = GetBrush("#F2F2F7"),
+                FontFamily = this.FontFamily
+            };
+
+            var root = new Grid { Margin = new Thickness(16) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var headerStack = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+            headerStack.Children.Add(new TextBlock
+            {
+                Text = "❓ Как посчитаны показатели",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#1C1C1E")
+            });
+            headerStack.Children.Add(new TextBlock
+            {
+                Text = "Пошаговая расшифровка источников, налоговой базы, формул и сверки с банком (" + snap.TaxRegimeTitle + ")",
+                FontSize = 11.5,
+                Foreground = GetBrush("#636366"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+            Grid.SetRow(headerStack, 0);
+            root.Children.Add(headerStack);
+
+            string auditText = (snap.CalculationAuditDetails != null && snap.CalculationAuditDetails.Count > 0)
+                ? string.Join("\r\n\r\n", snap.CalculationAuditDetails)
+                : "Нет данных для расшифровки.";
+
+            var auditBox = new TextBox
+            {
+                Text = auditText,
+                IsReadOnly = true,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                AcceptsReturn = true,
+                FontFamily = new FontFamily("Consolas, Segoe UI"),
+                FontSize = 12,
+                Foreground = GetBrush("#1C1C1E"),
+                Background = Brushes.White,
+                BorderBrush = GetBrush("#E5E5EA"),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12)
+            };
+            Grid.SetRow(auditBox, 1);
+            root.Children.Add(auditBox);
+
+            var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var btnCopy = CreateSolidActionButton("📋 Копировать расшифровку", "#007AFF", Brushes.White);
+            btnCopy.Click += delegate
+            {
+                try
+                {
+                    Clipboard.SetText(auditBox.Text ?? "");
+                    ShowToast("✓ Расшифровка расчёта скопирована в буфер обмена");
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("⚠️ Не удалось скопировать: " + ex.Message);
+                }
+            };
+            Grid.SetColumn(btnCopy, 0);
+            footer.Children.Add(btnCopy);
+
+            var btnClose = CreateCompactActionButton("Закрыть", "#E5E5EA", "#1C1C1E");
+            btnClose.Height = 38;
+            btnClose.Padding = new Thickness(14, 0, 14, 0);
+            btnClose.Click += delegate { win.Close(); };
+            Grid.SetColumn(btnClose, 2);
+            footer.Children.Add(btnClose);
+
+            Grid.SetRow(footer, 2);
             root.Children.Add(footer);
 
             win.Content = root;

@@ -2,6 +2,9 @@
 *.log
 *.pdb
 *.env
+*.pyc
+__pycache__/
+portal_state.json
 .vs/
 bin/
 obj/

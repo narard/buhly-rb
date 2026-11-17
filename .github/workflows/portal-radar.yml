@@ -1,0 +1,41 @@
+name: RB GovPortals Auto-Radar
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-radar-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-portals:
+    name: Check RB GovPortals (МНС, ФСЗН, ЭСЧФ, Е-Паслуга)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore and save portal state cache
+        uses: actions/cache@v4
+        with:
+          path: portal_state.json
+          key: portal-state-v1-${{ github.run_id }}
+          restore-keys: |
+            portal-state-v1-
+
+      - name: Run RB GovPortals availability check
+        env:
+          PORTAL_STATE_FILE: portal_state.json
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+        run: python3 scripts/check_portals.py --state-file portal_state.json

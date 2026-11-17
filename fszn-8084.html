@@ -75,7 +75,7 @@
       <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
         Главная
       </a>
-      <a href="https://t.me/buhly_by_chat" target="_blank" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+      <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
         Чат помощи
       </a>
     </div>
@@ -99,9 +99,9 @@
     <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
         <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v3.0</div>
-        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~541 КБ (ZIP 210 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
+        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~602 КБ (ZIP 229 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
       </div>
-      <a href="https://buhly.by/Release/Buhly.zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
+      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
         Скачать Buhly v3.0 (ZIP)
       </a>
     </div>
@@ -133,10 +133,10 @@
         <li>✓ Если компьютер «голый» и не хватает ГосСУОК или <code>AvTunProxy</code>, мастер настройки помогает скачать официальные установщики.</li>
       </ul>
       <div class="mt-6 flex flex-wrap gap-3">
-        <a href="https://buhly.by/Release/Buhly.zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
+        <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
           Скачать архив Buhly.zip
         </a>
-        <a href="https://t.me/buhly_by_chat" target="_blank" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
           Задать вопрос в Telegram-чате
         </a>
       </div>
@@ -179,13 +179,83 @@
       <div>
         <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly</a> • Создано для предпринимателей и бухгалтеров Беларуси
       </div>
-      <div class="flex items-center space-x-6">
-        <a href="https://github.com/narard/buhly-rb" target="_blank" class="hover:text-white transition">GitHub Repo</a>
-        <a href="https://t.me/buhly_by" target="_blank" class="hover:text-white transition">Канал @buhly_by</a>
-        <a href="https://t.me/buhly_by_chat" target="_blank" class="hover:text-white transition">Чат помощи</a>
+      <div class="flex items-center flex-wrap gap-5">
+        <a href="privacy.html" class="hover:text-white transition">Политика приватности</a>
+        <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="hover:text-white transition">Канал @buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="hover:text-white transition">Чат помощи</a>
       </div>
     </div>
   </footer>
 
+  <!-- Cookie-free Click & UTM Helper (0% cookies, 0% localStorage, Закон РБ № 99-З) -->
+  <script>
+    (function () {
+      var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      var params = new URLSearchParams(window.location.search || '');
+      var activeUtm = {};
+      var hasUtm = false;
+      utmKeys.forEach(function (k) {
+        var v = params.get(k);
+        if (v) { activeUtm[k] = v; hasUtm = true; }
+      });
+
+      window.buhlyEvents = window.buhlyEvents || [];
+      window.buhlyTrack = function (goal, url) {
+        var payload = { goal: goal, url: url || '', path: window.location.pathname, utm: activeUtm, ts: Date.now() };
+        window.buhlyEvents.push(payload);
+        try {
+          window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
+        } catch (e) {}
+      };
+
+      var links = document.querySelectorAll('a[href]');
+      for (var i = 0; i < links.length; i++) {
+        (function (a) {
+          var href = a.getAttribute('href') || '';
+          var goal = a.getAttribute('data-goal');
+          if (!goal) {
+            if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
+              goal = 'download_zip';
+            } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
+              goal = 'tg_chat';
+            } else if (href.indexOf('t.me/buhly_by') !== -1) {
+              goal = 'tg_channel';
+            } else if (href.indexOf('github.com/narard/buhly-rb') !== -1) {
+              goal = 'github_click';
+            }
+            if (goal) a.setAttribute('data-goal', goal);
+          }
+
+          if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
+            var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1;
+            if (isInternal || isGithubPage) {
+              try {
+                var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';
+                var u = new URL(href, base);
+                utmKeys.forEach(function (k) {
+                  if (activeUtm[k] && !u.searchParams.has(k)) u.searchParams.set(k, activeUtm[k]);
+                });
+                if (href.indexOf('http') !== 0) {
+                  a.setAttribute('href', href.split('?')[0].split('#')[0] + u.search + u.hash);
+                } else {
+                  a.setAttribute('href', u.toString());
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (goal) {
+            a.addEventListener('click', function () {
+              window.buhlyTrack(goal, a.href);
+            });
+          }
+        })(links[i]);
+      }
+    })();
+  </script>
+  <!-- Cloudflare Web Analytics: вставить data-cf-beacon token после подключения в Cloudflare -->
+  <!-- <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "YOUR_CLOUDFLARE_TOKEN"}'></script> -->
 </body>
 </html>

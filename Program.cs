@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -18,21 +19,63 @@ using System.Windows.Threading;
 [assembly: AssemblyCompany("Buhly Open Source")]
 [assembly: AssemblyProduct("Buhly Desktop Assistant")]
 [assembly: AssemblyCopyright("Copyright © 2026 Buhly (github.com/narard/buhly-rb)")]
-[assembly: AssemblyVersion("3.0.0.0")]
-[assembly: AssemblyFileVersion("3.0.0.0")]
+[assembly: AssemblyVersion("3.1.0.0")]
+[assembly: AssemblyFileVersion("3.1.0.0")]
 
 namespace GovPortalsApp
 {
     public class Program
     {
+        [DllImport("kernel32.dll")]
+        private static extern bool AttachConsole(int dwProcessId);
+
         public static void ConfigureSafeTls()
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         [STAThread]
-        public static void Main()
+        public static void Main(string[] args)
         {
+            bool isSelfTest = false;
+            if (args != null)
+            {
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (string.Equals(args[i], "--self-test", StringComparison.OrdinalIgnoreCase))
+                    {
+                        isSelfTest = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isSelfTest)
+            {
+                try
+                {
+                    if (!Console.IsOutputRedirected) AttachConsole(-1);
+                }
+                catch { }
+                try
+                {
+                    ConfigureSafeTls();
+                    bool allPassed = AnalyticsEngine.RunSelfTests(Console.Out);
+                    Console.Out.Flush();
+                    Environment.Exit(allPassed ? 0 : 1);
+                }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        Console.Error.WriteLine("[FAIL] Self-test runner crashed: " + ex.Message);
+                    }
+                    catch { }
+                    Environment.Exit(1);
+                }
+                return;
+            }
+
             try
             {
                 ConfigureSafeTls();
@@ -65,6 +108,8 @@ namespace GovPortalsApp
 
         private ComboBox sidebarProfileCombo;
         private bool _suppressProfileSelection = false;
+        private Button btnUiModeSimple;
+        private Button btnUiModePro;
 
         private Button navBtnOverview;
         private Button navBtnPortals;
@@ -199,7 +244,7 @@ namespace GovPortalsApp
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(11),
                 Padding = new Thickness(9, 8, 9, 8),
-                Margin = new Thickness(0, 0, 0, 14)
+                Margin = new Thickness(0, 0, 0, 8)
             };
             var profStack = new StackPanel();
             var profTop = new Grid { Margin = new Thickness(0, 0, 0, 5) };
@@ -250,6 +295,46 @@ namespace GovPortalsApp
 
             profileBox.Child = profStack;
             sidebarTop.Children.Add(profileBox);
+
+            // UI Mode 2-button pill switcher: Базовый / Бухгалтер PRO
+            var modeSwitchWrap = new Border
+            {
+                Background = GetBrush("#E5E5EA"),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(3),
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            var modeSwitchGrid = new Grid();
+            modeSwitchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            modeSwitchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2) });
+            modeSwitchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+
+            btnUiModeSimple = CreateSidebarPillSwitchButton("Базовый", "Упрощённый режим для селлера: быстрый старт и только нужные поля");
+            btnUiModeSimple.Click += delegate
+            {
+                if (companyStore == null) return;
+                companyStore.UiMode = "Simple";
+                CompanyProfilesManager.Save(companyStore);
+                RefreshUiModeAcrossTabs();
+                ShowToast("Режим интерфейса: Базовый");
+            };
+            Grid.SetColumn(btnUiModeSimple, 0);
+            modeSwitchGrid.Children.Add(btnUiModeSimple);
+
+            btnUiModePro = CreateSidebarPillSwitchButton("Бухгалтер PRO", "Полный режим: выгрузка 1С, БСО в мм, ТТН-1 и правила группировки");
+            btnUiModePro.Click += delegate
+            {
+                if (companyStore == null) return;
+                companyStore.UiMode = "Pro";
+                CompanyProfilesManager.Save(companyStore);
+                RefreshUiModeAcrossTabs();
+                ShowToast("Режим интерфейса: Бухгалтер PRO");
+            };
+            Grid.SetColumn(btnUiModePro, 2);
+            modeSwitchGrid.Children.Add(btnUiModePro);
+
+            modeSwitchWrap.Child = modeSwitchGrid;
+            sidebarTop.Children.Add(modeSwitchWrap);
 
             DockPanel.SetDock(sidebarTop, Dock.Top);
             sidebarDock.Children.Add(sidebarTop);
@@ -399,9 +484,62 @@ namespace GovPortalsApp
             outerGrid.Children.Add(rightGrid);
 
             RefreshSidebarProfileCombo();
+            RefreshUiModeAcrossTabs();
             SwitchTab(0);
 
             Content = outerGrid;
+        }
+
+        private Button CreateSidebarPillSwitchButton(string text, string tooltip)
+        {
+            var btn = new Button
+            {
+                Content = text,
+                Height = 26,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = tooltip,
+                Padding = new Thickness(6, 0, 6, 0)
+            };
+            var template = new ControlTemplate(typeof(Button));
+            var bf = new FrameworkElementFactory(typeof(Border));
+            bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+            bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            bf.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
+            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            bf.AppendChild(cp);
+            template.VisualTree = bf;
+            btn.Template = template;
+            return btn;
+        }
+
+        private void UpdateSidebarUiModeButtons(bool isPro)
+        {
+            if (btnUiModeSimple != null)
+            {
+                btnUiModeSimple.Background = isPro ? Brushes.Transparent : Brushes.White;
+                btnUiModeSimple.Foreground = GetBrush(isPro ? "#636366" : "#007AFF");
+                btnUiModeSimple.FontWeight = isPro ? FontWeights.Medium : FontWeights.Bold;
+            }
+            if (btnUiModePro != null)
+            {
+                btnUiModePro.Background = isPro ? GetBrush("#007AFF") : Brushes.Transparent;
+                btnUiModePro.Foreground = isPro ? Brushes.White : GetBrush("#636366");
+                btnUiModePro.FontWeight = isPro ? FontWeights.Bold : FontWeights.Medium;
+            }
+        }
+
+        private void RefreshUiModeAcrossTabs()
+        {
+            bool isPro = IsProUiMode();
+            UpdateSidebarUiModeButtons(isPro);
+            RefreshOverviewUiMode(isPro);
+            RefreshAnalyticsUiMode(isPro);
+            RefreshWaybillUiMode(isPro);
         }
 
         private void RefreshSidebarProfileCombo()
@@ -434,6 +572,7 @@ namespace GovPortalsApp
             RefreshOverviewCalendar();
             RefreshWaybillTabFromActiveProfile();
             RefreshAnalyticsTabFromActiveProfile();
+            RefreshUiModeAcrossTabs();
         }
 
         private Button CreateSidebarNavButton(string title, int tabIndex)

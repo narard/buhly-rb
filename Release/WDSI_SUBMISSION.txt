@@ -9,9 +9,9 @@
    Software developer
 
 3. Прикрепите файл:
-   GitHub\Buhly\Buhly.exe  (размер: 553 984 байт / ~541 КБ)
-   SHA-256: EAEC888200DC7555AE86ABF67D9F052E060527906E403C7AB9DEE4550C466F19
-   Версия:  3.0.0.0
+   GitHub\Buhly\Buhly.exe  (размер: 616 960 байт / ~603 КБ)
+   SHA-256: D32BD5DC092C32612A837D5C06A0CF54F30AF16CED94F8F11AC99C4D4C7A63D8
+   Версия:  3.1.0.0
 
 4. Выберите тип обращения:
    "Incorrectly detected as malware/PUA" / "SmartScreen false positive (Clean file)"
@@ -19,13 +19,13 @@
 5. Скопируйте в поле описания (Additional information / Comments) текст ниже:
 
 ------------------------------------------------------------------------
-Product Name: Buhly Desktop Assistant (v3.0.0.0)
+Product Name: Buhly Desktop Assistant (v3.1.0.0)
 License: MIT Open Source
 Official Website: https://buhly.by
 Public Source Repository: https://github.com/narard/buhly-rb
 Build Script: https://github.com/narard/buhly-rb/blob/main/build.bat
 GitHub Actions CI/CD: https://github.com/narard/buhly-rb/blob/main/.github/workflows/release.yml
-File SHA-256 (Buhly.exe): EAEC888200DC7555AE86ABF67D9F052E060527906E403C7AB9DEE4550C466F19
+File SHA-256 (Buhly.exe): D32BD5DC092C32612A837D5C06A0CF54F30AF16CED94F8F11AC99C4D4C7A63D8
 
 Description:
 Buhly is a free, open-source (MIT) Windows WPF utility (.NET Framework 4.8, compiled reproducibly from public C# source files using standard csc.exe with zero third-party binaries) designed for small businesses and accountants in the Republic of Belarus.

@@ -78,12 +78,19 @@ namespace GovPortalsApp
     public class CompanyProfileStore
     {
         public string ActiveProfileId { get; set; }
+        public string UiMode { get; set; }
         public List<CompanyProfile> Profiles { get; set; }
 
         public CompanyProfileStore()
         {
             ActiveProfileId = "";
+            UiMode = "Simple";
             Profiles = new List<CompanyProfile>();
+        }
+
+        public bool IsProMode()
+        {
+            return string.Equals(UiMode, "Pro", StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -176,8 +183,15 @@ namespace GovPortalsApp
             return newStore;
         }
 
-        private static void NormalizeStore(CompanyProfileStore store)
+        internal static void NormalizeStore(CompanyProfileStore store)
         {
+            if (store == null) return;
+            if (string.Equals(store.UiMode, "Pro", StringComparison.OrdinalIgnoreCase))
+                store.UiMode = "Pro";
+            else
+                store.UiMode = "Simple";
+
+            if (store.Profiles == null) store.Profiles = new List<CompanyProfile>();
             foreach (var p in store.Profiles)
             {
                 if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("N");
@@ -198,6 +212,11 @@ namespace GovPortalsApp
             {
                 store.ActiveProfileId = store.Profiles[0].Id;
             }
+        }
+
+        public static void Save(CompanyProfileStore store)
+        {
+            SaveStore(store);
         }
 
         public static void SaveStore(CompanyProfileStore store)
@@ -253,6 +272,12 @@ namespace GovPortalsApp
             {
                 CompanyProfilesManager.SaveStore(companyStore);
             }
+        }
+
+        public bool IsProUiMode()
+        {
+            if (companyStore == null) companyStore = CompanyProfilesManager.LoadStore();
+            return companyStore != null && companyStore.IsProMode();
         }
 
         private void OpenProfileManagerWindow()

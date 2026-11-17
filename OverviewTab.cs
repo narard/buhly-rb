@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +10,11 @@ namespace GovPortalsApp
 {
     public partial class MainWindow : Window
     {
+        private Border ovUpdateBanner;
+        private TextBlock ovUpdateBannerText;
+        private string ovUpdateReleaseUrl;
+        private Border ovOnboardingCard;
+
         private TextBlock ovProfileTitle;
         private TextBlock ovProfileMeta;
         private TextBlock ovTokenStatusText;
@@ -28,6 +34,77 @@ namespace GovPortalsApp
 
         private void BuildOverviewTab(StackPanel container)
         {
+            // SILENT UPDATE BANNER (shown only when a newer release exists on GitHub)
+            ovUpdateBanner = new Border
+            {
+                Background = GetBrush("#EFF6FF"),
+                BorderBrush = GetBrush("#93C5FD"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(14, 10, 14, 10),
+                Margin = new Thickness(0, 0, 0, 12),
+                Visibility = Visibility.Collapsed
+            };
+            var updGrid = new Grid();
+            updGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            updGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            updGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            updGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+            updGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            ovUpdateBannerText = new TextBlock
+            {
+                Text = "Доступна новая версия Buhly",
+                FontSize = 12.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#1E40AF"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            var btnOpenUpdate = CreateSmallPillButton("Скачать обновление →", "#2563EB", "#FFFFFF");
+            btnOpenUpdate.VerticalAlignment = VerticalAlignment.Center;
+            btnOpenUpdate.Click += delegate
+            {
+                if (!string.IsNullOrEmpty(ovUpdateReleaseUrl))
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo(ovUpdateReleaseUrl) { UseShellExecute = true });
+                    }
+                    catch { }
+                }
+            };
+            var btnDismissUpdate = CreateSmallPillButton("✕", "#DBEAFE", "#1E40AF");
+            btnDismissUpdate.VerticalAlignment = VerticalAlignment.Center;
+            btnDismissUpdate.ToolTip = "Скрыть уведомление";
+            btnDismissUpdate.Click += delegate
+            {
+                ovUpdateBanner.Visibility = Visibility.Collapsed;
+            };
+
+            Grid.SetColumn(ovUpdateBannerText, 0);
+            Grid.SetColumn(btnOpenUpdate, 2);
+            Grid.SetColumn(btnDismissUpdate, 4);
+            updGrid.Children.Add(ovUpdateBannerText);
+            updGrid.Children.Add(btnOpenUpdate);
+            updGrid.Children.Add(btnDismissUpdate);
+            ovUpdateBanner.Child = updGrid;
+            container.Children.Add(ovUpdateBanner);
+
+            UpdateChecker.CheckForUpdatesAsync(delegate(string tagName, string htmlUrl)
+            {
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (ovUpdateBanner == null || ovUpdateBannerText == null) return;
+                    string cleanTag = (tagName ?? "").Trim();
+                    if (!cleanTag.StartsWith("v", StringComparison.OrdinalIgnoreCase) && cleanTag.Length > 0)
+                        cleanTag = "v" + cleanTag;
+                    ovUpdateReleaseUrl = htmlUrl;
+                    ovUpdateBannerText.Text = "🚀 Доступна новая версия Buhly " + cleanTag + " — с исправлениями и обновлениями РБ.";
+                    ovUpdateBanner.Visibility = Visibility.Visible;
+                }));
+            });
+
             // HEADER CARD: Active Profile + Quick Actions
             var topCard = new Border
             {
@@ -72,6 +149,53 @@ namespace GovPortalsApp
             topGrid.Children.Add(btnManageProfiles);
             topCard.Child = topGrid;
             container.Children.Add(topCard);
+
+            // ONBOARDING CARD (visible in Simple mode, collapsed in Pro mode)
+            ovOnboardingCard = new Border
+            {
+                Background = GetBrush("#F0F9FF"),
+                BorderBrush = GetBrush("#BAE6FD"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(16),
+                Padding = new Thickness(16),
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            var onbStack = new StackPanel();
+            onbStack.Children.Add(new TextBlock
+            {
+                Text = "🚀 Быстрый старт: 3 шага",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#0369A1"),
+                Margin = new Thickness(0, 0, 0, 2)
+            });
+            onbStack.Children.Add(new TextBlock
+            {
+                Text = "Базовый режим для селлера: выберите организацию, проверьте налоги по отчётам и создайте ТН-2.",
+                FontSize = 11.5,
+                Foreground = GetBrush("#075985"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+
+            onbStack.Children.Add(CreateOnboardingStepRow(
+                "1. Профиль и ЭЦП",
+                "Проверьте организацию и систему налогообложения (ООО УСН 6% / ИП 20%) или заполните с ключа ЭЦП.",
+                "Профили →",
+                delegate { OpenProfileManagerWindow(); }));
+            onbStack.Children.Add(CreateOnboardingStepRow(
+                "2. Отчёты WB/Ozon и налоги",
+                "Перетащите отчёты маркетплейса и выписку банка — Бухли сверит выплаты и покажет расшифровку налога.",
+                "Аналитика →",
+                delegate { SwitchTab(2); }));
+            onbStack.Children.Add(CreateOnboardingStepRow(
+                "3. Накладная ТН-2",
+                "Загрузите файл поставки WB FBS/FBO, при необходимости поправьте цены и сформируйте ТН-2.",
+                "Накладные →",
+                delegate { SwitchTab(3); }));
+
+            ovOnboardingCard.Child = onbStack;
+            container.Children.Add(ovOnboardingCard);
 
             // CARD 1: USB TOKEN + 4 PORTALS PING STRIP + REPAIR ALL
             var statusCard = new Border
@@ -273,6 +397,60 @@ namespace GovPortalsApp
             RefreshOverviewProfileHeader();
             RefreshOverviewCalendar();
             RefreshOverviewAlerts();
+            RefreshOverviewUiMode(IsProUiMode());
+        }
+
+        private Border CreateOnboardingStepRow(string title, string desc, string btnText, Action onClick)
+        {
+            var rowCard = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = GetBrush("#E0F2FE"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var g = new Grid();
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            textStack.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 12.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#1C1C1E")
+            });
+            textStack.Children.Add(new TextBlock
+            {
+                Text = desc,
+                FontSize = 11,
+                Foreground = GetBrush("#636366"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 1, 0, 0)
+            });
+
+            var btn = CreateSmallPillButton(btnText, "#EBF3FF", "#007AFF");
+            btn.VerticalAlignment = VerticalAlignment.Center;
+            btn.Click += delegate { if (onClick != null) onClick(); };
+
+            Grid.SetColumn(textStack, 0);
+            Grid.SetColumn(btn, 2);
+            g.Children.Add(textStack);
+            g.Children.Add(btn);
+            rowCard.Child = g;
+            return rowCard;
+        }
+
+        private void RefreshOverviewUiMode(bool isPro)
+        {
+            if (ovOnboardingCard != null)
+            {
+                ovOnboardingCard.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
 
         private StackPanel CreateCompactPingCell(int colIndex, string title, out System.Windows.Shapes.Ellipse dot, out TextBlock pingText)
@@ -536,13 +714,16 @@ namespace GovPortalsApp
                 {
                     string qLabel = GetPreviousQuarterLabel(m);
                     string declTitle = regime == CompanyProfilesManager.RegimeIpPn20
-                        ? "Декларация ИП (подоходный 20%) и 4-Фонд"
+                        ? "Декларация ИП (подоходный 20%) (4-Фонд — только при найме работников)"
                         : (regime == CompanyProfilesManager.RegimeOsn20
                             ? "Декларация на прибыль / 4-Фонд"
                             : "Декларация УСН 6% и отчёт 4-Фонд");
+                    string declDesc = regime == CompanyProfilesManager.RegimeIpPn20
+                        ? "Сдача декларации по подоходному налогу ИП в МНС. Отчёт 4-Фонд в ФСЗН сдаётся только при наличии наёмных работников."
+                        : "Сдача налоговой декларации в МНС и отчёта 4-Фонд в ФСЗН.";
                     list.Add(CreateCalendarRow(d20, today,
                         declTitle + " за " + qLabel,
-                        "Сдача налоговой декларации в МНС и отчёта 4-Фонд в ФСЗН.",
+                        declDesc,
                         "Квартально"));
 
                     var d22 = new DateTime(m.Year, m.Month, 22);
@@ -561,6 +742,16 @@ namespace GovPortalsApp
                         "Уплата взносов в Белгосстрах за " + qLabel,
                         "Ежеквартальная уплата страховых взносов по обязательному страхованию от несчастных случаев.",
                         regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме" : "Квартально"));
+                }
+
+                // Annual IP FSZN self-employed deadline: March 31
+                if (regime == CompanyProfilesManager.RegimeIpPn20 && m.Month == 3)
+                {
+                    var d31 = new DateTime(m.Year, 3, 31);
+                    list.Add(CreateCalendarRow(d31, today,
+                        "Взносы ФСЗН ИП «за себя» за прошлый год",
+                        "Годовая уплата 35% от чистого дохода (потолок 12 МЗП = 3 603.60 BYN для 2026 г.). Форма ПУ-3 «за себя» отменена — ФСЗН считает взнос по данным МНС.",
+                        "Годовой (ИП)"));
                 }
             }
 
@@ -583,9 +774,17 @@ namespace GovPortalsApp
                 var q20 = new DateTime(qMonth.Year, qMonth.Month, 20);
                 var q22 = new DateTime(qMonth.Year, qMonth.Month, 22);
                 var q25 = new DateTime(qMonth.Year, qMonth.Month, 25);
+                string qDeclTitle = regime == CompanyProfilesManager.RegimeIpPn20
+                    ? "Декларация ИП (подоходный 20%) (4-Фонд — только при найме работников)"
+                    : (regime == CompanyProfilesManager.RegimeOsn20
+                        ? "Декларация на прибыль / 4-Фонд"
+                        : "Декларация УСН 6% и отчёт 4-Фонд");
+                string qDeclDesc = regime == CompanyProfilesManager.RegimeIpPn20
+                    ? "Подача квартальной декларации ИП в МНС за " + qLabel + ". Отчёт 4-Фонд — только при найме работников."
+                    : "Подача квартальной отчётности за " + qLabel + ".";
                 list.Add(CreateCalendarRow(q20, today,
-                    "Декларация (УСН / ПН ИП / Прибыль) и 4-Фонд",
-                    "Подача квартальной отчётности за " + qLabel + ".",
+                    qDeclTitle,
+                    qDeclDesc,
                     "Квартально"));
                 list.Add(CreateCalendarRow(q22, today,
                     "Уплата налога за " + qLabel,
@@ -595,6 +794,24 @@ namespace GovPortalsApp
                     "Уплата взносов в Белгосстрах за " + qLabel,
                     "Ежеквартальная уплата страховых взносов от несчастных случаев на производстве.",
                     regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме" : "Квартально"));
+            }
+
+            if (regime == CompanyProfilesManager.RegimeIpPn20 && curMonth.Month != 3 && nextMonth.Month != 3)
+            {
+                int fsznDueYear = curMonth.Month < 3 ? curMonth.Year : curMonth.Year + 1;
+                var d31 = new DateTime(fsznDueYear, 3, 31);
+                list.Add(new TextBlock
+                {
+                    Text = "Ближайший годовой срок ИП (ФСЗН «за себя» за " + (fsznDueYear - 1) + " г.)",
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = GetBrush("#B45309"),
+                    Margin = new Thickness(0, 10, 0, 6)
+                });
+                list.Add(CreateCalendarRow(d31, today,
+                    "Взносы ФСЗН ИП «за себя» за прошлый год",
+                    "Годовая уплата 35% от чистого дохода (потолок 12 МЗП = 3 603.60 BYN для 2026 г.). Форма ПУ-3 «за себя» отменена — ФСЗН считает взнос по данным МНС.",
+                    "Годовой (ИП)"));
             }
 
             return list;

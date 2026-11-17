@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -155,6 +156,9 @@ namespace GovPortalsApp
         public decimal IpTaxStandard20 { get; set; }
         public bool IpUsedStandardDeduction { get; set; }
         public bool IpHighIncomeRateApplied { get; set; }
+        public bool IpNear500kLimit { get; set; }
+        public decimal IpFsznBase { get; set; }
+        public bool IpFsznCapped12Mzp { get; set; }
         public decimal IpFszn35 { get; set; }
         public string PeriodEndDate { get; set; }
 
@@ -176,6 +180,8 @@ namespace GovPortalsApp
         public decimal BankFeesDebet { get; set; }
         public decimal BankTotalDebet { get; set; }
 
+        public List<string> CalculationAuditDetails { get; set; }
+
         public AnalyticsSnapshot()
         {
             TaxRegime = CompanyProfilesManager.RegimeUsn6;
@@ -186,6 +192,7 @@ namespace GovPortalsApp
             Skus = new List<SkuUnitStats>();
             BankTransactions = new List<BankTxItem>();
             BankCounterparties = new List<BankCounterpartyTotal>();
+            CalculationAuditDetails = new List<string>();
         }
     }
 
@@ -490,6 +497,7 @@ namespace GovPortalsApp
                 snap.IpNetBaseStandard20 = Math.Max(0m, grossTaxableIncome - snap.IpStandardDeduction20);
 
                 decimal effectiveIpRate = taxRatePercent;
+                snap.IpNear500kLimit = (grossTaxableIncome > 400000m && grossTaxableIncome <= 500000m);
                 if (grossTaxableIncome > 500000m && Math.Abs(taxRatePercent - 20m) < 0.01m)
                 {
                     effectiveIpRate = 30m;
@@ -508,7 +516,10 @@ namespace GovPortalsApp
 
                 snap.TaxBaseAmount = snap.IpUsedStandardDeduction ? snap.IpNetBaseStandard20 : snap.IpNetBaseDocumented;
                 snap.EstimatedTaxByRealization = snap.IpUsedStandardDeduction ? snap.IpTaxStandard20 : snap.IpTaxDocumented;
-                snap.IpFszn35 = Math.Round(snap.TaxBaseAmount * 0.35m, 2, MidpointRounding.AwayFromZero);
+                decimal fsznBase = Math.Min(snap.TaxBaseAmount, 10296m);
+                snap.IpFsznBase = fsznBase;
+                snap.IpFsznCapped12Mzp = snap.TaxBaseAmount > 10296m;
+                snap.IpFszn35 = Math.Round(fsznBase * 0.35m, 2, MidpointRounding.AwayFromZero);
                 snap.EstimatedNetProfitBeforeFixed = snap.TotalExpectedPayout - snap.TotalCostOfGoods - snap.EstimatedTaxByRealization - snap.IpFszn35;
             }
             else if (normRegime == CompanyProfilesManager.RegimeOsn20)
@@ -570,7 +581,136 @@ namespace GovPortalsApp
                 .ThenBy(r => r.ReportNumber, StringComparer.Ordinal)
                 .ToList();
 
+            BuildCalculationAuditDetails(snap, grossTaxableIncome);
+
             return snap;
+        }
+
+        private static string FmtAudit(decimal val)
+        {
+            return val.ToString("N2", CultureInfo.GetCultureInfo("ru-RU"));
+        }
+
+        private static void BuildCalculationAuditDetails(AnalyticsSnapshot snap, decimal grossTaxableIncome)
+        {
+            if (snap == null) return;
+            snap.CalculationAuditDetails.Clear();
+
+            snap.CalculationAuditDetails.Add(string.Format(
+                CultureInfo.InvariantCulture,
+                "1) Источники данных: отчётов WB — {0} (файлов: {1}), отчётов Ozon — {2} (файлов: {3}), дубликатов пропущено — {4}, операций банка — {5} (файлов выписки: {6}).",
+                snap.WbReportCount, snap.LoadedWbFiles, snap.OzonReportCount, snap.LoadedOzonFiles,
+                snap.DeduplicatedSkipped, snap.BankTransactions.Count, snap.LoadedBankFiles));
+
+            decimal otherMpHoldings = snap.TotalPenalties + snap.TotalHoldings + snap.TotalAcceptance + snap.TotalLoyalty;
+            snap.CalculationAuditDetails.Add(string.Format(
+                "2) Маркетплейсы (WB + Ozon): продажи — {0} шт., возвраты — {1} шт. Реализация (Пр) = {2} BYN; компенсации/корр. = {3} BYN; комиссия МП (с НДС) = {4} BYN; логистика = {5} BYN; хранение = {6} BYN; штрафы/удержания/приёмка/лояльность = {7} BYN; итого удержано МП = {8} BYN; к перечислению на р/с = {9} BYN (WB: {10}, Ozon: {11}).",
+                snap.TotalSaleQty, snap.TotalReturnQty,
+                FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations),
+                FmtAudit(snap.TotalCommissionWithVat), FmtAudit(snap.TotalLogistics),
+                FmtAudit(snap.TotalStorage), FmtAudit(otherMpHoldings),
+                FmtAudit(snap.MpServicesExpenses), FmtAudit(snap.TotalExpectedPayout),
+                FmtAudit(snap.WbExpectedPayout), FmtAudit(snap.OzonExpectedPayout)));
+
+            if (snap.BankTransactions.Count > 0)
+            {
+                snap.CalculationAuditDetails.Add(string.Format(
+                    "3) Выписка банка: приход всего = {0} BYN, списано всего = {1} BYN. Поступления от МП = {2} BYN (WB: {3}, Ozon: {4}); прочие облагаемые поступления = {5} BYN; необлагаемые поступления = {6} BYN. Списания: поставщики/товары всего = {7} BYN (оплата товара: {8}, прочие: {9}), комиссия банка = {10} BYN, налоги и ФСЗН = {11} BYN, зарплата/выплаты = {12} BYN.",
+                    FmtAudit(snap.BankTotalCredit), FmtAudit(snap.BankTotalDebet),
+                    FmtAudit(snap.BankMarketplaceCredits), FmtAudit(snap.BankWbCredits), FmtAudit(snap.BankOzonCredits),
+                    FmtAudit(snap.BankOtherCredits), FmtAudit(snap.BankNonTaxableCredits),
+                    FmtAudit(snap.BankVendorsDebet), FmtAudit(snap.IpBankGoodsPayments), FmtAudit(snap.IpBankOtherVendorExpenses),
+                    FmtAudit(snap.BankFeesDebet), FmtAudit(snap.BankTaxesDebet), FmtAudit(snap.BankPayrollDebet)));
+            }
+            else
+            {
+                snap.CalculationAuditDetails.Add("3) Выписка банка: файлы выписки не загружены — расчёт выполнен по отчётам маркетплейсов и справочнику себестоимости SKU.");
+            }
+
+            string noReportsBankIncomeNote = (snap.Reports.Count == 0 && snap.BankMarketplaceCredits > 0m)
+                ? string.Format(" + приход от МП по р/с ({0})", FmtAudit(snap.BankMarketplaceCredits))
+                : "";
+
+            if (snap.TaxRegime == CompanyProfilesManager.RegimeIpPn20)
+            {
+                string doubleGoodsExplain = snap.IpHasPotentialDoubleGoodsCost
+                    ? string.Format("защита от двойного списания активна — оплаты за товар с р/с ({0} BYN) исключены, т.к. учтена себестоимость проданных SKU ({1} BYN); с р/с взяты только прочие расходы + комиссии банка + ФОТ = {2} BYN",
+                        FmtAudit(snap.IpBankGoodsPayments), FmtAudit(snap.TotalCostOfGoods), FmtAudit(snap.IpBankDeductibleExpenses))
+                    : string.Format("с р/с (поставщики + комиссия банка + ФОТ) = {0} BYN", FmtAudit(snap.IpBankDeductibleExpenses));
+
+                string limitNote = snap.IpHighIncomeRateApplied || snap.IpGrossIncome > 500000m
+                    ? " Превышен порог 500 000 BYN: ставка 30% и с 01.01 следующего года обязателен переход в юрлицо (Закон № 365-З)."
+                    : (snap.IpNear500kLimit ? " Внимание: доход > 400 000 BYN (приближение к лимиту 500 000 BYN, при превышении — ставка 30% и переход в юрлицо)." : "");
+
+                snap.CalculationAuditDetails.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "4а) Подоходный налог ИП ({0:0.##}%): Валовой доход = Реализация ({1}) + Компенсации ({2}) + Облаг. р/с ({3}){4} = {5} BYN.\r\n    • Докум. расходы = Удержания МП ({6}) + Закупка SKU ({7}) + Р/с ({8}: {9}) = {10} BYN → База = {11} BYN → Налог = {12} BYN.\r\n    • Вычет 20% = 20% × {5} = {13} BYN → База = {14} BYN → Налог = {15} BYN.\r\n    • Выбрано: {16} → Подоходный налог = {17} BYN.{18}",
+                    snap.EffectiveTaxRateApplied,
+                    FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), FmtAudit(snap.BankOtherCredits),
+                    noReportsBankIncomeNote, FmtAudit(snap.IpGrossIncome),
+                    FmtAudit(snap.MpServicesExpenses), FmtAudit(snap.TotalCostOfGoods), FmtAudit(snap.IpBankDeductibleExpenses), doubleGoodsExplain, FmtAudit(snap.IpDocumentedExpenses),
+                    FmtAudit(snap.IpNetBaseDocumented), FmtAudit(snap.IpTaxDocumented),
+                    FmtAudit(snap.IpStandardDeduction20), FmtAudit(snap.IpNetBaseStandard20), FmtAudit(snap.IpTaxStandard20),
+                    snap.IpUsedStandardDeduction ? "стандартный вычет 20%" : "документальные расходы",
+                    FmtAudit(snap.EstimatedTaxByRealization), limitNote));
+
+                string capNote = snap.IpFsznCapped12Mzp
+                    ? "достигнут потолок 12 МЗП (10 296,00 BYN в 2026 г. при МЗП 858 BYN → макс. 3 603,60 BYN/год, Закон № 90-З)"
+                    : "ниже потолка 12 МЗП (10 296,00 BYN в 2026 г. при МЗП 858 BYN → макс. 3 603,60 BYN/год, Закон № 90-З)";
+                snap.CalculationAuditDetails.Add(string.Format(
+                    "4б) ФСЗН ИП 35% «за себя»: база = min(выбранная налоговая база {0}, 10 296,00) = {1} BYN ({2}) → 35% × {1} = {3} BYN.",
+                    FmtAudit(snap.TaxBaseAmount), FmtAudit(snap.IpFsznBase), capNote, FmtAudit(snap.IpFszn35)));
+            }
+            else if (snap.TaxRegime == CompanyProfilesManager.RegimeOsn20)
+            {
+                decimal revExVat = grossTaxableIncome - snap.OsnVat20;
+                decimal osnExpenses = snap.MpServicesExpenses + snap.TotalCostOfGoods + snap.BankVendorsDebet + snap.BankFeesDebet + snap.BankPayrollDebet;
+                snap.CalculationAuditDetails.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "4) Налоги ООО • ОСН: Выручка с НДС = Реализация ({0}) + Компенсации ({1}) + Облаг. р/с ({2}){3} = {4} BYN.\r\n    • Исходящий НДС (20/120) = {4} × 20 / 120 = {5} BYN (без учёта входящего вычета по ЭСЧФ).\r\n    • Выручка без НДС = {4} − {5} = {6} BYN; Расходы (МП + закупка SKU + р/с) = {7} BYN.\r\n    • База налога на прибыль = max(0; {6} − {7}) = {8} BYN → Налог на прибыль ({9:0.##}%) = {10} BYN.\r\n    • Итого налоговая нагрузка ОСН = {5} + {10} = {11} BYN.",
+                    FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), FmtAudit(snap.BankOtherCredits),
+                    noReportsBankIncomeNote, FmtAudit(grossTaxableIncome),
+                    FmtAudit(snap.OsnVat20), FmtAudit(revExVat), FmtAudit(osnExpenses),
+                    FmtAudit(snap.OsnProfitTaxBase), snap.EffectiveTaxRateApplied, FmtAudit(snap.OsnProfitTax20),
+                    FmtAudit(snap.EstimatedTaxByRealization)));
+            }
+            else
+            {
+                string regimePrefix = snap.TaxRegime == CompanyProfilesManager.RegimeCustom
+                    ? "Особый режим"
+                    : "ООО • УСН";
+                snap.CalculationAuditDetails.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "4) Налог ({0} {1:0.##}%): База = Реализация МП ({2}) + Компенсации МП ({3}) + Облагаемые поступления р/с ({4}){5} = {6} BYN → Налог = {6} × {1:0.##}% = {7} BYN.",
+                    regimePrefix, snap.EffectiveTaxRateApplied,
+                    FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), FmtAudit(snap.BankOtherCredits),
+                    noReportsBankIncomeNote, FmtAudit(snap.TaxBaseAmount), FmtAudit(snap.EstimatedTaxByRealization)));
+            }
+
+            string fsznSubtractNote = snap.TaxRegime == CompanyProfilesManager.RegimeIpPn20
+                ? (" − ФСЗН (" + FmtAudit(snap.IpFszn35) + ")")
+                : "";
+            snap.CalculationAuditDetails.Add(string.Format(
+                "5) Чистая прибыль до ФОТ и аренды = К перечислению МП ({0}) − Себестоимость SKU ({1}) − Налог ({2}){3} = {4} BYN.",
+                FmtAudit(snap.TotalExpectedPayout), FmtAudit(snap.TotalCostOfGoods),
+                FmtAudit(snap.EstimatedTaxByRealization), fsznSubtractNote, FmtAudit(snap.EstimatedNetProfitBeforeFixed)));
+
+            if (snap.BankTransactions.Count > 0 && snap.Reports.Count > 0)
+            {
+                decimal diff = snap.BankMarketplaceCredits - snap.TotalExpectedPayout;
+                string diffPrefix = diff > 0m ? "+" : "";
+                string diffStatus = Math.Abs(diff) < 1.0m
+                    ? "выплаты сошлись"
+                    : "расхождение обычно из-за переходящих выплат на границе периода";
+                snap.CalculationAuditDetails.Add(string.Format(
+                    "6) Сверка р/с vs отчёты МП: Поступило от МП на р/с ({0}) − Ожидалось по отчётам МП ({1}) = {2}{3} BYN ({4}).",
+                    FmtAudit(snap.BankMarketplaceCredits), FmtAudit(snap.TotalExpectedPayout),
+                    diffPrefix, FmtAudit(diff), diffStatus));
+            }
+            else
+            {
+                snap.CalculationAuditDetails.Add("6) Сверка р/с vs отчёты МП: загрузите одновременно отчёты МП и банковскую выписку для формулы сверки (Поступило на р/с − К перечислению).");
+            }
         }
 
         private static string GetRegimeDisplayTitle(string regime, decimal rate)
@@ -2170,7 +2310,14 @@ namespace GovPortalsApp
             AddKvHdr(sb, r++, "Налоговый расчёт (" + snap.TaxRegimeTitle + ")", "Сумма, BYN", "Пояснение");
             if (snap.TaxRegime == CompanyProfilesManager.RegimeIpPn20)
             {
-                AddKvMoney(sb, r++, "Валовой доход ИП (Реализация МП + комп. + облаг. р/с)", snap.IpGrossIncome, snap.IpHighIncomeRateApplied ? "ВНИМАНИЕ: доход > 500 000 BYN — применена повышенная ставка 30%!" : "УСН для ИП в РБ отменён — применяется подоходный налог");
+                string ipGrossComment;
+                if (snap.IpHighIncomeRateApplied || snap.IpGrossIncome > 500000m)
+                    ipGrossComment = "КРИТИЧНО (> 500 000 BYN): ставка 30%, а с 01.01 следующего года работа в статусе ИП запрещена (обязателен переход в юрлицо, Закон № 365-З)!";
+                else if (snap.IpNear500kLimit)
+                    ipGrossComment = "ВНИМАНИЕ (> 400 000 BYN): приближение к годовому лимиту ИП 500 000 BYN (при превышении — ставка 30% и переход в юрлицо с 01.01 по Закону № 365-З)";
+                else
+                    ipGrossComment = "УСН для ИП в РБ отменён — применяется подоходный налог (годовой лимит ИП — 500 000 BYN)";
+                AddKvMoney(sb, r++, "Валовой доход ИП (Реализация МП + комп. + облаг. р/с)", snap.IpGrossIncome, ipGrossComment);
                 string expNote = snap.IpHasPotentialDoubleGoodsCost
                     ? string.Format("По р/с учтены только прочие расходы ({0}); оплаты за товар ({1}) не дублированы с себестоимостью SKU", FmtInv(snap.IpBankDeductibleExpenses), FmtInv(snap.IpBankGoodsPayments))
                     : ("По р/с (поставщики, комиссия банка, ФОТ): " + FmtInv(snap.IpBankDeductibleExpenses));
@@ -2179,7 +2326,10 @@ namespace GovPortalsApp
                 AddKvMoney(sb, r++, string.Format(CultureInfo.InvariantCulture, "Подоходный налог при расходах ({0:0.##}%)", snap.EffectiveTaxRateApplied), snap.IpTaxDocumented, "База: " + FmtInv(snap.IpNetBaseDocumented) + " BYN");
                 AddKvMoney(sb, r++, string.Format(CultureInfo.InvariantCulture, "Подоходный налог при вычете 20% ({0:0.##}%)", snap.EffectiveTaxRateApplied), snap.IpTaxStandard20, "База: " + FmtInv(snap.IpNetBaseStandard20) + " BYN");
                 AddKvBoldMoney(sb, r++, "Рекомендуемый подоходный налог ИП", snap.EstimatedTaxByRealization, snap.IpUsedStandardDeduction ? "Выгоднее стандартный вычет 20%" : "Выгоднее документальные расходы");
-                AddKvMoney(sb, r++, "Ориентир взноса ФСЗН ИП (35% от чистого дохода)", snap.IpFszn35, "Не ниже 35% от МЗП за месяцы осуществления деятельности");
+                string fsznComment = snap.IpFsznCapped12Mzp
+                    ? "Потолок 12 МЗП (10 296 BYN в 2026 при МЗП 858 BYN) -> макс. 3 603.60 BYN/год (Закон № 90-З); ПУ-3 за себя отменена, ФСЗН считает по данным МНС, уплата до 31.03"
+                    : string.Format("35% от факт. чистого дохода {0} BYN (< 12 МЗП = 10 296 BYN в 2026 при МЗП 858 BYN, Закон № 90-З); ПУ-3 за себя отменена, ФСЗН считает по данным МНС, уплата до 31.03", FmtInv(snap.IpFsznBase));
+                AddKvMoney(sb, r++, "Ориентир взноса ФСЗН ИП (35%, потолок 12 МЗП)", snap.IpFszn35, fsznComment);
             }
             else if (snap.TaxRegime == CompanyProfilesManager.RegimeOsn20)
             {
@@ -2420,6 +2570,10 @@ namespace GovPortalsApp
                 ? string.Format("  |  ВНИМАНИЕ: оплаты за товар по р/с ({0} BYN) исключены во избежание дублирования с себестоимостью SKU", FmtInv(snap.IpBankGoodsPayments))
                 : "";
             sb.Append("<row r=\"2\">").Append(SC("A2", 0, "Сравнение: Документальные расходы (" + FmtInv(snap.IpDocumentedExpenses) + " BYN) vs Стандартный вычет 20% (" + FmtInv(snap.IpStandardDeduction20) + " BYN)" + compNote)).Append("</row>");
+            string fsznKudirNote = snap.IpFsznCapped12Mzp
+                ? string.Format("ФСЗН ИП 35% (Закон № 90-З): {0} BYN — потолок 12 МЗП (10 296 BYN в 2026 при МЗП 858 BYN, макс. 3 603.60 BYN/год). ПУ-3 за себя отменена, ФСЗН считает по данным МНС, уплата до 31.03.", FmtInv(snap.IpFszn35))
+                : string.Format("ФСЗН ИП 35% (Закон № 90-З): {0} BYN от факт. чистого дохода {1} BYN (< 12 МЗП = 10 296 BYN в 2026 при МЗП 858 BYN; потолок 3 603.60 BYN/год). ПУ-3 за себя отменена, уплата до 31.03.", FmtInv(snap.IpFszn35), FmtInv(snap.IpFsznBase));
+            sb.Append("<row r=\"3\">").Append(SC("A3", 0, fsznKudirNote)).Append("</row>");
 
             string[] h = { "№", "Дата", "Документ", "Статья / содержание расхода", "Сумма, BYN" };
             sb.Append("<row r=\"4\" ht=\"24\" customHeight=\"1\">");
@@ -2747,6 +2901,1038 @@ namespace GovPortalsApp
             var e = zip.CreateEntry(path, CompressionLevel.Optimal);
             using (var sw = new StreamWriter(e.Open(), new UTF8Encoding(false)))
                 sw.Write(content);
+        }
+
+        // ==================== ANONYMIZED DIAGNOSTIC REPORT (SUPPORT) ====================
+
+        public static string GenerateAnonymizedDiagReport(string filePath)
+        {
+            var sb = new StringBuilder();
+            string ver = "unknown";
+            try
+            {
+                var v = Assembly.GetExecutingAssembly().GetName().Version;
+                if (v != null) ver = v.ToString();
+            }
+            catch { }
+
+            sb.AppendLine("=== Buhly Anonymized File Diagnostic Report ===");
+            sb.AppendLine("Buhly Version: " + ver);
+            sb.AppendLine("Generated (UTC): " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + "Z");
+
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                sb.AppendLine("Error: File not found.");
+                return sb.ToString();
+            }
+
+            string ext = (Path.GetExtension(filePath) ?? "").ToLowerInvariant();
+            long byteSize = 0;
+            try { byteSize = new FileInfo(filePath).Length; } catch { }
+
+            sb.AppendLine("File Extension: " + (string.IsNullOrEmpty(ext) ? "(none)" : ext));
+            sb.AppendLine("File Size (bytes): " + byteSize.ToString(CultureInfo.InvariantCulture));
+            sb.AppendLine();
+
+            if (ext == ".zip")
+            {
+                try
+                {
+                    using (var z = ZipFile.OpenRead(filePath))
+                    {
+                        sb.AppendLine("ZIP Entries Count: " + z.Entries.Count.ToString(CultureInfo.InvariantCulture));
+                        int entryIdx = 0;
+                        foreach (var entry in z.Entries)
+                        {
+                            entryIdx++;
+                            string eExt = (Path.GetExtension(entry.Name) ?? "").ToLowerInvariant();
+                            sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                                "--- ZIP Entry #{0} (ext={1}, size={2} bytes) ---",
+                                entryIdx, string.IsNullOrEmpty(eExt) ? "(none)" : eExt, entry.Length));
+
+                            if (eExt == ".xlsx")
+                            {
+                                using (var ms = new MemoryStream())
+                                using (var es = entry.Open())
+                                {
+                                    es.CopyTo(ms);
+                                    ms.Position = 0;
+                                    AppendXlsxDiag(ms, sb);
+                                }
+                            }
+                            else if (eExt == ".txt" || eExt == ".csv")
+                            {
+                                using (var ms = new MemoryStream())
+                                using (var es = entry.Open())
+                                {
+                                    es.CopyTo(ms);
+                                    AppendTextDiag(ms.ToArray(), sb);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine("ZIP Exception: " + ex.GetType().Name + ": " + SanitizeExceptionMessage(ex.Message, filePath));
+                }
+            }
+            else if (ext == ".xlsx")
+            {
+                try
+                {
+                    using (var fs = File.OpenRead(filePath))
+                    {
+                        AppendXlsxDiag(fs, sb);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine("XLSX Exception: " + ex.GetType().Name + ": " + SanitizeExceptionMessage(ex.Message, filePath));
+                }
+            }
+            else if (ext == ".txt" || ext == ".csv")
+            {
+                try
+                {
+                    byte[] raw = File.ReadAllBytes(filePath);
+                    AppendTextDiag(raw, sb);
+                }
+                catch (Exception ex)
+                {
+                    sb.AppendLine("Text Exception: " + ex.GetType().Name + ": " + SanitizeExceptionMessage(ex.Message, filePath));
+                }
+            }
+            else
+            {
+                sb.AppendLine("Detected Parser Type: Unsupported extension (" + ext + ")");
+            }
+
+            // Also run full parser dry-run to capture any runtime exception during AnalyzeFiles
+            try
+            {
+                var drySnap = AnalyzeFiles(new string[] { filePath }, CompanyProfilesManager.RegimeUsn6, 6m, new Dictionary<string, decimal>());
+                sb.AppendLine();
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "Parser Dry-Run Summary: WBFiles={0}, OzonFiles={1}, BankFiles={2}, Reports={3}, Skus={4}, BankTx={5}",
+                    drySnap.LoadedWbFiles, drySnap.LoadedOzonFiles, drySnap.LoadedBankFiles,
+                    drySnap.Reports.Count, drySnap.Skus.Count, drySnap.BankTransactions.Count));
+                sb.AppendLine("Parser Exception: (none)");
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Parser Exception: " + ex.GetType().Name + ": " + SanitizeExceptionMessage(ex.Message, filePath));
+            }
+
+            return sb.ToString();
+        }
+
+        private static string DecodeBankTextWithEncoding(byte[] bytes, out string encodingName)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                encodingName = "empty";
+                return "";
+            }
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            {
+                encodingName = "UTF-8 (BOM)";
+                return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+            }
+
+            string asciiProbe = Encoding.ASCII.GetString(bytes, 0, Math.Min(bytes.Length, 1024));
+            if (asciiProbe.IndexOf("Кодировка=UTF-8", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                asciiProbe.IndexOf("UTF-8", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                encodingName = "UTF-8 (declared)";
+                return Encoding.UTF8.GetString(bytes);
+            }
+            if (asciiProbe.IndexOf("Кодировка=DOS", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                try
+                {
+                    encodingName = "CP866 (DOS)";
+                    return Encoding.GetEncoding(866).GetString(bytes);
+                }
+                catch { }
+            }
+            if (asciiProbe.IndexOf("Кодировка=Windows", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                try
+                {
+                    encodingName = "Windows-1251 (declared)";
+                    return Encoding.GetEncoding(1251).GetString(bytes);
+                }
+                catch { }
+            }
+
+            try
+            {
+                var strictUtf8 = new UTF8Encoding(false, true);
+                string s = strictUtf8.GetString(bytes);
+                encodingName = "UTF-8";
+                return s;
+            }
+            catch
+            {
+                try
+                {
+                    encodingName = "Windows-1251";
+                    return Encoding.GetEncoding(1251).GetString(bytes);
+                }
+                catch
+                {
+                    encodingName = "System Default";
+                    return Encoding.Default.GetString(bytes);
+                }
+            }
+        }
+
+        private static List<string> ReadXlsxSheetNames(Stream stream)
+        {
+            var names = new List<string>();
+            long origPos = stream.CanSeek ? stream.Position : 0;
+            try
+            {
+                using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, true))
+                {
+                    var wbEntry = zip.GetEntry("xl/workbook.xml");
+                    if (wbEntry != null)
+                    {
+                        using (var s = wbEntry.Open())
+                        {
+                            var doc = XDocument.Load(s);
+                            foreach (var sh in doc.Descendants(MainNs + "sheet"))
+                            {
+                                var nameAttr = sh.Attribute("name");
+                                if (nameAttr != null && !string.IsNullOrWhiteSpace(nameAttr.Value))
+                                    names.Add(nameAttr.Value);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (stream.CanSeek) stream.Position = origPos;
+            }
+            return names;
+        }
+
+        private static void AppendXlsxDiag(Stream xlsxStream, StringBuilder sb)
+        {
+            var sheetNames = ReadXlsxSheetNames(xlsxStream);
+            sb.AppendLine("XLSX Sheet Names (" + sheetNames.Count + "): " + (sheetNames.Count > 0 ? string.Join(", ", sheetNames.ToArray()) : "(none)"));
+
+            var allSheets = ReadXlsxAllSheets(xlsxStream);
+            sb.AppendLine("XLSX Readable Sheets Count: " + allSheets.Count.ToString(CultureInfo.InvariantCulture));
+
+            for (int si = 0; si < allSheets.Count; si++)
+            {
+                var rows = allSheets[si];
+                string sName = si < sheetNames.Count ? sheetNames[si] : ("Sheet #" + (si + 1));
+                sb.AppendLine();
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "[Sheet #{0}: {1}, Rows={2}]", si + 1, sName, rows != null ? rows.Count : 0));
+
+                if (rows == null || rows.Count == 0)
+                {
+                    sb.AppendLine("Detected Parser Type: Empty sheet");
+                    continue;
+                }
+
+                string parserType = "Unknown";
+                int hdrIdx = DetectBankHeader(rows);
+                if (hdrIdx >= 0)
+                {
+                    parserType = "Bank Statement (Excel)";
+                }
+                else
+                {
+                    hdrIdx = DetectWbReportHeader(rows);
+                    if (hdrIdx >= 0)
+                    {
+                        parserType = "WB Report (Excel)";
+                    }
+                    else
+                    {
+                        hdrIdx = DetectOzonReportHeader(rows);
+                        if (hdrIdx >= 0)
+                            parserType = "Ozon Report (Excel)";
+                    }
+                }
+
+                sb.AppendLine("Detected Parser Type: " + parserType);
+                sb.AppendLine("Detected Header Row Index (0-based): " + hdrIdx.ToString(CultureInfo.InvariantCulture));
+
+                if (hdrIdx >= 0)
+                {
+                    var hdr = rows[hdrIdx];
+                    sb.AppendLine("Header Row (unmasked): " + FormatRowUnmasked(hdr));
+
+                    int dataStart = hdrIdx + 1;
+                    if (parserType == "Ozon Report (Excel)" && hdrIdx + 1 < rows.Count)
+                    {
+                        int subHits = 0;
+                        foreach (var v in rows[hdrIdx + 1].Values)
+                        {
+                            string n = NormalizeHeader(v);
+                            if (n == "кол-во" || n == "количество" || n == "сумма" || n == "цена" || n == "итого" || n.Contains("кол-во"))
+                                subHits++;
+                        }
+                        if (subHits >= 2)
+                        {
+                            sb.AppendLine("Sub-Header Row (unmasked): " + FormatRowUnmasked(rows[hdrIdx + 1]));
+                            dataStart = hdrIdx + 2;
+                        }
+                    }
+
+                    AppendMaskedSampleRows(rows, dataStart, hdr, 10, sb);
+                }
+                else
+                {
+                    AppendUnknownCandidateAndSampleRows(rows, sb);
+                }
+            }
+        }
+
+        private static void AppendTextDiag(byte[] rawBytes, StringBuilder sb)
+        {
+            string encName;
+            string text = DecodeBankTextWithEncoding(rawBytes, out encName);
+            sb.AppendLine("Detected Encoding: " + encName);
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                sb.AppendLine("Detected Parser Type: Empty text");
+                return;
+            }
+
+            if (text.IndexOf("1CClientBankExchange", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("СекцияДокумент=", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                sb.AppendLine("Detected Parser Type: 1CClientBankExchange");
+                sb.AppendLine("Detected Header Row Index (0-based): 0");
+
+                var lines = text.Split(new string[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+                var allKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var headerPairs = new List<string>();
+                var sampleDocs = new List<string>();
+                var currentDocParts = new List<string>();
+                bool inDoc = false;
+
+                foreach (var rawLine in lines)
+                {
+                    string line = (rawLine ?? "").Trim();
+                    if (string.IsNullOrEmpty(line)) continue;
+                    if (line.StartsWith("КонецФайла", StringComparison.OrdinalIgnoreCase)) break;
+
+                    if (line.StartsWith("СекцияДокумент=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inDoc = true;
+                        currentDocParts.Clear();
+                        allKeys.Add("СекцияДокумент");
+                        currentDocParts.Add("СекцияДокумент=" + MaskDiagValue("СекцияДокумент", line.Substring(line.IndexOf('=') + 1)));
+                        continue;
+                    }
+                    if (line.Equals("КонецДокумента", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (inDoc && sampleDocs.Count < 10)
+                            sampleDocs.Add(string.Join(" | ", currentDocParts.ToArray()));
+                        inDoc = false;
+                        currentDocParts.Clear();
+                        continue;
+                    }
+
+                    int eq = line.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        string k = line.Substring(0, eq).Trim();
+                        string v = line.Substring(eq + 1).Trim();
+                        allKeys.Add(k);
+                        string masked = MaskDiagValue(k, v);
+                        if (!inDoc)
+                        {
+                            if (string.Equals(k, "ВерсияФормата", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(k, "Кодировка", StringComparison.OrdinalIgnoreCase))
+                                headerPairs.Add(k + "=" + v);
+                            else
+                                headerPairs.Add(k + "=" + masked);
+                        }
+                        else if (sampleDocs.Count < 10)
+                        {
+                            currentDocParts.Add(k + "=" + masked);
+                        }
+                    }
+                }
+
+                sb.AppendLine("Header Keys (unmasked): " + string.Join(", ", allKeys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray()));
+                if (headerPairs.Count > 0)
+                    sb.AppendLine("File Preamble (masked values): " + string.Join(" | ", headerPairs.ToArray()));
+                sb.AppendLine("Sample Data Rows (up to 10 documents, strictly masked):");
+                for (int i = 0; i < sampleDocs.Count; i++)
+                    sb.AppendLine("  Doc #" + (i + 1) + ": " + sampleDocs[i]);
+                return;
+            }
+
+            var csvRows = ParseCsvRows(text);
+            if (csvRows.Count == 0)
+            {
+                sb.AppendLine("Detected Parser Type: Unknown (fewer than 2 rows)");
+                var rawLines = text.Split(new string[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries);
+                int candLimit = Math.Min(3, rawLines.Length);
+                for (int i = 0; i < candLimit; i++)
+                    sb.AppendLine("  Candidate Line #" + i + ": " + SanitizeCandidateText(rawLines[i]));
+                return;
+            }
+
+            string parserType = "Unknown";
+            int hdrIdx = DetectWbReportHeader(csvRows);
+            if (hdrIdx >= 0) parserType = "WB Report (CSV)";
+            else
+            {
+                hdrIdx = DetectOzonReportHeader(csvRows);
+                if (hdrIdx >= 0) parserType = "Ozon Report (CSV)";
+                else
+                {
+                    hdrIdx = DetectBankHeader(csvRows);
+                    if (hdrIdx >= 0) parserType = "Bank Statement (CSV)";
+                }
+            }
+
+            sb.AppendLine("Detected Parser Type: " + parserType);
+            sb.AppendLine("Detected Header Row Index (0-based): " + hdrIdx.ToString(CultureInfo.InvariantCulture));
+            if (hdrIdx >= 0)
+            {
+                sb.AppendLine("Header Row (unmasked): " + FormatRowUnmasked(csvRows[hdrIdx]));
+                AppendMaskedSampleRows(csvRows, hdrIdx + 1, csvRows[hdrIdx], 10, sb);
+            }
+            else
+            {
+                AppendUnknownCandidateAndSampleRows(csvRows, sb);
+            }
+        }
+
+        private static string FormatRowUnmasked(Dictionary<int, string> row)
+        {
+            if (row == null || row.Count == 0) return "(empty)";
+            var parts = new List<string>();
+            foreach (var kv in row.OrderBy(k => k.Key))
+            {
+                string val = CleanXmlStr((kv.Value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim());
+                if (!string.IsNullOrEmpty(val))
+                    parts.Add(string.Format(CultureInfo.InvariantCulture, "[C{0}] {1}", kv.Key, val));
+            }
+            return parts.Count > 0 ? string.Join(" | ", parts.ToArray()) : "(empty)";
+        }
+
+        private static void AppendMaskedSampleRows(
+            List<Dictionary<int, string>> rows,
+            int startIdx,
+            Dictionary<int, string> hdrRow,
+            int maxSamples,
+            StringBuilder sb)
+        {
+            sb.AppendLine("Sample Data Rows (up to " + maxSamples + ", strictly masked):");
+            int printed = 0;
+            for (int r = startIdx; r < rows.Count && printed < maxSamples; r++)
+            {
+                var row = rows[r];
+                if (row == null || row.Count == 0) continue;
+                var parts = new List<string>();
+                foreach (var kv in row.OrderBy(k => k.Key))
+                {
+                    if (string.IsNullOrWhiteSpace(kv.Value)) continue;
+                    string hdrText = "";
+                    if (hdrRow != null) hdrRow.TryGetValue(kv.Key, out hdrText);
+                    string masked = MaskDiagValue(hdrText, kv.Value);
+                    parts.Add(string.Format(CultureInfo.InvariantCulture, "[C{0}] {1}", kv.Key, masked));
+                }
+                if (parts.Count == 0) continue;
+                printed++;
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "  Row {0}: {1}", r, string.Join(" | ", parts.ToArray())));
+            }
+            if (printed == 0) sb.AppendLine("  (no non-empty data rows)");
+        }
+
+        private static bool RowLooksLikeDataRow(Dictionary<int, string> row)
+        {
+            if (row == null) return false;
+            foreach (var v in row.Values)
+            {
+                if (string.IsNullOrWhiteSpace(v)) continue;
+                string t = v.Trim();
+                string noSpace = Regex.Replace(t, @"\s+", "");
+                if (Regex.IsMatch(noSpace, @"^BY\d{2}[A-Za-z0-9]{16,30}$", RegexOptions.IgnoreCase)) return true;
+                if (Regex.IsMatch(noSpace, @"^\d{9}$")) return true;
+                if (Regex.IsMatch(t, @"^(\d{2}[./-]\d{2}[./-]\d{4}|\d{4}-\d{2}-\d{2})([ T]\d{2}:\d{2}(:\d{2})?)?$")) return true;
+                string numCand = t.Replace("\u00A0", "").Replace(" ", "");
+                if (Regex.IsMatch(numCand, @"^[+-]?\d+([.,]\d+)?$")) return true;
+            }
+            return false;
+        }
+
+        private static void AppendUnknownCandidateAndSampleRows(List<Dictionary<int, string>> rows, StringBuilder sb)
+        {
+            sb.AppendLine("Candidate Header Rows (up to 3 non-data rows, sensitive tokens sanitized):");
+            int candPrinted = 0;
+            int firstDataRowIdx = rows.Count;
+            for (int r = 0; r < rows.Count; r++)
+            {
+                var row = rows[r];
+                if (row == null || row.Count == 0) continue;
+                bool hasNonEmpty = false;
+                foreach (var v in row.Values) { if (!string.IsNullOrWhiteSpace(v)) { hasNonEmpty = true; break; } }
+                if (!hasNonEmpty) continue;
+
+                if (RowLooksLikeDataRow(row))
+                {
+                    firstDataRowIdx = r;
+                    break;
+                }
+
+                if (candPrinted >= 3)
+                {
+                    firstDataRowIdx = r;
+                    break;
+                }
+
+                var parts = new List<string>();
+                foreach (var kv in row.OrderBy(k => k.Key))
+                {
+                    if (string.IsNullOrWhiteSpace(kv.Value)) continue;
+                    parts.Add(string.Format(CultureInfo.InvariantCulture, "[C{0}] {1}", kv.Key, SanitizeCandidateText(kv.Value)));
+                }
+                if (parts.Count == 0) continue;
+                candPrinted++;
+                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "  CandRow {0}: {1}", r, string.Join(" | ", parts.ToArray())));
+                firstDataRowIdx = r + 1;
+            }
+            if (candPrinted == 0) sb.AppendLine("  (none)");
+
+            AppendMaskedSampleRows(rows, firstDataRowIdx, null, 10, sb);
+        }
+
+        private static string SanitizeCandidateText(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            string s = raw.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            s = Regex.Replace(s, @"\bBY\d{2}[A-Za-z0-9]{16,30}\b", "BY00XXXX...", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\b\d{9}\b", "190000000");
+            s = Regex.Replace(s, @"\b(\d{2}[./-]\d{2}[./-]\d{4}|\d{4}-\d{2}-\d{2})\b", "[DATE:XXXX-XX]");
+            s = Regex.Replace(s, @"(?<!\w)[+-]?\d+([.,]\d+)(?!\w)", "[NUM:XXX.XX]");
+            return s;
+        }
+
+        private static string SanitizeExceptionMessage(string msg, string filePath)
+        {
+            if (string.IsNullOrEmpty(msg)) return "";
+            string s = msg;
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                s = s.Replace(filePath, "<FILE>");
+                string dir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(dir)) s = s.Replace(dir, "<DIR>");
+            }
+            s = Regex.Replace(s, @"\bBY\d{2}[A-Za-z0-9]{16,30}\b", "BY00XXXX...", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\b\d{9}\b", "190000000");
+            return s;
+        }
+
+        public static string MaskDiagValue(string colHeaderOrKey, string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            string t = raw.Trim();
+            string noSpace = Regex.Replace(t, @"\s+", "");
+
+            // 1. IBAN (BY...)
+            if (Regex.IsMatch(noSpace, @"^BY\d{2}[A-Za-z0-9]{16,30}$", RegexOptions.IgnoreCase))
+                return "BY00XXXX...";
+
+            // 2. 9-digit UNP / INN
+            if (Regex.IsMatch(noSpace, @"^\d{9}$"))
+                return "190000000";
+
+            // 3. Dates -> [DATE:yyyy-MM]
+            string hLow = NormalizeHeader(colHeaderOrKey ?? "");
+            bool isDateHeader = hLow.Contains("дата") || hLow.Contains("date");
+            if (Regex.IsMatch(t, @"^(\d{2}[./-]\d{2}[./-]\d{4}|\d{4}-\d{2}-\d{2})([ T]\d{2}:\d{2}(:\d{2})?)?$"))
+            {
+                DateTime dt = ParseFlexibleDate(t);
+                if (dt != DateTime.MinValue)
+                    return string.Format(CultureInfo.InvariantCulture, "[DATE:{0:yyyy-MM}]", dt);
+            }
+            else if (isDateHeader && Regex.IsMatch(noSpace, @"^\d{5}([.,]\d+)?$"))
+            {
+                DateTime dt = ParseFlexibleDate(noSpace);
+                if (dt != DateTime.MinValue)
+                    return string.Format(CultureInfo.InvariantCulture, "[DATE:{0:yyyy-MM}]", dt);
+            }
+
+            // 4. Numbers (amounts / quantities)
+            string numCand = t.Replace("\u00A0", "").Replace(" ", "");
+            var numMatch = Regex.Match(numCand, @"^([+-]?)(\d+)([.,](\d+))?$");
+            if (numMatch.Success)
+            {
+                string signRaw = numMatch.Groups[1].Value;
+                string intDigits = numMatch.Groups[2].Value;
+                bool hasFrac = numMatch.Groups[3].Success;
+                if (hasFrac)
+                {
+                    string sign = signRaw == "-" ? "-" : "+";
+                    string xInt = new string('X', Math.Min(intDigits.Length, 12));
+                    string xFrac = new string('X', Math.Min(numMatch.Groups[4].Value.Length, 8));
+                    return "[NUM:" + sign + xInt + "." + xFrac + "]";
+                }
+                else
+                {
+                    string sign = signRaw == "-" ? "-" : "";
+                    return "[INT:" + sign + intDigits.Length.ToString(CultureInfo.InvariantCulture) + "d]";
+                }
+            }
+
+            // 5. All other text -> [TEXT len=N]
+            return string.Format(CultureInfo.InvariantCulture, "[TEXT len={0}]", t.Length);
+        }
+
+        // ==================== BUILT-IN SELF-TEST SUITE (--self-test) ====================
+
+        public static bool RunSelfTests()
+        {
+            return RunSelfTests(Console.Out);
+        }
+
+        public static bool RunSelfTests(TextWriter output)
+        {
+            if (output == null) output = TextWriter.Null;
+            string tempRoot = Path.Combine(Path.GetTempPath(), "Buhly_SelfTest_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+
+            int passed = 0;
+            int total = 7;
+
+            try
+            {
+                if (RunSingleSelfTest(output, "1. Demo WB + Ozon + 1C Bank -> USN_6 / IP_PN_20 / OSN_20", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t1");
+                    Dictionary<string, decimal> demoCosts;
+                    var files = GenerateDemoAnalyticsFiles(dir, out demoCosts);
+
+                    var usn = AnalyzeFiles(files, CompanyProfilesManager.RegimeUsn6, 6m, demoCosts);
+                    AssertEqDec(usn.TotalRealizedP, 1302.00m, "USN TotalRealizedP");
+                    AssertEqDec(usn.TotalCompensations, 15.20m, "USN TotalCompensations");
+                    AssertEqDec(usn.TotalExpectedPayout, 988.27m, "USN TotalExpectedPayout");
+                    AssertEqDec(usn.MpServicesExpenses, 328.93m, "USN MpServicesExpenses");
+                    AssertEqDec(usn.TotalCostOfGoods, 469.30m, "USN TotalCostOfGoods");
+                    AssertEqDec(usn.TaxBaseAmount, 1317.20m, "USN TaxBaseAmount");
+                    AssertEqDec(usn.EstimatedTaxByRealization, 79.03m, "USN Tax 6%");
+
+                    var ip = AnalyzeFiles(files, CompanyProfilesManager.RegimeIpPn20, 20m, demoCosts);
+                    AssertTrue(ip.IpHasPotentialDoubleGoodsCost, "IP double-goods guard active on demo");
+                    AssertEqDec(ip.IpBankDeductibleExpenses, 19.50m, "IP bank deductible excludes 240 BYN goods");
+                    AssertEqDec(ip.IpDocumentedExpenses, 817.73m, "IP documented expenses");
+                    AssertEqDec(ip.TaxBaseAmount, 499.47m, "IP TaxBaseAmount");
+                    AssertEqDec(ip.EstimatedTaxByRealization, 99.89m, "IP Tax 20%");
+                    AssertEqDec(ip.IpFszn35, 174.81m, "IP FSZN 35%");
+
+                    var osn = AnalyzeFiles(files, CompanyProfilesManager.RegimeOsn20, 20m, demoCosts);
+                    AssertEqDec(osn.OsnVat20, 219.53m, "OSN VAT 20%");
+                    AssertEqDec(osn.OsnProfitTaxBase, 39.94m, "OSN ProfitTaxBase");
+                    AssertEqDec(osn.OsnProfitTax20, 7.99m, "OSN ProfitTax 20%");
+                    AssertEqDec(osn.EstimatedTaxByRealization, 227.52m, "OSN TotalTax");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "2. Ozon Accruals + 2-row merged header + Ozon CSV", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t2");
+                    Directory.CreateDirectory(dir);
+
+                    // 2a. Ozon Accruals ("Доставка покупателю" as sale, not logistics)
+                    string accPath = Path.Combine(dir, "ozon_accruals.xlsx");
+                    WriteSimpleXlsx(accPath, "Начисления", new string[]
+                    {
+                        "Тип начисления", "Артикул продавца", "Наименование товара", "Количество", "Цена продавца", "Вознаграждение Ozon", "Итого к начислению"
+                    }, new object[][]
+                    {
+                        new object[] { "Доставка покупателю", "OZ-ART-1", "Товар А", 2, 100.00m, 15.00m, 85.00m },
+                        new object[] { "Услуги доставки товара", "OZ-ART-1", "Товар А", 0, 0m, 0m, -12.00m }
+                    });
+                    var accSnap = AnalyzeFiles(new string[] { accPath }, CompanyProfilesManager.RegimeUsn6, 6m, null);
+                    AssertEqInt(accSnap.OzonReportCount, 1, "Ozon Accruals report count");
+                    AssertEqInt(accSnap.TotalSaleQty, 2, "Ozon Accruals SaleQty");
+                    AssertEqDec(accSnap.TotalRealizedP, 100.00m, "Ozon Accruals RealizedP");
+                    AssertEqDec(accSnap.TotalLogistics, 12.00m, "Ozon Accruals Logistics");
+                    AssertEqDec(accSnap.TotalExpectedPayout, 73.00m, "Ozon Accruals ExpectedPayout");
+
+                    // 2b. Ozon 2-row merged header
+                    string mergedPath = Path.Combine(dir, "ozon_merged.xlsx");
+                    WriteCustomRowsXlsx(mergedPath, "Реализация", new object[][]
+                    {
+                        new object[] { "Отчет о реализации Ozon", "", "", "", "", "", "", "" },
+                        new object[] { "Артикул продавца", "Наименование товара", "Реализовано", "", "Возвращено", "", "Вознаграждение Ozon", "Итого" },
+                        new object[] { "", "", "Кол-во", "Сумма", "Кол-во", "Сумма", "", "" },
+                        new object[] { "OZ-MERG-1", "Товар Б", 5, 250.00m, 1, 50.00m, 30.00m, 170.00m }
+                    });
+                    var mergedSnap = AnalyzeFiles(new string[] { mergedPath }, CompanyProfilesManager.RegimeUsn6, 6m, null);
+                    AssertEqInt(mergedSnap.OzonReportCount, 1, "Ozon 2-row report count");
+                    AssertEqInt(mergedSnap.TotalSaleQty, 5, "Ozon 2-row SaleQty");
+                    AssertEqInt(mergedSnap.TotalReturnQty, 1, "Ozon 2-row ReturnQty");
+                    AssertEqDec(mergedSnap.TotalRealizedP, 200.00m, "Ozon 2-row RealizedP");
+                    AssertEqDec(mergedSnap.TotalExpectedPayout, 170.00m, "Ozon 2-row ExpectedPayout");
+
+                    // 2c. Ozon CSV
+                    string csvPath = Path.Combine(dir, "ozon_report.csv");
+                    string csvText =
+                        "Артикул продавца;Наименование товара;Реализовано Кол-во;Реализовано на сумму;Вознаграждение Ozon;Итого к начислению\r\n" +
+                        "OZ-CSV-1;Товар С;3;90.00;13.50;76.50\r\n";
+                    File.WriteAllText(csvPath, csvText, new UTF8Encoding(true));
+                    var csvSnap = AnalyzeFiles(new string[] { csvPath }, CompanyProfilesManager.RegimeUsn6, 6m, null);
+                    AssertEqInt(csvSnap.LoadedOzonFiles, 1, "Ozon CSV LoadedOzonFiles");
+                    AssertEqInt(csvSnap.TotalSaleQty, 3, "Ozon CSV SaleQty");
+                    AssertEqDec(csvSnap.TotalRealizedP, 90.00m, "Ozon CSV RealizedP");
+                    AssertEqDec(csvSnap.TotalExpectedPayout, 76.50m, "Ozon CSV ExpectedPayout");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "3. 1CClientBank (Win-1251/UTF-8) + Excel Bank (2-col/1-col) + ClassifyBankTx", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t3");
+                    Directory.CreateDirectory(dir);
+
+                    // 3a. 1C Win-1251
+                    string c1251Path = Path.Combine(dir, "bank_1251.txt");
+                    string c1251Text =
+                        "1CClientBankExchange\r\nКодировка=Windows\r\nРасчСчет=BY00TEST00000000000000000001\r\n" +
+                        "СекцияДокумент=Платежное поручение\r\nНомер=201\r\nДата=05.09.2026\r\nДатаСписано=05.09.2026\r\nСумма=300.00\r\n" +
+                        "ПлательщикСчет=BY00TEST00000000000000000001\r\nПолучатель=ПАО Сбербанк\r\nПолучательИНН=190000011\r\n" +
+                        "НазначениеПлатежа=Оплата по договору поставки № 15 за оборудование\r\nКонецДокумента\r\nКонецФайла\r\n";
+                    File.WriteAllBytes(c1251Path, Encoding.GetEncoding(1251).GetBytes(c1251Text));
+
+                    // 3b. 1C UTF-8
+                    string cUtf8Path = Path.Combine(dir, "bank_utf8.txt");
+                    string cUtf8Text =
+                        "1CClientBankExchange\r\nКодировка=UTF-8\r\nРасчСчет=BY00TEST00000000000000000001\r\n" +
+                        "СекцияДокумент=Банковский ордер\r\nНомер=202\r\nДата=06.09.2026\r\nДатаСписано=06.09.2026\r\nСумма=12.50\r\n" +
+                        "ПлательщикСчет=BY00TEST00000000000000000001\r\nПолучатель=ПАО Сбербанк\r\nПолучательИНН=190000011\r\n" +
+                        "НазначениеПлатежа=Комиссия банка за платежное поручение\r\nКонецДокумента\r\nКонецФайла\r\n";
+                    File.WriteAllText(cUtf8Path, cUtf8Text, new UTF8Encoding(false));
+
+                    // 3c. Excel Bank 2-col
+                    string xl2Path = Path.Combine(dir, "bank_2col.xlsx");
+                    WriteSimpleXlsx(xl2Path, "Выписка", new string[]
+                    {
+                        "Дата операции", "Номер док.", "Корреспондент", "УНП", "Назначение платежа", "Дебет", "Кредит"
+                    }, new object[][]
+                    {
+                        new object[] { "07.09.2026", "301", "ООО \"ИМВБРБ\"", "193630204", "Выплата по оферте WB", 0m, 500.00m }
+                    });
+
+                    // 3d. Excel Bank 1-col
+                    string xl1Path = Path.Combine(dir, "bank_1col.xlsx");
+                    WriteSimpleXlsx(xl1Path, "Выписка", new string[]
+                    {
+                        "Дата проводки", "Номер", "Контрагент", "УНП", "Назначение", "Сумма операции", "Дт/Кт"
+                    }, new object[][]
+                    {
+                        new object[] { "08.09.2026", "401", "ООО \"Поставщик\"", "190000022", "За товар по ТН", 120.00m, "Дт" }
+                    });
+
+                    var bankSnap = AnalyzeFiles(new string[] { c1251Path, cUtf8Path, xl2Path, xl1Path }, CompanyProfilesManager.RegimeUsn6, 6m, null);
+                    AssertEqInt(bankSnap.LoadedBankFiles, 4, "LoadedBankFiles == 4");
+                    AssertEqInt(bankSnap.BankTransactions.Count, 4, "BankTransactions.Count == 4");
+
+                    var sberVendorTx = bankSnap.BankTransactions.FirstOrDefault(t => t.DocNum == "201");
+                    AssertTrue(sberVendorTx != null, "1C Win-1251 tx parsed");
+                    AssertTrue(sberVendorTx.Counterparty.Contains("Сбербанк"), "1C Win-1251 Cyrillic decoded");
+                    AssertTrue(sberVendorTx.Category == "Поставщики и расходы", "Sberbank vendor payment != bank fee (got: " + sberVendorTx.Category + ")");
+
+                    var sberFeeTx = bankSnap.BankTransactions.FirstOrDefault(t => t.DocNum == "202");
+                    AssertTrue(sberFeeTx != null && sberFeeTx.Category == "Комиссия банка", "Sberbank fee classified as Комиссия банка");
+
+                    AssertEqDec(bankSnap.BankWbCredits, 500.00m, "Excel 2-col WB credit");
+                    AssertEqDec(bankSnap.BankVendorsDebet, 420.00m, "Vendors debet (300 + 120)");
+                    AssertEqDec(bankSnap.BankFeesDebet, 12.50m, "Bank fees debet");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "4. WB report deduplication when renamed without report number", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t4");
+                    Dictionary<string, decimal> demoCosts;
+                    var files = GenerateDemoAnalyticsFiles(dir, out demoCosts);
+                    string wbOrig = files[0];
+                    string wbRenamed = Path.Combine(dir, "renamed_report_copy.xlsx");
+                    File.Copy(wbOrig, wbRenamed, true);
+
+                    var dupSnap = AnalyzeFiles(new string[] { wbOrig, wbRenamed }, CompanyProfilesManager.RegimeUsn6, 6m, demoCosts);
+                    AssertEqInt(dupSnap.Reports.Count, 1, "Reports.Count == 1 after dedup");
+                    AssertEqInt(dupSnap.DeduplicatedSkipped, 1, "DeduplicatedSkipped == 1");
+                    AssertEqDec(dupSnap.TotalRealizedP, 883.00m, "TotalRealizedP not doubled");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "5. RB 2026 IP Law #90-Z (FSZN 35%, 12 MZP cap, 500k 30%, double-cost guard)", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t5");
+                    Directory.CreateDirectory(dir);
+
+                    // Case A: net 5000 (gross 10000 - documented logistics 5000 = 5000) -> FSZN 1750.00
+                    string pA = Path.Combine(dir, "wb_net5k.xlsx");
+                    WriteMinimalWbXlsx(pA, 10000m, 5000m, 0m);
+                    var sA = AnalyzeFiles(new string[] { pA }, CompanyProfilesManager.RegimeIpPn20, 20m, null);
+                    AssertTrue(!sA.IpUsedStandardDeduction, "Case A uses documented deduction");
+                    AssertEqDec(sA.TaxBaseAmount, 5000.00m, "Case A net base 5000");
+                    AssertEqDec(sA.IpFszn35, 1750.00m, "Case A FSZN 1750.00");
+
+                    // Case B: net 50000 (gross 100000 - logistics 50000 = 50000) -> FSZN capped 12 MZP = 10296 -> 3603.60
+                    string pB = Path.Combine(dir, "wb_net50k.xlsx");
+                    WriteMinimalWbXlsx(pB, 100000m, 50000m, 0m);
+                    var sB = AnalyzeFiles(new string[] { pB }, CompanyProfilesManager.RegimeIpPn20, 20m, null);
+                    AssertEqDec(sB.TaxBaseAmount, 50000.00m, "Case B net base 50000");
+                    AssertTrue(sB.IpFsznCapped12Mzp, "Case B FSZN capped at 12 MZP");
+                    AssertEqDec(sB.IpFsznBase, 10296.00m, "Case B FSZN base 10296");
+                    AssertEqDec(sB.IpFszn35, 3603.60m, "Case B FSZN 3603.60");
+
+                    // Case C: gross 450000 -> IpNear500kLimit = true, rate = 20%
+                    string pC = Path.Combine(dir, "wb_gross450k.xlsx");
+                    WriteMinimalWbXlsx(pC, 450000m, 450000m, 0m);
+                    var sC = AnalyzeFiles(new string[] { pC }, CompanyProfilesManager.RegimeIpPn20, 20m, null);
+                    AssertEqDec(sC.IpGrossIncome, 450000.00m, "Case C gross 450000");
+                    AssertTrue(sC.IpNear500kLimit, "Case C IpNear500kLimit == true");
+                    AssertEqDec(sC.EffectiveTaxRateApplied, 20m, "Case C rate 20%");
+
+                    // Case D: gross 600000 -> rate 30% + FSZN 3603.60
+                    string pD = Path.Combine(dir, "wb_gross600k.xlsx");
+                    WriteMinimalWbXlsx(pD, 600000m, 300000m, 0m);
+                    var sD = AnalyzeFiles(new string[] { pD }, CompanyProfilesManager.RegimeIpPn20, 20m, null);
+                    AssertEqDec(sD.IpGrossIncome, 600000.00m, "Case D gross 600000");
+                    AssertTrue(sD.IpHighIncomeRateApplied, "Case D IpHighIncomeRateApplied == true");
+                    AssertEqDec(sD.EffectiveTaxRateApplied, 30m, "Case D rate 30%");
+                    AssertEqDec(sD.IpFszn35, 3603.60m, "Case D FSZN 3603.60");
+
+                    // Case E: double-goods-cost guard active
+                    string bE = Path.Combine(dir, "bank_goods.txt");
+                    File.WriteAllText(bE,
+                        "1CClientBankExchange\r\nКодировка=UTF-8\r\nРасчСчет=BY00TEST00000000000000000002\r\n" +
+                        "СекцияДокумент=Платежное поручение\r\nНомер=1\r\nДата=10.09.2026\r\nДатаСписано=10.09.2026\r\nСумма=800.00\r\n" +
+                        "ПлательщикСчет=BY00TEST00000000000000000002\r\nПолучатель=ООО Опт\r\nПолучательИНН=190000033\r\n" +
+                        "НазначениеПлатежа=Оплата за товар по накладной № 5\r\nКонецДокумента\r\nКонецФайла\r\n",
+                        new UTF8Encoding(false));
+                    var costsE = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                    costsE["TEST-SKU"] = 100.00m;
+                    var sE = AnalyzeFiles(new string[] { pA, bE }, CompanyProfilesManager.RegimeIpPn20, 20m, costsE);
+                    AssertTrue(sE.IpHasPotentialDoubleGoodsCost, "Case E double-goods-cost guard active");
+                    AssertEqDec(sE.IpBankDeductibleExpenses, 0m, "Case E excludes bank goods payment");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "6. Exports (Summary XLSX, KUDIR XLSX, 1C XML/CSV) + Waybill Demo", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t6");
+                    Dictionary<string, decimal> demoCosts;
+                    var files = GenerateDemoAnalyticsFiles(dir, out demoCosts);
+                    var snapIp = AnalyzeFiles(files, CompanyProfilesManager.RegimeIpPn20, 20m, demoCosts);
+
+                    var profileIp = new CompanyProfile
+                    {
+                        DisplayName = "ИП Тестов Т.Т.",
+                        OrgInfo = "ИП Тестов Т.Т., УНП 190000099",
+                        Unp = "190000099",
+                        TaxRegime = CompanyProfilesManager.RegimeIpPn20
+                    };
+
+                    string summaryXlsx = Path.Combine(dir, "out_summary.xlsx");
+                    ExportAnalyticsXlsx(snapIp, summaryXlsx);
+                    ValidateXlsxXmlEntries(summaryXlsx);
+
+                    string kudirXlsx = Path.Combine(dir, "out_kudir.xlsx");
+                    ExportKudirXlsx(snapIp, profileIp, kudirXlsx);
+                    ValidateXlsxXmlEntries(kudirXlsx);
+
+                    string xml1c = Path.Combine(dir, "out_1c.xml");
+                    Export1CXml(snapIp, profileIp, xml1c);
+                    using (var fs = File.OpenRead(xml1c))
+                        XDocument.Load(fs);
+
+                    string csv1c = Path.Combine(dir, "out_1c.csv");
+                    Export1CCsv(snapIp, profileIp, csv1c);
+                    string csvContent = File.ReadAllText(csv1c, Encoding.UTF8);
+                    AssertTrue(!string.IsNullOrWhiteSpace(csvContent) && csvContent.Contains("Тип_записи") && csvContent.Contains("Отчет_МП") && csvContent.Contains("Выписка_РБ"), "1C CSV contains expected header and rows");
+
+                    string supplyXlsx = Path.Combine(dir, "demo_supply.xlsx");
+                    WaybillEngine.GenerateDemoSupplyFile(supplyXlsx);
+                    ValidateXlsxXmlEntries(supplyXlsx);
+                    var wbRes = WaybillEngine.ParseSupplyExcelFiles(new string[] { supplyXlsx }, new WaybillProfile());
+                    AssertTrue(wbRes != null && wbRes.GroupedItems.Count > 0, "Waybill ParseSupplyExcelFiles parsed items");
+                    AssertTrue(wbRes.TotalQty > 0 && wbRes.TotalWithVat > 0m, "Waybill totals > 0");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "7. CalculationAuditDetails (USN_6 & IP_PN_20) + CompanyProfileStore UiMode Simple/Pro", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t7");
+                    Dictionary<string, decimal> demoCosts;
+                    var files = GenerateDemoAnalyticsFiles(dir, out demoCosts);
+
+                    var usn = AnalyzeFiles(files, CompanyProfilesManager.RegimeUsn6, 6m, demoCosts);
+                    AssertTrue(usn.CalculationAuditDetails != null && usn.CalculationAuditDetails.Count >= 4, "USN_6 CalculationAuditDetails.Count >= 4");
+                    string usnJoined = string.Join("\n", usn.CalculationAuditDetails);
+                    AssertTrue(usnJoined.Contains("УСН") && usnJoined.Contains("Сверка"), "USN_6 audit contains USN & reconciliation");
+
+                    var ip = AnalyzeFiles(files, CompanyProfilesManager.RegimeIpPn20, 20m, demoCosts);
+                    AssertTrue(ip.CalculationAuditDetails != null && ip.CalculationAuditDetails.Count >= 4, "IP_PN_20 CalculationAuditDetails.Count >= 4");
+                    string ipJoined = string.Join("\n", ip.CalculationAuditDetails);
+                    AssertTrue(ipJoined.Contains("Подоходный") && ipJoined.Contains("ФСЗН"), "IP_PN_20 audit contains Income tax & FSZN");
+
+                    // CompanyProfileStore UiMode defaults, round-trip XML serialization & switching in temp file
+                    var store = new CompanyProfileStore();
+                    AssertTrue(string.Equals(store.UiMode, "Simple", StringComparison.Ordinal), "Default UiMode == Simple");
+                    AssertTrue(!store.IsProMode(), "Default IsProMode() == false");
+                    store.Profiles.Add(new CompanyProfile { DisplayName = "Test Co" });
+                    store.ActiveProfileId = store.Profiles[0].Id;
+
+                    store.UiMode = "Pro";
+                    AssertTrue(store.IsProMode(), "Switched UiMode == Pro -> IsProMode() == true");
+                    string storeXmlPath = Path.Combine(dir, "profiles_test.xml");
+                    var ser = new System.Xml.Serialization.XmlSerializer(typeof(CompanyProfileStore));
+                    using (var fs = File.Create(storeXmlPath)) ser.Serialize(fs, store);
+
+                    CompanyProfileStore loadedPro;
+                    using (var fs = File.OpenRead(storeXmlPath)) loadedPro = ser.Deserialize(fs) as CompanyProfileStore;
+                    AssertTrue(loadedPro != null && loadedPro.IsProMode(), "Deserialized Pro UiMode preserved");
+
+                    loadedPro.UiMode = "Simple";
+                    using (var fs = File.Create(storeXmlPath)) ser.Serialize(fs, loadedPro);
+                    CompanyProfileStore loadedSimple;
+                    using (var fs = File.OpenRead(storeXmlPath)) loadedSimple = ser.Deserialize(fs) as CompanyProfileStore;
+                    AssertTrue(loadedSimple != null && string.Equals(loadedSimple.UiMode, "Simple", StringComparison.Ordinal) && !loadedSimple.IsProMode(), "Deserialized Simple UiMode preserved");
+
+                    // Legacy XML without UiMode or empty UiMode normalizes to Simple
+                    loadedSimple.UiMode = "";
+                    CompanyProfilesManager.NormalizeStore(loadedSimple);
+                    AssertTrue(string.Equals(loadedSimple.UiMode, "Simple", StringComparison.Ordinal) && !loadedSimple.IsProMode(), "Empty UiMode normalized to Simple");
+                })) passed++;
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(tempRoot))
+                        Directory.Delete(tempRoot, true);
+                }
+                catch { }
+            }
+
+            bool allOk = (passed == total);
+            output.WriteLine(string.Format(CultureInfo.InvariantCulture, "SUMMARY: {0}/{1} passed ({2})", passed, total, allOk ? "ALL PASS" : "FAILURES"));
+            return allOk;
+        }
+
+        private static bool RunSingleSelfTest(TextWriter output, string name, Action body)
+        {
+            try
+            {
+                body();
+                output.WriteLine("[PASS] " + name);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                output.WriteLine("[FAIL] " + name + " -> " + ex.Message);
+                return false;
+            }
+        }
+
+        private static void AssertTrue(bool cond, string msg)
+        {
+            if (!cond) throw new InvalidOperationException("Assertion failed: " + msg);
+        }
+
+        private static void AssertEqInt(int actual, int expected, string msg)
+        {
+            if (actual != expected)
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, "{0}: expected {1}, got {2}", msg, expected, actual));
+        }
+
+        private static void AssertEqDec(decimal actual, decimal expected, string msg)
+        {
+            if (Math.Abs(actual - expected) > 0.005m)
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, "{0}: expected {1:0.00}, got {2:0.00}", msg, expected, actual));
+        }
+
+        private static void ValidateXlsxXmlEntries(string xlsxPath)
+        {
+            AssertTrue(File.Exists(xlsxPath), "XLSX exists: " + Path.GetFileName(xlsxPath));
+            int xmlCount = 0;
+            bool hasContentTypes = false;
+            bool hasWorkbook = false;
+            using (var fs = File.OpenRead(xlsxPath))
+            using (var zip = new ZipArchive(fs, ZipArchiveMode.Read))
+            {
+                foreach (var entry in zip.Entries)
+                {
+                    if (string.Equals(entry.FullName, "[Content_Types].xml", StringComparison.OrdinalIgnoreCase))
+                        hasContentTypes = true;
+                    if (string.Equals(entry.FullName, "xl/workbook.xml", StringComparison.OrdinalIgnoreCase))
+                        hasWorkbook = true;
+                    if (entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) ||
+                        entry.FullName.EndsWith(".rels", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var es = entry.Open())
+                        {
+                            XDocument.Load(es);
+                            xmlCount++;
+                        }
+                    }
+                }
+            }
+            AssertTrue(hasContentTypes && hasWorkbook && xmlCount >= 5, "XLSX structure & XML entries valid (" + xmlCount + " entries)");
+        }
+
+        private static void WriteSimpleXlsx(string path, string sheetName, string[] headers, object[][] rows)
+        {
+            var allRows = new List<object[]>();
+            allRows.Add(headers);
+            if (rows != null)
+            {
+                foreach (var r in rows) allRows.Add(r);
+            }
+            WriteCustomRowsXlsx(path, sheetName, allRows.ToArray());
+        }
+
+        private static void WriteCustomRowsXlsx(string path, string sheetName, object[][] rows)
+        {
+            var sb = new StringBuilder();
+            sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>");
+            for (int rIdx = 0; rIdx < rows.Length; rIdx++)
+            {
+                int rn = rIdx + 1;
+                var r = rows[rIdx];
+                sb.Append("<row r=\"" + rn + "\">");
+                for (int c = 0; c < r.Length; c++)
+                {
+                    if (r[c] == null) continue;
+                    string coord = ColName(c + 1) + rn;
+                    if (r[c] is int) sb.Append(NC(coord, 5, ((int)r[c]).ToString(CultureInfo.InvariantCulture)));
+                    else if (r[c] is decimal) sb.Append(MC(coord, 4, (decimal)r[c]));
+                    else sb.Append(SC(coord, 3, r[c].ToString()));
+                }
+                sb.Append("</row>");
+            }
+            sb.Append("</sheetData></worksheet>");
+            WriteXlsxWorkbook(path, new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>(sheetName, sb.ToString()) });
+        }
+
+        private static void WriteMinimalWbXlsx(string path, decimal realizedP, decimal toPayGoods, decimal logistics)
+        {
+            string[] h =
+            {
+                "Артикул поставщика", "Название", "Баркод", "Тип документа", "Обоснование для оплаты",
+                "Дата продажи", "Кол-во", "Вайлдберриз реализовал Товар (Пр)",
+                "К перечислению Продавцу за реализованный Товар", "Услуги по доставке товара покупателю"
+            };
+            object[][] rows = new object[][]
+            {
+                new object[] { "TEST-SKU", "Тестовый товар", "4810000000999", "Продажа", "Продажа", "2026-09-10", 10, realizedP, toPayGoods, logistics }
+            };
+            WriteSimpleXlsx(path, "Отчет WB", h, rows);
         }
     }
 }

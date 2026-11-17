@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -621,6 +622,165 @@ namespace GovPortalsApp
                     string text = "НБРБ: USD " + snap.Usd + " • 100 RUB " + snap.Rub100;
                     if (!string.IsNullOrEmpty(snap.Eur)) text += " • EUR " + snap.Eur;
                     if (onLoaded != null) onLoaded(text);
+                }
+            });
+        }
+    }
+
+    public static class UpdateChecker
+    {
+        private const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
+
+        public static string GetCacheFilePath()
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "update_check.txt");
+        }
+
+        private static string ExtractJsonField(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json)) return "";
+            var m = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+            if (!m.Success) return "";
+            var val = m.Groups[1].Value;
+            return val.Replace("\\\"", "\"").Replace("\\\\", "\\").Replace("\\/", "/").Trim();
+        }
+
+        public static Version ParseNormalizedVersion(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            string s = raw.Trim();
+            if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(1).Trim();
+            int dashIdx = s.IndexOfAny(new char[] { '-', '+' });
+            if (dashIdx >= 0) s = s.Substring(0, dashIdx);
+
+            var parts = s.Split('.');
+            if (parts.Length < 2 || parts.Length > 4) return null;
+
+            int[] nums = new int[4];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                int val;
+                if (!int.TryParse(parts[i], NumberStyles.None, CultureInfo.InvariantCulture, out val) || val < 0)
+                    return null;
+                nums[i] = val;
+            }
+            return new Version(nums[0], nums[1], nums[2], nums[3]);
+        }
+
+        public static bool IsRemoteNewer(string remoteTag, Version currentVersion)
+        {
+            if (currentVersion == null) return false;
+            var remoteVer = ParseNormalizedVersion(remoteTag);
+            if (remoteVer == null) return false;
+
+            var normCurrent = new Version(
+                Math.Max(0, currentVersion.Major),
+                Math.Max(0, currentVersion.Minor),
+                Math.Max(0, currentVersion.Build),
+                Math.Max(0, currentVersion.Revision));
+
+            return remoteVer > normCurrent;
+        }
+
+        private static bool IsValidReleaseUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            return url.StartsWith("https://github.com/narard/buhly-rb/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void SaveCache(string path, string tagName, string htmlUrl)
+        {
+            try
+            {
+                var lines = new string[]
+                {
+                    DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+                    tagName ?? "",
+                    htmlUrl ?? ""
+                };
+                File.WriteAllLines(path, lines, Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        public static void CheckForUpdatesAsync(Action<string, string> onUpdateAvailable)
+        {
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    Version currentVer = Assembly.GetExecutingAssembly().GetName().Version;
+                    string cachePath = GetCacheFilePath();
+
+                    if (File.Exists(cachePath))
+                    {
+                        try
+                        {
+                            string[] lines = File.ReadAllLines(cachePath, Encoding.UTF8);
+                            if (lines.Length >= 1)
+                            {
+                                DateTime lastCheck;
+                                if (DateTime.TryParseExact(
+                                    lines[0].Trim(),
+                                    "yyyy-MM-ddTHH:mm:ssZ",
+                                    CultureInfo.InvariantCulture,
+                                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                                    out lastCheck))
+                                {
+                                    if ((DateTime.UtcNow - lastCheck) < TimeSpan.FromHours(24))
+                                    {
+                                        string cachedTag = lines.Length >= 2 ? lines[1].Trim() : "";
+                                        string cachedUrl = lines.Length >= 3 ? lines[2].Trim() : "";
+                                        if (IsRemoteNewer(cachedTag, currentVer) && IsValidReleaseUrl(cachedUrl))
+                                        {
+                                            if (onUpdateAvailable != null) onUpdateAvailable(cachedTag, cachedUrl);
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    Program.ConfigureSafeTls();
+                    var req = (HttpWebRequest)WebRequest.Create(LatestReleaseApiUrl);
+                    req.Method = "GET";
+                    req.Timeout = 5000;
+                    req.ReadWriteTimeout = 5000;
+                    req.UserAgent = "Buhly-Desktop";
+                    req.Accept = "application/vnd.github+json";
+
+                    string json = "";
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        json = sr.ReadToEnd();
+                    }
+
+                    string tagName = ExtractJsonField(json, "tag_name");
+                    string htmlUrl = ExtractJsonField(json, "html_url");
+
+                    SaveCache(cachePath, tagName, htmlUrl);
+
+                    if (IsRemoteNewer(tagName, currentVer) && IsValidReleaseUrl(htmlUrl))
+                    {
+                        if (onUpdateAvailable != null) onUpdateAvailable(tagName, htmlUrl);
+                    }
+                }
+                catch
+                {
+                    // Offline or GitHub API unreachable: cache timestamp silently so we don't retry excessively
+                    try
+                    {
+                        string cachePath = GetCacheFilePath();
+                        if (!File.Exists(cachePath))
+                            SaveCache(cachePath, "", "");
+                    }
+                    catch { }
                 }
             });
         }

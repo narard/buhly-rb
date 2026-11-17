@@ -63,6 +63,8 @@ namespace GovPortalsApp
         private CheckBox wbSortDescCheck;
         private CheckBox wbUseRulesCheck;
         private TextBox wbRulesBox;
+        private StackPanel wbRulesProSection;
+        private TextBlock wbProModeHint;
         private TextBox wbOutputFolderBox;
         private Border wbNamesStatusBorder;
         private TextBlock wbNamesStatusText;
@@ -145,6 +147,16 @@ namespace GovPortalsApp
             Grid.SetColumn(printModeStack, 2);
             modeGrid.Children.Add(printModeStack);
             stack.Children.Add(modeGrid);
+
+            wbProModeHint = new TextBlock
+            {
+                Text = "ℹ️ Расширенные поля (ТТН-1, БСО в мм, правила) доступны в режиме «Бухгалтер PRO» (переключатель в меню слева).",
+                FontSize = 10.5,
+                Foreground = GetBrush("#8E8E93"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, -4, 0, 8)
+            };
+            stack.Children.Add(wbProModeHint);
 
             // BSO MARGINS PANEL
             wbBsoMarginsPanel = new StackPanel
@@ -838,6 +850,25 @@ namespace GovPortalsApp
             hdrBtn.Content = hdrGrid;
             memoRoot.Children.Add(hdrBtn);
 
+            var etnAlertBanner = new Border
+            {
+                Background = GetBrush("#FEF3C7"),
+                BorderBrush = GetBrush("#F59E0B"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(11, 8, 11, 8),
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            etnAlertBanner.Child = new TextBlock
+            {
+                Text = "⚠️ Внимание (с 01.03.2026, Постановление Совмина № 250): обязательные электронные накладные ЭТН (бумажные ТН-2 / БСО запрещены!) действуют НЕ ТОЛЬКО на маркируемые товары (одежда/обувь УКЗ/СИ), но и на прослеживаемую бытовую технику и электронику (чайники, утюги, фены, пылесосы, мультиварки, дрели, шины, велосипеды и др.).",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#92400E"),
+                TextWrapping = TextWrapping.Wrap
+            };
+            memoRoot.Children.Add(etnAlertBanner);
+
             wbMemoBody = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0) };
             hdrBtn.Click += delegate
             {
@@ -850,7 +881,7 @@ namespace GovPortalsApp
             {
                 "• БСО («Белбланкавыд»): в РБ оригиналы ТН-2 и ТТН-1 оформляются на типографских бланках строгой отчётности. Режим «Полный бланк А4» предназначен для черновика и согласования; для печати на сам бланк выбирайте режим «Печать данных на бланк БСО».",
                 "• Приложение к накладной: если строк больше 178 или нужно приложить расшифровку на обычной бумаге А4, выберите режим «Приложение к накладной (реестр А4)» и укажите серию/номер основного БСО.",
-                "• Прослеживаемые и маркируемые товары (УКЗ / СИ, GTIN): при отгрузке товаров, подлежащих прослеживаемости или маркировке средствами идентификации (по перечням Совмина РБ), закон требует электронную накладную (ЭТН) через аттестованного EDI-провайдера — бумажная ТН-2 её не заменяет.",
+                "• Обязательные ЭТН с 01.03.2026 (Постановление Совмина № 250): электронная накладная (ЭТН) через аттестованного EDI-провайдера обязательна (бумажная ТН-2/БСО запрещена!) НЕ ТОЛЬКО для маркируемых товаров (одежда/обувь с УКЗ/СИ), но и для прослеживаемой бытовой техники и электроники: чайники, утюги, фены, пылесосы, мультиварки, дрели, шины, велосипеды и др.",
                 "• Точность НДС в строках: в ТН-2/ТТН-1 и ЭСЧФ произведение «Цена без НДС × Кол-во» обязано строго равняться «Стоимости без НДС». При выделении НДС из розничной цены возможны копеечные отклонения итоговой суммы — такие строки программа подсвечивает жёлтым."
             };
             foreach (var b in bullets)
@@ -1013,7 +1044,8 @@ namespace GovPortalsApp
             vatGrid.Children.Add(wbSortDescCheck);
             body.Children.Add(vatGrid);
 
-            // NORMALIZATION RULES
+            // NORMALIZATION RULES (PRO mode only)
+            wbRulesProSection = new StackPanel();
             wbUseRulesCheck = new CheckBox
             {
                 Content = "Группировать названия по правилам (если снять — будут оригиналы из Excel)",
@@ -1028,7 +1060,7 @@ namespace GovPortalsApp
                 UpdateWaybillNamesStatusBadge();
                 RecomputePreviewIfLoaded();
             };
-            body.Children.Add(wbUseRulesCheck);
+            wbRulesProSection.Children.Add(wbUseRulesCheck);
 
             wbRulesBox = new TextBox
             {
@@ -1044,14 +1076,15 @@ namespace GovPortalsApp
                 ToolTip = "Пример строки: ручк; pen => Ручка шариковая (строки с # игнорируются)"
             };
             wbRulesBox.TextChanged += delegate { UpdateWaybillNamesStatusBadge(); };
-            body.Children.Add(wbRulesBox);
-            body.Children.Add(new TextBlock
+            wbRulesProSection.Children.Add(wbRulesBox);
+            wbRulesProSection.Children.Add(new TextBlock
             {
                 Text = "Пример правила: ручк; pen => Ручка шариковая   |   Комментарий: # текст",
                 FontSize = 10.5,
                 Foreground = GetBrush("#8E8E93"),
                 Margin = new Thickness(0, 3, 0, 10)
             });
+            body.Children.Add(wbRulesProSection);
 
             UpdateWaybillNamesStatusBadge();
 
@@ -1092,12 +1125,18 @@ namespace GovPortalsApp
             body.Children.Add(btnSaveProf);
         }
 
+        private void RefreshWaybillUiMode(bool isPro)
+        {
+            UpdateModePanelsVisibility();
+        }
+
         private void UpdateModePanelsVisibility()
         {
             if (wbProfile == null) return;
+            bool isPro = IsProUiMode();
             if (wbBsoMarginsPanel != null)
             {
-                wbBsoMarginsPanel.Visibility = string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase)
+                wbBsoMarginsPanel.Visibility = (isPro && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase))
                     ? Visibility.Visible : Visibility.Collapsed;
             }
             if (wbAppendixMetaPanel != null)
@@ -1107,8 +1146,16 @@ namespace GovPortalsApp
             }
             if (wbTtn1FieldsPanel != null)
             {
-                wbTtn1FieldsPanel.Visibility = string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase)
+                wbTtn1FieldsPanel.Visibility = (isPro && string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase))
                     ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (wbRulesProSection != null)
+            {
+                wbRulesProSection.Visibility = isPro ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (wbProModeHint != null)
+            {
+                wbProModeHint.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
             }
         }
 
