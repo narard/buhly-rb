@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buhly v3.1 — Локальный помощник селлера и малого бизнеса РБ (WB/Ozon, налоги, ТН-2, госпорталы)</title>
-  <meta name="description" content="Локальный помощник селлера и малого бизнеса РБ: WB/Ozon, налоги (УСН и ИП), ТН-2/БСО, выписка любого банка и госпорталы (МНС, ФСЗН, ЭСЧФ) в 1 клик.">
-  <meta name="keywords" content="buhly, wildberries беларусь налоги, ozon отчет рб, тн-2 бсо генератор, vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, кудир рб, ввозной ндс рф еаэс, эцп авест">
+  <title>Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров</title>
+  <meta name="description" content="Простой локальный помощник для малого бизнеса РБ на WB и Ozon и бухгалтеров: накладные из Excel, сверка отчётов с банком, расчёт налога и вход на порталы МНС/ЭСЧФ.">
+  <meta name="keywords" content="buhly, wildberries беларусь налоги, ozon отчет рб, тн-2 генератор, vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, кудир рб, ввозной ндс рф, эцп авест">
   <meta name="google-site-verification" content="WD-6rHtHfFlNpetvUoZ7PJtIo6KkqRYPiqFOh4MdhPQ">
   <meta name="yandex-verification" content="153895d755675f1a">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Buhly v3.1 — Помощник селлера и малого бизнеса РБ">
-  <meta property="og:description" content="Локальный помощник селлера и малого бизнеса РБ: WB/Ozon, налоги (УСН и ИП), ТН-2/БСО, выписка любого банка и госпорталы в 1 клик.">
+  <meta property="og:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
+  <meta property="og:description" content="Накладные ТН/ТТН из Excel, сверка WB/Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://buhly.by/">
   <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Buhly v3.1 — Помощник селлера и малого бизнеса РБ">
-  <meta name="twitter:description" content="Локальный помощник селлера и малого бизнеса РБ: WB/Ozon, налоги (УСН и ИП), ТН-2/БСО, выписка любого банка и госпорталы в 1 клик.">
+  <meta name="twitter:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
+  <meta name="twitter:description" content="Накладные ТН/ТТН из Excel, сверка WB/Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <link rel="canonical" href="https://buhly.by/">
 
@@ -32,7 +32,7 @@
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   </style>
 
-  <!-- Schema.org for AI & Google Rich Snippets -->
+  <!-- Schema.org -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -49,7 +49,7 @@
           "price": "0",
           "priceCurrency": "BYN"
         },
-        "description": "Локальный помощник селлера и малого бизнеса РБ: WB/Ozon, налоги (УСН и ИП), ТН-2/БСО, выписка любого банка и госпорталы в 1 клик.",
+        "description": "Бесплатный локальный помощник для продавцов WB/Ozon в Беларуси и бухгалтеров: накладные, сверка отчётов с банком, налоги и вход на госпорталы.",
         "downloadUrl": "https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip"
       },
       {
@@ -60,7 +60,7 @@
             "name": "Как исправить ошибку ERR_SSL_PROTOCOL_ERROR на vat.gov.by?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Ошибка ERR_SSL_PROTOCOL_ERROR на vat.gov.by возникает из-за попытки открыть устаревший портал в обычном режиме Chromium, не поддерживающем национальные стандарты СТБ/ActiveX. Buhly автоматически настраивает режим Internet Explorer в Microsoft Edge бессрочно."
+              "text": "Buhly автоматически включает режим Internet Explorer для vat.gov.by в Microsoft Edge без закрытия открытых вкладок."
             }
           },
           {
@@ -68,23 +68,7 @@
             "name": "Почему служба NTClientSoftware выдает ошибку на порту 8084?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "NTClient может зависнуть в памяти и удерживать порт 8084. Buhly находит зависшие процессы, освобождает порт и перезапускает службу за 1 секунду."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Почему не открывается account.gov.by, e-pasluga.by или nalog.gov.by (ERR_CONNECTION_REFUSED)?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Иногда программы для туннелирования или настройки ЭЦП оставляют в файле hosts записи 127.0.0.1 для доменов .gov.by. Buhly находит такие записи, делает резервную копию и очищает hosts со сбросом DNS-кеша."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Как Buhly считает налоги для ООО на УСН и для ИП в Беларуси?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "В профиле компании задаётся режим: ООО на УСН 6% (от выручки реализации), ИП на подоходном налоге 20%/30% + ФСЗН 35% (сравнение доходы минус расходы и вычета 20%) или ООО на ОСН. Также встроен калькулятор ввозного НДС 20% при закупке из РФ/ЕАЭС по курсу НБРБ."
+              "text": "NTClient может зависать и удерживать порт 8084. Buhly проверяет порт и перезапускает службу в один клик."
             }
           }
         ]
@@ -96,7 +80,7 @@
 <body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
 
   <!-- Navigation -->
-  <nav class="max-w-6xl mx-auto w-full px-6 py-5 flex items-center justify-between gap-4">
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between gap-4">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
         B
@@ -106,334 +90,215 @@
           <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
           <span class="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">v3.1</span>
         </div>
-        <span class="text-xs text-neutral-500 block font-medium">Помощник бизнеса РБ</span>
+        <span class="text-xs text-neutral-500 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
       </div>
     </div>
     <div class="flex items-center flex-wrap gap-2 sm:gap-3">
-      <a href="#security-admins" class="hidden md:inline-block text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
-        Для сисадминов и СБ
+      <a href="#features" class="hidden sm:inline-block text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Что умеет
       </a>
-      <a href="#about-privacy" class="hidden sm:inline-block text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
-        Приватность
+      <a href="#safety" class="hidden md:inline-block text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Безопасность
       </a>
       <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
         GitHub
       </a>
       <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
-        Telegram-чат
+        Чат @buhly_by_chat
       </a>
     </div>
   </nav>
 
   <!-- Hero Section -->
-  <main class="max-w-5xl mx-auto w-full px-6 pt-8 pb-16 text-center">
+  <main class="max-w-5xl mx-auto w-full px-6 pt-6 pb-12 text-center">
 
-    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-6">
-      <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-      <span>Релиз v3.1 • Мультипрофиль • WB + Ozon • Все банки РБ • ТН-2/БСО • ГосПорталы</span>
+    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5">
+      <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+      <span>Бесплатно • Windows 10/11 • 1 файл без установки</span>
     </div>
 
     <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-neutral-900 max-w-4xl mx-auto leading-tight">
-      Локальный помощник селлера и малого бизнеса РБ:
-      <span class="text-blue-600">WB/Ozon, налоги, ТН-2/БСО, выписка банка и госпорталы</span> в 1 клик
+      Простой помощник для продавцов WB / Ozon в Беларуси и <span class="text-blue-600">бухгалтеров, которые их ведут</span>
     </h1>
 
-    <p class="text-base sm:text-lg text-neutral-600 max-w-3xl mx-auto mt-5 font-normal leading-relaxed">
-      Учёт для ООО на УСН 6%, ИП на подоходном 20%/30% + ФСЗН 35% и ОСН. Сверка маркетплейсов с выпиской любого банка РБ, печать на бланки БСО, налоговый календарь и вход в МНС, ФСЗН 2.0 и ЭСЧФ без <code class="text-xs bg-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded font-mono">ERR_SSL_PROTOCOL_ERROR</code>.
+    <p class="text-base sm:text-lg text-neutral-600 max-w-2xl mx-auto mt-5 leading-relaxed">
+      Убирает ручную рутину: накладные из екселя поставки, сверка отчётов с выпиской банка, понятный расчёт налога и вход на порталы МНС / ЭСЧФ в один клик.
     </p>
 
     <!-- Download CTA -->
-    <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
-      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        <span>Скачать Buhly v3.1 (ZIP, 229 КБ)</span>
+    <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <span>Скачать Buhly (ZIP, 229 КБ)</span>
       </a>
       <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
-        <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
-        <span>Канал @buhly_by</span>
+        <span>Канал в Telegram</span>
       </a>
       <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
-        <span>💬 Чат @buhly_by_chat</span>
+        <span>Чат с автором</span>
       </a>
     </div>
+
     <p class="mt-3 text-xs text-neutral-500">
-      Внутри чистого архива: <b>Buhly.exe</b> (~602 КБ, без установки и без .cmd-скриптов), <b>README.md</b> и <b>LICENSE (MIT)</b>.
-      <a href="https://buhly.by/Buhly.exe" class="text-blue-600 hover:underline ml-1">Прямая ссылка на .exe</a> •
-      <a href="https://buhly.by/Release/SHA256SUMS.txt" class="text-blue-600 hover:underline ml-1">SHA256SUMS.txt</a>
-    </p>
-    <p class="mt-1.5 text-[11px] text-neutral-500">
-      Code Signing Policy: Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath.io</a>, using a certificate by <a href="https://signpath.org" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath Foundation</a>.
+      Внутри: только <b>Buhly.exe</b> (~602 КБ), <b>README</b> и <b>LICENSE (MIT)</b> •
+      <a href="https://buhly.by/Buhly.exe" class="text-blue-600 hover:underline">Прямой .exe</a> •
+      <a href="https://buhly.by/Release/SHA256SUMS.txt" class="text-blue-600 hover:underline">SHA-256</a>
     </p>
 
-    <!-- Badges -->
-    <div class="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-neutral-500">
-      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> Portable (1 файл, без установки)</span>
-      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> 0% телеметрии • TLS 1.2</span>
-      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> Windows 10 / 11 (.NET 4.8)</span>
-      <span class="flex items-center"><svg class="w-4 h-4 text-emerald-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> MIT Open Source</span>
-    </div>
-
-    <!-- Interactive Screenshots Showcase (Wide v3.1 UI) -->
-    <div class="mt-12 bg-white rounded-3xl p-4 sm:p-6 shadow-xl border border-neutral-200/80 text-left">
+    <!-- Screenshots Switcher -->
+    <div class="mt-10 bg-white rounded-3xl p-4 sm:p-5 shadow-lg border border-neutral-200/80 text-left">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100">
         <div>
-          <span class="font-extrabold text-base sm:text-lg text-neutral-900">Новый десктопный интерфейс Buhly v3.1</span>
-          <span class="block text-xs text-neutral-500">Мультипрофиль компаний слева, курсы НБРБ и рабочие модули — всё на одном экране</span>
+          <span class="font-bold text-base text-neutral-900">Как выглядит внутри</span>
+          <span class="block text-xs text-neutral-500">Внутри есть кнопка «Попробовать на демо-данных» — можно пощёлкать без своих отчётов</span>
         </div>
         <div class="flex flex-wrap gap-1.5 bg-[#F2F2F7] p-1 rounded-xl" id="shot-tabs">
-          <button type="button" onclick="showShot('overview')" id="tab-overview" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition">🏠 Сводка и календарь</button>
-          <button type="button" onclick="showShot('analytics')" id="tab-analytics" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">📊 WB/Ozon и налоги</button>
-          <button type="button" onclick="showShot('waybills')" id="tab-waybills" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">📦 Накладные ТН-2/БСО</button>
+          <button type="button" onclick="showShot('overview')" id="tab-overview" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition">Сводка и сроки</button>
+          <button type="button" onclick="showShot('analytics')" id="tab-analytics" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Отчёты и налоги</button>
+          <button type="button" onclick="showShot('waybills')" id="tab-waybills" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Накладные ТН/ТТН</button>
         </div>
       </div>
 
       <div class="mt-4">
-        <img id="shot-img" src="screenshots/buhly_v3_overview.png" alt="Интерфейс Buhly v3.1 — Сводка, мультипрофиль и налоговый календарь РБ" class="w-full rounded-2xl border border-neutral-200/80 shadow-sm">
+        <img id="shot-img" src="screenshots/buhly_v3_overview.png" alt="Интерфейс Buhly — Сводка, компании и сроки" class="w-full rounded-2xl border border-neutral-200/80">
         <p id="shot-caption" class="mt-3 text-xs text-neutral-500 text-center">
-          Сводка: активная компания, статус USB-токена ЭЦП, пинг 4 госпорталов и налоговый календарь РБ с учётом переноса выходных и ввозного НДС 20%.
+          Сводка: список ваших компаний, курсы Нацбанка, статус флешки ЭЦП и календарь сроков уплаты.
         </p>
       </div>
     </div>
 
   </main>
 
-  <!-- Feature Grid -->
-  <section class="bg-white py-16 border-t border-neutral-200">
-    <div class="max-w-6xl mx-auto px-6">
-      <h2 class="text-3xl font-extrabold text-center text-neutral-900 mb-4">
-        Всё для работы ИП и ООО в Беларуси
+  <!-- Two Audience Columns -->
+  <section id="features" class="bg-white py-14 border-t border-neutral-200">
+    <div class="max-w-5xl mx-auto px-6">
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-center text-neutral-900 mb-3">
+        Кому и чем помогает Buhly
       </h2>
-      <p class="text-center text-neutral-500 max-w-2xl mx-auto mb-12 text-sm sm:text-base">
-        От ежедневного входа в МНС и выписки накладных до сверки отчётов Wildberries/Ozon и подготовки КУДиР.
+      <p class="text-center text-neutral-500 max-w-xl mx-auto mb-10 text-sm sm:text-base">
+        Это не замена 1С и не большой комбайн, а простой ежедневный помощник без лишних кнопок.
       </p>
 
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg mb-4">🏢</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">Мультипрофиль и календарь РБ</h3>
-          <p class="text-sm text-neutral-600">Ведите сразу несколько ООО и ИП. Автозаполнение реквизитов с USB-токена ЭЦП и ГРП МНС, налоговый календарь с переносом выходных и курсами НБРБ (USD, 100 RUB, EUR).</p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-lg mb-4">📊</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">WB + Ozon, банки РБ и КУДиР</h3>
-          <p class="text-sm text-neutral-600">Парсинг отчётов WB и Ozon, выписок 1CClientBankExchange (.txt) и Excel любого банка РБ. Расчёт УСН 6%, ИП ПН 20%/30% + ФСЗН 35%, калькулятор ввозного НДС 20%, выгрузка КУДиР и 1С (XML/CSV).</p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg mb-4">📦</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">ТН-2, ТТН-1 и печать на БСО</h3>
-          <p class="text-sm text-neutral-600">Загрузка WB FBS и WB FBO, редактируемый предпросмотр с точным НДС, печать чистых данных на типографский бланк БСО с отступами в мм, приложение к накладной и лист сборки.</p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg mb-4">IE</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">ГосПорталы РБ в 1 клик</h3>
-          <p class="text-sm text-neutral-600">МНС, ФСЗН 2.0 (актуальные домены 2026), ЭСЧФ (vat.gov.by) и Е-Паслуга. Бессрочный IE Mode в Edge через политику, лечение порта 8084 и откат hosts/PAC из бэкапа.</p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg mb-4">🔑</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">Реестр ЭЦП и проверка УНП</h3>
-          <p class="text-sm text-neutral-600">Учёт сроков всех ключей Авест, умный поиск старых дублей при продлении сертификата, фильтр истекающих ≤30 дн., экспорт в Excel/CSV и проверка контрагентов по ГРП МНС.</p>
-        </div>
-
-        <div class="p-6 rounded-2xl bg-[#F2F2F7] border border-neutral-200/60">
-          <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg mb-4">⚡</div>
-          <h3 class="font-bold text-lg text-neutral-900 mb-2">Демо-режим в 1 нажатие</h3>
-          <p class="text-sm text-neutral-600">Не нужно искать рабочие отчёты перед тестом: нажмите «Попробовать на демо-данных» в модулях «Маркетплейсы» и «Накладные» для мгновенного тест-драйва на синтетических данных.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 60-Second Video Demo Placeholder -->
-  <section id="demo-video" class="max-w-5xl mx-auto px-6 pt-16 w-full">
-    <div class="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200 shadow-sm">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Видеообзор • 60 секунд</span>
-          <h2 class="text-2xl font-extrabold text-neutral-900 mt-1">Как Buhly экономит часы рутины</h2>
-        </div>
-        <span class="text-xs font-medium bg-neutral-100 text-neutral-600 px-3 py-1.5 rounded-full">Скоро: короткое демо без воды</span>
-      </div>
-
-      <!-- ЗАГОТОВКА ПОД ВИДЕО-ДЕМО: замените блок ниже на <video controls src="demo.mp4"> или <iframe> YouTube/RuTube -->
-      <div class="relative rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-800 to-blue-950 text-white p-8 sm:p-12 overflow-hidden border border-neutral-800">
-        <div class="max-w-2xl mx-auto text-center">
-          <div class="w-16 h-16 rounded-full bg-blue-600/90 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-600/30">
-            <svg class="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </div>
-          <h3 class="text-lg sm:text-xl font-bold">Место под 60-секундное видео-демо (v3.1)</h3>
-          <p class="text-sm text-neutral-300 mt-2">
-            Сценарий ролика: <b>0:00–0:15</b> вход на МНС/ЭСЧФ с ЭЦП → <b>0:15–0:35</b> перетаскивание отчётов WB + Ozon + банковской выписки и расчёт налога → <b>0:35–1:00</b> создание ТН-2 / БСО из файла поставки.
-          </p>
-          <div class="mt-5 inline-flex items-center justify-center bg-blue-500/20 border border-blue-400/40 text-blue-100 text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl">
-            <span>Протестировать за 10 секунд без своих файлов можно прямо сейчас — в программе есть кнопка «⚡ Попробовать на демо-данных» на вкладках Маркетплейсы и Накладные.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- For Sysadmins and Security Teams -->
-  <section id="security-admins" class="max-w-5xl mx-auto px-6 pt-12 w-full">
-    <div class="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200 shadow-sm">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">Открытый код и воспроизводимая сборка</span>
-          <h2 class="text-2xl font-extrabold text-neutral-900 mt-1">Для сисадминов и служб безопасности (СБ)</h2>
-        </div>
-        <a href="https://github.com/narard/buhly-rb/blob/main/.github/workflows/release.yml" target="_blank" rel="noopener" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition">
-          GitHub Actions Workflow →
-        </a>
-      </div>
-
       <div class="grid md:grid-cols-2 gap-6">
-        <div class="bg-[#F2F2F7] rounded-2xl p-5 border border-neutral-200/70">
-          <h3 class="font-bold text-base text-neutral-900 mb-2">1. Сборка из исходников за 3 секунды</h3>
-          <p class="text-xs text-neutral-600 mb-3 leading-relaxed">
-            Не доверяйте готовым бинарникам на слово — соберите <code class="bg-white px-1 py-0.5 rounded">Buhly.exe</code> сами штатным компилятором Windows (<code class="bg-white px-1 py-0.5 rounded">csc.exe</code>, .NET Framework 4.8). В проекте <b>0 внешних NuGet-пакетов и сторонних DLL</b>.
-          </p>
-          <pre class="bg-neutral-900 text-neutral-100 text-xs p-3.5 rounded-xl overflow-x-auto font-mono">git clone https://github.com/narard/buhly-rb.git
-cd buhly-rb
-build.bat</pre>
-        </div>
-
-        <div class="bg-[#F2F2F7] rounded-2xl p-5 border border-neutral-200/70">
-          <h3 class="font-bold text-base text-neutral-900 mb-2">2. Проверка контрольных сумм SHA-256</h3>
-          <p class="text-xs text-neutral-600 mb-2">Актуальный хеш <b>Buhly.exe</b> (v3.1.0.0):</p>
-          <div class="flex items-center gap-2 bg-white border border-neutral-200 rounded-xl px-3 py-2 mb-2">
-            <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all">D32BD5DC092C32612A837D5C06A0CF54F30AF16CED94F8F11AC99C4D4C7A63D8</code>
-            <button type="button" onclick="copyHash()" id="copy-hash-btn" class="shrink-0 text-[11px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition">Копировать</button>
+        <!-- Sellers -->
+        <div class="p-6 sm:p-7 rounded-3xl bg-[#F2F2F7] border border-neutral-200/80">
+          <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-100/80 px-3 py-1 rounded-full mb-4">
+            Для селлеров
           </div>
-          <p class="text-[11px] text-neutral-500 mb-2">
-            SHA-256 архива <b>Release/Buhly.zip</b>: <code class="font-mono break-all">DE0D197821F51D093818DDC92526815899A7043E27319E77E774B09B2611B677</code>
-          </p>
-          <p class="text-[11px] text-neutral-500 mb-2.5 leading-relaxed">
-            Примечание: <code class="font-mono">D32BD5DC...</code> — контрольная сумма опубликованного бинарника с <code class="font-mono">buhly.by</code>. Последний GitHub Release всегда публикует свежий <a href="https://github.com/narard/buhly-rb/releases/latest/download/SHA256SUMS.txt" target="_blank" rel="noopener" data-goal="github_click" class="text-blue-600 hover:underline font-mono">SHA256SUMS.txt</a> для каждого релиза (также доступно резервное зеркало <a href="https://buhly.by/Release/SHA256SUMS.txt" class="text-blue-600 hover:underline font-mono">SHA256SUMS.txt</a>).
-          </p>
-          <code class="block bg-neutral-900 text-neutral-100 text-[11px] p-2.5 rounded-xl font-mono overflow-x-auto">Get-FileHash .\Buhly.exe -Algorithm SHA256</code>
+          <h3 class="font-extrabold text-xl text-neutral-900 mb-4">Кто сам ведёт свою бухгалтерию</h3>
+          <ul class="space-y-3.5 text-sm text-neutral-700 leading-relaxed">
+            <li>
+              <b class="text-neutral-900">Накладные из екселя поставки:</b> закидываешь файл WB, подставляешь реквизиты — получаешь готовую ТН/ТТН под печать (есть настройка отступов под готовые бланки).
+            </li>
+            <li>
+              <b class="text-neutral-900">Сверка «начислили / пришло» и налог:</b> загружаешь отчёт WB/Ozon и выписку банка — видно, сколько реально дошло до счёта и с какой суммы считается налог (УСН или ИП + ФСЗН).
+            </li>
+            <li>
+              <b class="text-neutral-900">Расшифровка «Как посчитано?»:</b> по каждой цифре можно открыть расчёт по строчкам, чтобы перепроверить себя, а не верить программе на слово.
+            </li>
+            <li>
+              <b class="text-neutral-900">Товар из России и госпорталы:</b> сам тянет курс Нацбанка для расчёта ввозного НДС 20% и в 1 клик открывает ЭСЧФ, МНС и ФСЗН (чинит слетевший режим в Edge без закрытия вкладок).
+            </li>
+          </ul>
         </div>
-      </div>
 
-      <div class="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-neutral-700">
-        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-          <b>Без .cmd и Bypass:</b> релизный архив содержит только <code class="font-mono">Buhly.exe</code>, <code class="font-mono">README.md</code> и <code class="font-mono">LICENSE</code>.
-        </div>
-        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-          <b>Права asInvoker:</b> манифест не требует прав администратора, пока вы сами не чините системный <code class="font-mono">hosts</code>.
-        </div>
-        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-          <b>Бэкапы и мягкость:</b> перед правкой <code class="font-mono">hosts</code>, PAC и Edge создаются <code class="font-mono">.bak</code>-копии; <code class="font-mono">EDeclaration</code> не «убивается».
-        </div>
-        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-          <b>Строгий TLS 1.2:</b> проверка SSL-сертификатов не отключается; запросы идут только к официальным доменам РБ.
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- About Developer & Privacy -->
-  <section id="about-privacy" class="max-w-5xl mx-auto px-6 pt-12 w-full">
-    <div class="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200 shadow-sm">
-      <h2 class="text-2xl font-extrabold text-neutral-900 mb-6">О разработчике и приватности</h2>
-      <div class="grid md:grid-cols-2 gap-6 text-sm">
-        <div class="space-y-3 text-neutral-600 leading-relaxed">
-          <div class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 font-semibold text-xs px-3 py-1 rounded-full">
-            🔒 Политика «0% телеметрии»
+        <!-- Accountants -->
+        <div class="p-6 sm:p-7 rounded-3xl bg-[#F2F2F7] border border-neutral-200/80">
+          <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-3 py-1 rounded-full mb-4">
+            Для бухгалтеров
           </div>
-          <p>
-            Buhly работает <b>100% локально на вашем компьютере</b>. Ваши отчёты Wildberries и Ozon, банковские выписки, накладные ТН-2/ТТН-1, справочники себестоимости, профили организаций и реестр ЭЦП никогда не передаются на внешние серверы и хранятся только в папке пользователя (<code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">%LOCALAPPDATA%\Buhly</code>).
-          </p>
-          <p>
-            Программа распространяется бесплатно с открытым исходным кодом по лицензии <a href="https://github.com/narard/buhly-rb/blob/main/LICENSE" target="_blank" rel="noopener" data-goal="github_click" class="text-blue-600 hover:underline font-medium">MIT License</a>. Подробнее об обработке данных — в <a href="privacy.html" class="text-blue-600 hover:underline font-medium">Политике приватности (Закон № 99-З)</a>.
-          </p>
-          <div class="pt-2">
-            <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="consult_click" class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition">
-              <span>Нужна помощь с ЭЦП, ФСЗН или сверкой WB? Написать в Telegram</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- При публикации от имени ИП/ООО можно указать здесь наименование и УНП -->
-        <div class="bg-[#F2F2F7] rounded-2xl p-5 border border-neutral-200/70 space-y-2.5">
-          <div class="text-xs font-bold uppercase tracking-wider text-neutral-500">О проекте и контактах</div>
-          <div class="text-xs sm:text-sm text-neutral-800"><b>Проект:</b> Buhly Open Source (независимая разработка)</div>
-          <div class="text-xs sm:text-sm text-neutral-800"><b>Репозиторий:</b> <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="text-blue-600 hover:underline">github.com/narard/buhly-rb</a></div>
-          <div class="text-xs sm:text-sm text-neutral-800"><b>Регион:</b> Республика Беларусь</div>
-          <div class="text-xs sm:text-sm text-neutral-800"><b>Поддержка и связь:</b> <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="text-blue-600 hover:underline">@buhly_by_chat</a> • <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="text-blue-600 hover:underline">Канал @buhly_by</a></div>
+          <h3 class="font-extrabold text-xl text-neutral-900 mb-4">Кто ведёт несколько ООО и ИП</h3>
+          <ul class="space-y-3.5 text-sm text-neutral-700 leading-relaxed">
+            <li>
+              <b class="text-neutral-900">Все компании в одном окне:</b> быстрое переключение между ООО и ИП, общий календарь сроков с переносом выходных и актуальные курсы НБРБ.
+            </li>
+            <li>
+              <b class="text-neutral-900">Порядок с флешками ЭЦП (Авест):</b> видно все ключи в одном списке, какие скоро истекают и какие старые дубли мешают при входе.
+            </li>
+            <li>
+              <b class="text-neutral-900">Проверка партнёров по УНП без капчи:</b> быстро проверить статус поставщика или клиента по базе налоговой.
+            </li>
+            <li>
+              <b class="text-neutral-900">Любые банки РБ и выгрузки:</b> читает 1С-выписки и Excel разных банков, сохраняет таблицы в КУДиР и 1С. Если какой-то файл банка не открылся — есть безопасная диагностика без сумм и названий.
+            </li>
+          </ul>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- FAQ Section (SEO/GEO) -->
-  <section class="max-w-3xl mx-auto px-6 py-16 w-full">
-    <h2 class="text-2xl md:text-3xl font-extrabold text-neutral-900 text-center mb-8">
-      Частые вопросы и ошибки при входе
-    </h2>
+  <!-- Safety & Free -->
+  <section id="safety" class="max-w-5xl mx-auto px-6 py-12 w-full">
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Why Safe -->
+      <div class="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200 shadow-sm flex flex-col justify-between">
+        <div>
+          <h2 class="text-xl font-extrabold text-neutral-900 mb-3">Почему программе можно доверять</h2>
+          <ul class="space-y-2.5 text-sm text-neutral-600 leading-relaxed">
+            <li>• <b>Работает только на вашем ПК:</b> никаких облаков, аккаунтов и телеметрии. Выписки, суммы, накладные и пароли от ЭЦП никуда не отправляются.</li>
+            <li>• <b>Только официальные адреса:</b> в интернет программа обращается только за курсами НБРБ и чтобы открыть порталы налоговой, ФСЗН и ЭСЧФ.</li>
+            <li>• <b>Открытый код и проверки:</b> исходники выложены на GitHub, политика приватности оформлена по Закону РБ № 99-З. Бинарник уже направлен на проверку в Microsoft (WDSI) и в программу бесплатной подписи open-source софта SignPath Foundation.</li>
+          </ul>
+        </div>
 
-    <div class="space-y-4">
-      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
-        <summary class="font-bold text-neutral-900 text-base">Почему на vat.gov.by возникает ошибка ERR_SSL_PROTOCOL_ERROR?</summary>
-        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
-          Портал ЭСЧФ жестко привязан к старому модулю ActiveX и белорусским криптоалгоритмам СТБ. Современный браузер Google Chrome и Edge в обычном режиме их не поддерживают. Чтобы зайти, сайт должен быть загружен в режиме Internet Explorer (IE Mode). Buhly выполняет эту настройку автоматически за 1 клик.
-        </p>
-      </details>
+        <details class="mt-5 pt-4 border-t border-neutral-100 text-xs text-neutral-600">
+          <summary class="cursor-pointer font-semibold text-neutral-800 hover:text-blue-600 transition">
+            Для сисадминов: SHA-256 и сборка из исходников
+          </summary>
+          <div class="mt-3 space-y-2">
+            <p>0 внешних библиотек — собирается штатным компилятором Windows (<code class="bg-neutral-100 px-1 rounded">build.bat</code>). Перед правкой <code class="bg-neutral-100 px-1 rounded">hosts</code> или Edge всегда создаётся <code class="bg-neutral-100 px-1 rounded">.bak</code>-бэкап.</p>
+            <div class="flex items-center gap-2 bg-[#F2F2F7] rounded-xl px-3 py-2">
+              <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all">D32BD5DC092C32612A837D5C06A0CF54F30AF16CED94F8F11AC99C4D4C7A63D8</code>
+              <button type="button" onclick="copyHash()" id="copy-hash-btn" class="shrink-0 text-[11px] font-semibold bg-white text-blue-600 px-2.5 py-1 rounded-lg border border-neutral-200">Копировать</button>
+            </div>
+            <p class="text-[11px] text-neutral-500">
+              Code Signing Policy: Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath.io</a>, using a certificate by <a href="https://signpath.org" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath Foundation</a>.
+            </p>
+          </div>
+        </details>
+      </div>
 
-      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
-        <summary class="font-bold text-neutral-900 text-base">Почему не заходит в МНС, если запущена EDeclaration (АРМ «Плательщик»)?</summary>
-        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
-          Программа EDeclaration монопольно блокирует USB-токен Avest на аппаратном уровне. Пока открыта EDeclaration или менеджер сертификатов MngCert, браузер не может получить доступ к ключу. Buhly определяет конфликт и предупреждает вас перед входом, не закрывая программы с вашими несохранёнными отчётами.
-        </p>
-      </details>
+      <!-- Why Free & Pilot Notice -->
+      <div class="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200 shadow-sm flex flex-col justify-between">
+        <div>
+          <h2 class="text-xl font-extrabold text-neutral-900 mb-3">Почему бесплатно — и важное уточнение</h2>
+          <p class="text-sm text-neutral-600 leading-relaxed mb-4">
+            У меня самого небольшое ООО в Минске, торгую на WB и сам веду бухгалтерию. Программу изначально делал чисто под себя — чтобы не набивать накладные руками и не чинить каждый месяц вход в ЭСЧФ.
+          </p>
+          <p class="text-sm text-neutral-600 leading-relaxed mb-5">
+            Она уже работает и экономит мне время, поэтому мне не жалко поделиться ей бесплатно с такими же селлерами и бухгалтерами. Никаких подписок и рекламы.
+          </p>
+        </div>
 
-      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
-        <summary class="font-bold text-neutral-900 text-base">Нужно ли устанавливать Buhly на компьютер?</summary>
-        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
-          Нет. Buhly поставляется как единый файл (Portable) со встроенными шаблонами ТН-2/ТТН-1 и аналитикой WB/Ozon/1С. Вы можете запускать его прямо с рабочего стола или флешки.
-        </p>
-      </details>
-
-      <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
-        <summary class="font-bold text-neutral-900 text-base">Почему не открывается account.gov.by, e-pasluga.by или nalog.gov.by (ERR_CONNECTION_REFUSED)?</summary>
-        <p class="text-sm text-neutral-600 mt-3 leading-relaxed">
-          Иногда старые программы для туннелирования или настройки ЭЦП оставляют в системном файле <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">C:\Windows\System32\drivers\etc\hosts</code> перенаправления <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">127.0.0.1</code> на <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">account.gov.by</code> и другие домены <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">.gov.by</code>. Из-за этого браузер не может достучаться до реального сервера. Buhly автоматически находит такие записи, очищает <code class="text-xs bg-neutral-100 px-1 py-0.5 rounded">hosts</code> в 1 клик (с резервной копией) и сбрасывает DNS-кеш.
-        </p>
-      </details>
+        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs sm:text-sm text-amber-900 leading-relaxed">
+          <b>Пилотный проект:</b> все расчёты делаются программой автоматически, автор ответственности за них не несёт — важные цифры обязательно пересчитывайте и перепроверяйте перед подачей отчётов. Если нашли баг или есть идея, что добавить — пишите в <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" class="font-semibold underline">@buhly_by_chat</a>, это очень важно!
+        </div>
+      </div>
     </div>
 
-    <div class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
-      <h3 class="font-bold text-lg text-neutral-900 mb-3">Инструкции по исправлению частых ошибок</h3>
-      <div class="grid sm:grid-cols-2 gap-3 text-sm">
-        <a href="vat-err-ssl.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">
-          🧾 Ошибка ERR_SSL_PROTOCOL_ERROR на ЭСЧФ (vat.gov.by) →
-        </a>
-        <a href="fszn-8084.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">
-          📑 Портал ФСЗН 2.0 (portal2.ssf.gov.by): порт 8084 и AvTunProxy →
-        </a>
-        <a href="mns-nalog-avest.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">
-          🏛️ Не заходит в МНС (nalog.gov.by / account.gov.by) с ЭЦП →
-        </a>
-        <a href="avest-srok-ecp.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">
-          🔑 Как проверить срок действия ЭЦП Авест для всех фирм и ИП →
-        </a>
+    <!-- Compact Troubleshooting Strip -->
+    <div class="mt-6 bg-white rounded-2xl p-4 sm:p-5 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <span class="font-semibold text-neutral-700">Шпаргалки по частым ошибкам порталов РБ:</span>
+      <div class="flex flex-wrap gap-2">
+        <a href="vat-err-ssl.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">ЭСЧФ (ERR_SSL)</a>
+        <a href="fszn-8084.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">ФСЗН (порт 8084)</a>
+        <a href="mns-nalog-avest.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">МНС и Авест</a>
+        <a href="avest-srok-ecp.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">Сроки ключей ЭЦП</a>
       </div>
     </div>
   </section>
 
   <!-- Footer -->
-  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
-    <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+  <footer class="bg-neutral-900 text-neutral-400 py-8 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <span class="text-white font-bold text-base">Buhly v3.1</span> • Локальный помощник селлера и малого бизнеса РБ (MIT)
+        <span class="text-white font-bold">Buhly</span> • Бесплатный помощник продавцов и бухгалтеров РБ (MIT)
       </div>
       <div class="flex items-center flex-wrap gap-5">
         <a href="privacy.html" class="hover:text-white transition">Политика приватности</a>
-        <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="hover:text-white transition">GitHub Repo</a>
-        <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="hover:text-white transition">Канал @buhly_by</a>
-        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="hover:text-white transition">Чат @buhly_by_chat</a>
+        <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="hover:text-white transition">GitHub</a>
+        <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="hover:text-white transition">@buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="hover:text-white transition">@buhly_by_chat</a>
       </div>
     </div>
   </footer>
@@ -442,18 +307,18 @@ build.bat</pre>
     var shots = {
       overview: {
         src: 'screenshots/buhly_v3_overview.png',
-        alt: 'Интерфейс Buhly v3.1 — Сводка, мультипрофиль и налоговый календарь РБ',
-        caption: 'Сводка: активная компания, статус USB-токена ЭЦП, пинг 4 госпорталов и налоговый календарь РБ с учётом переноса выходных и ввозного НДС 20%.'
+        alt: 'Buhly — Сводка, компании и календарь сроков',
+        caption: 'Сводка: список ваших компаний, курсы Нацбанка, статус флешки ЭЦП и календарь сроков уплаты.'
       },
       analytics: {
         src: 'screenshots/buhly_v3_analytics.png',
-        alt: 'Интерфейс Buhly v3.1 — Маркетплейсы WB и Ozon, налоги и банковская выписка',
-        caption: 'Маркетплейсы и налоги: режим «Базовый / Бухгалтер PRO», расшифровка «❓ Как посчитано?», сверка WB + Ozon с выпиской 1CClientBankExchange/Excel любого банка РБ, налоги УСН/ИП/ОСН с порогом ФСЗН 12 МЗП, КУДиР и 1С.'
+        alt: 'Buhly — Отчёты WB/Ozon, банк и расчёт налога',
+        caption: 'Отчёты и налоги: сверка WB/Ozon с выпиской банка, расчёт налога и расшифровка «Как посчитано?» по строчкам.'
       },
       waybills: {
         src: 'screenshots/buhly_v3_waybills.png',
-        alt: 'Интерфейс Buhly v3.1 — Генератор накладных ТН-2, ТТН-1 и печать на БСО',
-        caption: 'Накладные: загрузка WB FBS/FBO, редактируемый предпросмотр с точным НДС, выбор режима ТН-2 / ТТН-1 и печать данных на типографский бланк БСО.'
+        alt: 'Buhly — Генератор накладных ТН/ТТН',
+        caption: 'Накладные: загружаешь файл поставки WB, проверяешь цены — и готовая накладная под печать.'
       }
     };
 
