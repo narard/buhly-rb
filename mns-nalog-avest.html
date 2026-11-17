@@ -13,6 +13,12 @@
   <meta property="og:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и блокировки токена.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://buhly.by/mns-nalog-avest.html">
+  <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Не заходит в Личный кабинет МНС (nalog.gov.by и account.gov.by) с ЭЦП Авест | Buhly">
+  <meta name="twitter:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и блокировки токена.">
+  <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -43,7 +49,7 @@
       "name": "Подходит ли Buhly одновременно для МНС и для Е-Паслуги (e-pasluga.by)?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Да, в Buhly v3.0 есть отдельные кнопки для Личного кабинета МНС, ФСЗН 2.0, ЭСЧФ (vat.gov.by) и Е-Паслуги (e-pasluga.by)."
+        "text": "Да, в Buhly v3.1 есть отдельные кнопки для Личного кабинета МНС, ФСЗН 2.0, ЭСЧФ (vat.gov.by) и Е-Паслуги (e-pasluga.by)."
       }
     },
     {
@@ -98,11 +104,11 @@
     <!-- Download CTA Banner -->
     <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
-        <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v3.0</div>
+        <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v3.1</div>
         <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~602 КБ (ZIP 229 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
       </div>
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
-        Скачать Buhly v3.0 (ZIP)
+        Скачать Buhly v3.1 (ZIP)
       </a>
     </div>
 
@@ -125,7 +131,7 @@
 
     <!-- Auto Solution -->
     <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
-      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как это чинит Buhly v3.0 автоматически</h2>
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как это чинит Buhly v3.1 автоматически</h2>
       <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
         <li>✓ <b>Авточистка файла hosts в 1 клик:</b> программа сама находит паразитные перенаправления на госдомены <code>.gov.by</code>, очищает <code>hosts</code> и сбрасывает DNS-кеш.</li>
         <li>✓ <b>Снятие блокировки токена:</b> завершает конфликтующие процессы <code>EDeclaration</code> / <code>MngCert</code> и перезапускает порт <code>8084</code>.</li>
@@ -151,7 +157,7 @@
         </details>
         <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
           <summary class="font-bold text-neutral-900 text-base">Подходит ли Buhly одновременно для МНС и для Е-Паслуги (e-pasluga.by)?</summary>
-          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Да, в Buhly v3.0 есть отдельные кнопки для Личного кабинета МНС, ФСЗН 2.0, ЭСЧФ (vat.gov.by) и Е-Паслуги (e-pasluga.by).</p>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Да, в Buhly v3.1 есть отдельные кнопки для Личного кабинета МНС, ФСЗН 2.0, ЭСЧФ (vat.gov.by) и Е-Паслуги (e-pasluga.by).</p>
         </details>
         <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
           <summary class="font-bold text-neutral-900 text-base">Видит ли программа мой пин-код от флешки налоговой?</summary>
@@ -167,7 +173,7 @@
         <a href="vat-err-ssl.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🧾 Ошибка ERR_SSL_PROTOCOL_ERROR на ЭСЧФ (vat.gov.by) →</a>
         <a href="fszn-8084.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📑 Портал ФСЗН 2.0 (portal2.ssf.gov.by): порт 8084 и AvTunProxy →</a>
         <a href="avest-srok-ecp.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🔑 Как проверить срок действия ЭЦП Авест для всех фирм →</a>
-        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v3.0 →</a>
+        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v3.1 →</a>
       </div>
     </section>
   </main>
