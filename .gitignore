@@ -5,6 +5,7 @@
 *.pyc
 __pycache__/
 portal_state.json
+tg_posts_state.json
 .vs/
 bin/
 obj/

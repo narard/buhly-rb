@@ -1,0 +1,46 @@
+name: Telegram Channel Auto-Poster (@buhly_by)
+
+on:
+  schedule:
+    - cron: '0 8 * * 2,5'
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: 'Post ID (or auto for next unsent)'
+        required: false
+        default: 'auto'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tg-autopost-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-post:
+    name: Publish next scheduled post to @buhly_by
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore and save Telegram posts state cache
+        uses: actions/cache@v4
+        with:
+          path: tg_posts_state.json
+          key: tg-posts-state-v1-${{ github.run_id }}
+          restore-keys: |
+            tg-posts-state-v1-
+
+      - name: Publish queued Telegram post
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+        run: python3 scripts/post_tg_queue.py --queue scripts/tg_autopost_queue.json --state tg_posts_state.json --post-id "${{ inputs.post_id || 'auto' }}"
