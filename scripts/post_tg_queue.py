@@ -156,6 +156,12 @@ def parse_args(argv):
         help="Allow resending a specific --post-id even if already in sent_ids",
     )
     parser.add_argument(
+        "--edit-message-id",
+        type=int,
+        default=0,
+        help="If > 0, edit an existing channel message_id instead of sendMessage",
+    )
+    parser.add_argument(
         "--dry-run-mark",
         action="store_true",
         help="Local test helper: mark post as sent in state file during dry-run",
@@ -201,10 +207,11 @@ def main(argv=None):
     tg_channel = os.environ.get("TG_CHANNEL_ID", "").strip()
 
     if not tg_token or not tg_channel:
+        action = "edit message_id={0}".format(args.edit_message_id) if args.edit_message_id > 0 else "publish"
         print(
             "[DRY-RUN] TG_BOT_TOKEN or TG_CHANNEL_ID not set. "
-            "Would publish id='{0}' (pin={1}), preview (first 120 chars): {2}".format(
-                post_id, should_pin, preview
+            "Would {0} id='{1}' (pin={2}), preview (first 120 chars): {3}".format(
+                action, post_id, should_pin, preview
             )
         )
         if args.dry_run_mark:
@@ -214,6 +221,26 @@ def main(argv=None):
             state["updated_at_msk"] = now_msk_iso()
             save_state(args.state, state)
             print("[DRY-RUN] Marked '{0}' in {1}".format(post_id, args.state))
+        return 0
+
+    if args.edit_message_id > 0:
+        ok, result, err = call_telegram_api(
+            tg_token,
+            "editMessageText",
+            {
+                "chat_id": tg_channel,
+                "message_id": args.edit_message_id,
+                "text": post["text"],
+                "parse_mode": "HTML",
+                "disable_web_page_preview": False,
+            },
+            timeout=args.timeout,
+            strict_ctx=strict_ctx,
+        )
+        if not ok:
+            print("[ERROR] Failed to edit message_id={0} for '{1}': {2}".format(args.edit_message_id, post_id, err), file=sys.stderr)
+            return 1
+        print("[EDITED] Updated '{0}' in message_id={1}.".format(post_id, args.edit_message_id))
         return 0
 
     ok, result, err = call_telegram_api(
