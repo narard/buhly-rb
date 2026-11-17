@@ -64,6 +64,7 @@
 - **Проект и контакты:**
   - Проект: Buhly Open Source (независимая разработка, Республика Беларусь)
   - Лицензия: [MIT License](LICENSE)
+  - **Code Signing Policy:** Free code signing provided by [SignPath.io](https://signpath.io), using a certificate by [SignPath Foundation](https://signpath.org). Team roles (committers, reviewers, approvers): project maintainer `@narard`. This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it (see [Privacy Policy](https://buhly.by/privacy.html)).
   - Обратная связь: [Чат @buhly_by_chat](https://t.me/buhly_by_chat) • [Канал @buhly_by](https://t.me/buhly_by) • [GitHub Issues](https://github.com/narard/buhly-rb/issues)
 
 ---
