@@ -20,6 +20,7 @@ namespace GovPortalsApp
         public string Signer { get; set; }
         public string TaxRegime { get; set; }
         public decimal CustomTaxRate { get; set; }
+        public decimal IpExpenseNormPercent { get; set; }
         public WaybillProfile WaybillProfile { get; set; }
 
         public CompanyProfile()
@@ -31,6 +32,7 @@ namespace GovPortalsApp
             Signer = "";
             TaxRegime = CompanyProfilesManager.RegimeUsn6;
             CustomTaxRate = 6m;
+            IpExpenseNormPercent = 30m;
             WaybillProfile = new WaybillProfile();
         }
 
@@ -47,7 +49,7 @@ namespace GovPortalsApp
             if (TaxRegime == CompanyProfilesManager.RegimeIpPn20)
                 return "ИП • Подоходный 20% + ФСЗН 35%";
             if (TaxRegime == CompanyProfilesManager.RegimeOsn20)
-                return "ООО • ОСН (НДС 20% + Прибыль 20%)";
+                return "ООО • ОСН [ЭКСПЕРИМЕНТАЛЬНЫЙ РЕЖИМ] (НДС 20% + Прибыль 20%)";
             if (TaxRegime == CompanyProfilesManager.RegimeCustom)
                 return string.Format("Особый режим ({0}%)", CustomTaxRate.ToString("0.##", CultureInfo.InvariantCulture));
             return "ООО • УСН 6% (без НДС)";
@@ -101,6 +103,9 @@ namespace GovPortalsApp
         public const string RegimeOsn20 = "OSN_20";
         public const string RegimeCustom = "CUSTOM";
 
+        public static bool LastLoadHadCorruptFile { get; private set; }
+        public static string LastCorruptBackupPath { get; private set; }
+
         public static string GetProfilesPath()
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
@@ -132,13 +137,19 @@ namespace GovPortalsApp
 
         public static CompanyProfileStore LoadStore()
         {
-            var path = GetProfilesPath();
+            return LoadStoreFromPath(GetProfilesPath(), WaybillEngine.GetProfilePath(), true);
+        }
+
+        internal static CompanyProfileStore LoadStoreFromPath(string path, string legacyPath, bool saveWhenMissing)
+        {
+            LastLoadHadCorruptFile = false;
+            LastCorruptBackupPath = "";
             if (File.Exists(path))
             {
                 try
                 {
                     var ser = new XmlSerializer(typeof(CompanyProfileStore));
-                    using (var fs = File.OpenRead(path))
+                    using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     {
                         var store = ser.Deserialize(fs) as CompanyProfileStore;
                         if (store != null && store.Profiles != null && store.Profiles.Count > 0)
@@ -149,12 +160,21 @@ namespace GovPortalsApp
                     }
                 }
                 catch { }
+
+                // File existed, but was unreadable/corrupt/empty: preserve a backup and DO NOT overwrite original
+                LastLoadHadCorruptFile = true;
+                try
+                {
+                    string bakPath = path + ".corrupt.bak";
+                    File.Copy(path, bakPath, true);
+                    LastCorruptBackupPath = bakPath;
+                }
+                catch { }
             }
 
             // Migrate existing waybill_profile.xml on first launch
             var newStore = new CompanyProfileStore();
-            var legacyPath = WaybillEngine.GetProfilePath();
-            if (File.Exists(legacyPath))
+            if (!string.IsNullOrEmpty(legacyPath) && File.Exists(legacyPath))
             {
                 var wp = WaybillEngine.LoadProfile();
                 var p = new CompanyProfile
@@ -165,6 +185,7 @@ namespace GovPortalsApp
                     Signer = wp.Signer ?? "",
                     DisplayName = GuessDisplayName(wp.SenderInfo, "Основная организация"),
                     TaxRegime = GuessRegime(wp.SenderInfo),
+                    IpExpenseNormPercent = 30m,
                     WaybillProfile = wp
                 };
                 p.CustomTaxRate = p.TaxRegime == RegimeIpPn20 ? 20m : 6m;
@@ -179,7 +200,10 @@ namespace GovPortalsApp
                 newStore.ActiveProfileId = def.Id;
             }
 
-            SaveStore(newStore);
+            if (!LastLoadHadCorruptFile && saveWhenMissing)
+            {
+                SaveStore(newStore);
+            }
             return newStore;
         }
 
@@ -197,6 +221,8 @@ namespace GovPortalsApp
                 if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("N");
                 if (string.IsNullOrWhiteSpace(p.DisplayName)) p.DisplayName = GuessDisplayName(p.OrgInfo, "Компания");
                 if (string.IsNullOrWhiteSpace(p.TaxRegime)) p.TaxRegime = RegimeUsn6;
+                if (p.IpExpenseNormPercent != 20m && p.IpExpenseNormPercent != 30m)
+                    p.IpExpenseNormPercent = 30m;
                 if (p.WaybillProfile == null) p.WaybillProfile = new WaybillProfile();
                 WaybillEngine.NormalizeProfileDefaults(p.WaybillProfile);
                 if (string.IsNullOrWhiteSpace(p.Unp) && !string.IsNullOrWhiteSpace(p.WaybillProfile.SenderUnp))
@@ -421,7 +447,7 @@ namespace GovPortalsApp
             var cbRegime = new ComboBox { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
             cbRegime.Items.Add("ООО • УСН 6% (без НДС)");
             cbRegime.Items.Add("ИП • Подоходный 20% + ФСЗН 35%");
-            cbRegime.Items.Add("ООО • ОСН (НДС 20% + Прибыль 20%)");
+            cbRegime.Items.Add("ООО • ОСН [ЭКСПЕРИМЕНТАЛЬНЫЙ] (НДС 20% + Прибыль 20%)");
             cbRegime.Items.Add("Другая ставка (%)");
 
             var tbCustomRate = CreateStyledInput("6", "Ставка налога, %");
@@ -430,6 +456,14 @@ namespace GovPortalsApp
             regimeGrid.Children.Add(cbRegime);
             regimeGrid.Children.Add(tbCustomRate);
             form.Children.Add(regimeGrid);
+
+            var ipNormPanel = new StackPanel { Margin = new Thickness(0, 2, 0, 8), Visibility = Visibility.Collapsed };
+            ipNormPanel.Children.Add(CreateFieldLabel("Норматив проф. вычета ИП (п. 10 ст. 205 НК РБ, с 2026 г.)"));
+            var cbIpNorm = new ComboBox { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
+            cbIpNorm.Items.Add("30% — розничная торговля физлицам (по умолчанию)");
+            cbIpNorm.Items.Add("20% — смешанная / оптовая / B2B деятельность");
+            ipNormPanel.Children.Add(cbIpNorm);
+            form.Children.Add(ipNormPanel);
 
             var regimeHint = new TextBlock
             {
@@ -492,6 +526,8 @@ namespace GovPortalsApp
                 decimal rate = prof.TaxRegime == CompanyProfilesManager.RegimeCustom ? prof.CustomTaxRate : prof.GetEffectiveTaxRate();
                 tbCustomRate.Text = rate.ToString("0.##", CultureInfo.InvariantCulture);
                 tbCustomRate.IsEnabled = (cbRegime.SelectedIndex == 3);
+                ipNormPanel.Visibility = (cbRegime.SelectedIndex == 1) ? Visibility.Visible : Visibility.Collapsed;
+                cbIpNorm.SelectedIndex = (prof.IpExpenseNormPercent == 20m) ? 1 : 0;
                 dialogStatus.Text = "";
             };
 
@@ -516,6 +552,7 @@ namespace GovPortalsApp
             {
                 int idx = cbRegime.SelectedIndex;
                 tbCustomRate.IsEnabled = (idx == 3);
+                ipNormPanel.Visibility = (idx == 1) ? Visibility.Visible : Visibility.Collapsed;
                 if (idx == 0) tbCustomRate.Text = "6";
                 else if (idx == 1 || idx == 2) tbCustomRate.Text = "20";
             };
@@ -646,6 +683,8 @@ namespace GovPortalsApp
                 else if (cbRegime.SelectedIndex == 2) selectedProfile.TaxRegime = CompanyProfilesManager.RegimeOsn20;
                 else if (cbRegime.SelectedIndex == 3) selectedProfile.TaxRegime = CompanyProfilesManager.RegimeCustom;
                 else selectedProfile.TaxRegime = CompanyProfilesManager.RegimeUsn6;
+
+                selectedProfile.IpExpenseNormPercent = (cbIpNorm.SelectedIndex == 1) ? 20m : 30m;
 
                 decimal parsedRate;
                 string rawRate = (tbCustomRate.Text ?? "").Trim().Replace(",", ".");

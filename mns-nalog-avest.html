@@ -4,32 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Не заходит в Личный кабинет МНС (nalog.gov.by и account.gov.by) с ЭЦП Авест | Buhly</title>
-  <meta name="description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и блокировки токена.">
+  <meta name="description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и проверка блокировки токена.">
   <meta name="keywords" content="не заходит в личный кабинет мнс, nalog.gov.by не открывается, account.gov.by err_connection_refused, налоговая не видит эцп, очистить hosts account.gov.by">
   <link rel="canonical" href="https://buhly.by/mns-nalog-avest.html">
+  <link rel="icon" href="favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Не заходит в Личный кабинет МНС (nalog.gov.by и account.gov.by) с ЭЦП Авест | Buhly">
-  <meta property="og:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и блокировки токена.">
+  <meta property="og:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и проверка блокировки токена.">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://buhly.by/mns-nalog-avest.html">
   <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Не заходит в Личный кабинет МНС (nalog.gov.by и account.gov.by) с ЭЦП Авест | Buhly">
-  <meta name="twitter:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и блокировки токена.">
+  <meta name="twitter:description" content="Ошибка ERR_CONNECTION_REFUSED на account.gov.by, не видит ключ Авест в Личном кабинете МНС nalog.gov.by: быстрое исправление файла hosts, порта 8084 и проверка блокировки токена.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
-
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    code { background: #e5e5ea; color: #1f2937; padding: 0.1rem 0.35rem; border-radius: 0.35rem; font-size: 0.875em; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 
   <script type="application/ld+json">
 {
@@ -67,17 +58,17 @@
 <body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
 
   <!-- Navigation -->
-  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
-    <a href="https://buhly.by/" class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <a href="https://buhly.by/" class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
         B
       </div>
-      <div>
+      <div class="min-w-0">
         <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
-        <span class="text-xs text-neutral-500 block font-medium">ГосПорталы Беларуси</span>
+        <span class="text-xs text-neutral-600 block font-medium">ГосПорталы Беларуси</span>
       </div>
     </a>
-    <div class="flex items-center space-x-3">
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
       <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
         Главная
       </a>
@@ -89,11 +80,11 @@
 
   <!-- Article Main -->
   <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
-    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
       <span>Инструкция МНС • nalog.gov.by / account.gov.by</span>
     </div>
 
-    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight">
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight break-words">
       Не заходит в Личный кабинет МНС (<span class="text-blue-600">nalog.gov.by</span> / <span class="text-blue-600">account.gov.by</span>) с ЭЦП
     </h1>
 
@@ -105,7 +96,7 @@
     <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
         <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v3.1</div>
-        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~602 КБ (ZIP 229 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
+        <div class="text-xs text-neutral-600 mt-1">Бесплатно, ~725 КБ (ZIP ~266 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
       </div>
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
         Скачать Buhly v3.1 (ZIP)
@@ -133,8 +124,8 @@
     <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
       <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как это чинит Buhly v3.1 автоматически</h2>
       <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
-        <li>✓ <b>Авточистка файла hosts в 1 клик:</b> программа сама находит паразитные перенаправления на госдомены <code>.gov.by</code>, очищает <code>hosts</code> и сбрасывает DNS-кеш.</li>
-        <li>✓ <b>Снятие блокировки токена:</b> завершает конфликтующие процессы <code>EDeclaration</code> / <code>MngCert</code> и перезапускает порт <code>8084</code>.</li>
+        <li>✓ <b>Авточистка файла hosts в 1 клик:</b> программа сама находит паразитные перенаправления на госдомены <code>.gov.by</code>, создаёт <code>.bak</code>-копию, очищает <code>hosts</code> и сбрасывает DNS-кеш.</li>
+        <li>✓ <b>Контроль блокировки токена:</b> предупредит о конфликтующем процессе <code>EDeclaration</code>/<code>MngCert</code>, не завершая его принудительно, и при необходимости перезапустит службу <code>NTClientSoftware</code> (порт <code>8084</code>).</li>
         <li>✓ Показывает активный USB-ключ прямо в окне программы и открывает нужный портал (МНС или Е-Паслуга) в 1 клик.</li>
       </ul>
       <div class="mt-6 flex flex-wrap gap-3">
@@ -168,7 +159,7 @@
 
     <!-- Other Guides -->
     <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
-      <h3 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h3>
+      <h2 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h2>
       <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
         <a href="vat-err-ssl.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🧾 Ошибка ERR_SSL_PROTOCOL_ERROR на ЭСЧФ (vat.gov.by) →</a>
         <a href="fszn-8084.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📑 Портал ФСЗН 2.0 (portal2.ssf.gov.by): порт 8084 и AvTunProxy →</a>
@@ -212,6 +203,17 @@
         try {
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
       };
 
       var links = document.querySelectorAll('a[href]');
@@ -222,6 +224,8 @@
           if (!goal) {
             if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
               goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
             } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
               goal = 'tg_chat';
             } else if (href.indexOf('t.me/buhly_by') !== -1) {
@@ -234,7 +238,7 @@
 
           if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
             var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
-            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
             if (isInternal || isGithubPage) {
               try {
                 var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';

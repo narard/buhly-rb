@@ -41,11 +41,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Restore and save Telegram posts state cache
-        uses: actions/cache@v4
+      - name: Restore Telegram posts state cache
+        uses: actions/cache/restore@v4
         with:
           path: tg_posts_state.json
-          key: tg-posts-state-v1-${{ github.run_id }}
+          key: tg-posts-state-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             tg-posts-state-v1-
 
@@ -53,10 +53,24 @@ jobs:
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
+          INPUT_POST_ID: ${{ inputs.post_id || 'auto' }}
+          INPUT_EDIT_MESSAGE_ID: ${{ inputs.edit_message_id || '0' }}
+          INPUT_FORCE: ${{ inputs.force }}
         run: |
           FORCE_FLAG=""
-          if [ "${{ inputs.force }}" = "true" ]; then
+          if [ "$INPUT_FORCE" = "true" ]; then
             FORCE_FLAG="--force"
           fi
-          EDIT_ID="${{ inputs.edit_message_id || '0' }}"
-          python3 scripts/post_tg_queue.py --queue scripts/tg_autopost_queue.json --state tg_posts_state.json --post-id "${{ inputs.post_id || 'auto' }}" --edit-message-id "${EDIT_ID}" ${FORCE_FLAG}
+          python3 scripts/post_tg_queue.py \
+            --queue scripts/tg_autopost_queue.json \
+            --state tg_posts_state.json \
+            --post-id "$INPUT_POST_ID" \
+            --edit-message-id "$INPUT_EDIT_MESSAGE_ID" \
+            ${FORCE_FLAG}
+
+      - name: Save Telegram posts state cache
+        if: always() && hashFiles('tg_posts_state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: tg_posts_state.json
+          key: tg-posts-state-v1-${{ github.run_id }}-${{ github.run_attempt }}

@@ -11,16 +11,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 [assembly: AssemblyTitle("Buhly — Помощник бизнеса и ЭЦП РБ")]
-[assembly: AssemblyDescription("Локальный помощник селлера и малого бизнеса РБ: госпорталы, ЭЦП, накладные ТН-2, аналитика WB и налоги")]
+[assembly: AssemblyDescription("Локальный помощник селлера и малого бизнеса РБ: госпорталы, ЭЦП, накладные ТН-2/ТТН-1, аналитика WB/Ozon и налоги")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyCompany("Buhly Open Source")]
+[assembly: AssemblyCompany("Maxim Repin (@narard)")]
 [assembly: AssemblyProduct("Buhly Desktop Assistant")]
-[assembly: AssemblyCopyright("Copyright © 2026 Buhly (github.com/narard/buhly-rb)")]
-[assembly: AssemblyVersion("3.1.0.0")]
-[assembly: AssemblyFileVersion("3.1.0.0")]
+[assembly: AssemblyCopyright("Copyright © 2026 Maxim Repin (@narard)")]
+[assembly: AssemblyVersion("3.1.1.0")]
+[assembly: AssemblyFileVersion("3.1.1.0")]
 
 namespace GovPortalsApp
 {
@@ -31,7 +32,7 @@ namespace GovPortalsApp
 
         public static void ConfigureSafeTls()
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         }
 
         [STAThread]
@@ -76,11 +77,49 @@ namespace GovPortalsApp
                 return;
             }
 
+            Mutex singleInstanceMutex = null;
+            bool createdNew = false;
+            try
+            {
+                singleInstanceMutex = new Mutex(true, "Local\\BuhlyDesktopMutex_v3", out createdNew);
+            }
+            catch
+            {
+                createdNew = true;
+            }
+
+            if (singleInstanceMutex != null && !createdNew)
+            {
+                try { singleInstanceMutex.Dispose(); } catch { }
+                MessageBox.Show(
+                    "Buhly уже запущен.\n\nЧтобы не повредить профили компаний и настройки, закройте открытое окно программы перед повторным запуском.",
+                    "Buhly",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
             try
             {
                 ConfigureSafeTls();
 
                 var app = new Application();
+                app.DispatcherUnhandledException += delegate(object sender, DispatcherUnhandledExceptionEventArgs e)
+                {
+                    try
+                    {
+                        var logPath = Path.Combine(Path.GetTempPath(), "Buhly_error.log");
+                        File.AppendAllText(logPath, DateTime.Now + " - UI EXCEPTION: " + e.Exception.ToString() + "\r\n");
+                    }
+                    catch { }
+                    MessageBox.Show(
+                        "Произошла непредвиденная ошибка интерфейса:\n" + e.Exception.Message + "\n\nПодробности сохранены в %TEMP%\\Buhly_error.log.",
+                        "Buhly",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    e.Handled = true;
+                };
+
                 var mainWindow = new MainWindow();
                 app.Run(mainWindow);
             }
@@ -93,6 +132,18 @@ namespace GovPortalsApp
                 }
                 catch { }
                 MessageBox.Show("Ошибка запуска Buhly:\n" + ex.Message, "Buhly", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (singleInstanceMutex != null)
+                {
+                    try
+                    {
+                        if (createdNew) singleInstanceMutex.ReleaseMutex();
+                    }
+                    catch { }
+                    try { singleInstanceMutex.Dispose(); } catch { }
+                }
             }
         }
     }
@@ -133,10 +184,12 @@ namespace GovPortalsApp
         public MainWindow()
         {
             Title = "Buhly — Помощник для бизнеса РБ";
-            Width = 1020;
-            Height = 740;
-            MinWidth = 860;
-            MinHeight = 620;
+            double waW = SystemParameters.WorkArea.Width > 0 ? SystemParameters.WorkArea.Width : 1280;
+            double waH = SystemParameters.WorkArea.Height > 0 ? SystemParameters.WorkArea.Height : 768;
+            MinWidth = Math.Min(760, Math.Max(640, waW * 0.90));
+            MinHeight = Math.Min(480, Math.Max(420, waH * 0.85));
+            Width = Math.Min(1020, Math.Max(MinWidth, waW * 0.92));
+            Height = Math.Min(740, Math.Max(MinHeight, waH * 0.90));
             SizeToContent = SizeToContent.Manual;
             WindowStyle = WindowStyle.SingleBorderWindow;
             ResizeMode = ResizeMode.CanResize;
@@ -149,6 +202,16 @@ namespace GovPortalsApp
             TextOptions.SetTextRenderingMode(this, TextRenderingMode.ClearType);
 
             companyStore = CompanyProfilesManager.LoadStore();
+            if (CompanyProfilesManager.LastLoadHadCorruptFile)
+            {
+                MessageBox.Show(
+                    "Не удалось прочитать файл профилей организаций (profiles.xml). Резервная копия сохранена как:\n" +
+                    CompanyProfilesManager.LastCorruptBackupPath +
+                    "\n\nЧтобы не затереть ваши данные, создан временный профиль. Проверьте или пересохраните настройки.",
+                    "Buhly — Восстановление профилей",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
 
             BuildUI();
             RefreshStatuses();
@@ -156,6 +219,7 @@ namespace GovPortalsApp
 
             NbrbRatesHelper.FetchAllRatesAsync(delegate(NbrbRatesSnapshot snap)
             {
+                if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
                 Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (snap == null) return;
@@ -176,6 +240,14 @@ namespace GovPortalsApp
             portalOnlineTimer.Tick += delegate { CheckAllPortalsOnline(); };
             portalOnlineTimer.Start();
             CheckAllPortalsOnline();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            if (autoRefreshTimer != null) autoRefreshTimer.Stop();
+            if (portalOnlineTimer != null) portalOnlineTimer.Stop();
+            if (toastTimer != null) toastTimer.Stop();
+            base.OnClosed(e);
         }
 
         private void BuildUI()
@@ -217,7 +289,7 @@ namespace GovPortalsApp
             };
             verBadge.Child = new TextBlock
             {
-                Text = "BY 3.0",
+                Text = "BY 3.1",
                 FontSize = 10.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#007AFF")
@@ -386,7 +458,7 @@ namespace GovPortalsApp
             sidebarBottom.Children.Add(nbrbCard);
 
             var tgBtn = CreateCompactActionButton("💬 Чат @buhly_by_chat", "#EBF3FF", "#007AFF");
-            tgBtn.Height = 34;
+            tgBtn.Height = 32;
             tgBtn.FontSize = 11.5;
             tgBtn.ToolTip = "Открыть Telegram-чат сообщества и поддержки Buhly";
             tgBtn.Click += delegate
@@ -394,6 +466,20 @@ namespace GovPortalsApp
                 try { Process.Start(new ProcessStartInfo("https://t.me/buhly_by_chat") { UseShellExecute = true }); } catch { }
             };
             sidebarBottom.Children.Add(tgBtn);
+
+            var aboutBtn = new Button
+            {
+                Content = "ℹ️ О программе и дисклеймер",
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Foreground = GetBrush("#636366"),
+                FontSize = 10.5,
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 6, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            aboutBtn.Click += delegate { OpenAboutDisclaimerDialog(); };
+            sidebarBottom.Children.Add(aboutBtn);
 
             DockPanel.SetDock(sidebarBottom, Dock.Bottom);
             sidebarDock.Children.Add(sidebarBottom);
@@ -505,6 +591,7 @@ namespace GovPortalsApp
             };
             var template = new ControlTemplate(typeof(Button));
             var bf = new FrameworkElementFactory(typeof(Border));
+            bf.Name = "pillBorder";
             bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
             bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
             bf.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
@@ -513,6 +600,15 @@ namespace GovPortalsApp
             cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
             bf.AppendChild(cp);
             template.VisualTree = bf;
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.86, "pillBorder"));
+            template.Triggers.Add(hoverTrigger);
+
+            var pressTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.72, "pillBorder"));
+            template.Triggers.Add(pressTrigger);
+
             btn.Template = template;
             return btn;
         }
@@ -557,6 +653,10 @@ namespace GovPortalsApp
                 if (active != null)
                 {
                     sidebarProfileCombo.SelectedItem = active;
+                    sidebarProfileCombo.ToolTip = string.Format("{0}\nУНП: {1} • Режим: {2}",
+                        active.DisplayName ?? "",
+                        string.IsNullOrEmpty(active.Unp) ? "не указан" : active.Unp,
+                        active.GetTaxRegimeTitle());
                 }
             }
             finally
@@ -609,6 +709,10 @@ namespace GovPortalsApp
             hoverTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.85, "navBorder"));
             template.Triggers.Add(hoverTrigger);
 
+            var pressTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.70, "navBorder"));
+            template.Triggers.Add(pressTrigger);
+
             btn.Template = template;
             btn.Click += delegate { SwitchTab(tabIndex); };
             return btn;
@@ -646,9 +750,24 @@ namespace GovPortalsApp
 
         private void ShowToast(string message)
         {
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(delegate { ShowToast(message); }));
+                return;
+            }
             if (toastText == null || toastBanner == null) return;
             toastText.Text = message;
             toastBanner.Visibility = Visibility.Visible;
+            try
+            {
+                var fade = new DoubleAnimation(0.0, 0.95, TimeSpan.FromMilliseconds(160));
+                toastBanner.BeginAnimation(UIElement.OpacityProperty, fade);
+            }
+            catch
+            {
+                toastBanner.Opacity = 0.95;
+            }
             if (toastTimer != null) toastTimer.Stop();
             toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             toastTimer.Tick += delegate
@@ -657,6 +776,70 @@ namespace GovPortalsApp
                 toastTimer.Stop();
             };
             toastTimer.Start();
+        }
+
+        private void OpenAboutDisclaimerDialog()
+        {
+            var win = new Window
+            {
+                Title = "О программе Buhly v3.1.1",
+                Width = 520,
+                Height = 410,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                Background = GetBrush("#F2F2F7")
+            };
+            var root = new StackPanel { Margin = new Thickness(18) };
+            var card = new Border
+            {
+                Background = Brushes.White,
+                CornerRadius = new CornerRadius(14),
+                Padding = new Thickness(16),
+                BorderBrush = GetBrush("#E5E5EA"),
+                BorderThickness = new Thickness(1)
+            };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Buhly v3.1.1 — открытая локальная утилита (MIT)",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#1C1C1E"),
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Автор: Максим Репин (@narard / @max_repin), г. Минск.\n" +
+                       "Лицензия: MIT Open Source (Copyright © 2026 Maxim Repin).\n\n" +
+                       "Отказ от ответственности (дисклеймер):\n" +
+                       "• Программа предоставляется «как есть» (AS IS) без каких-либо гарантий.\n" +
+                       "• Все расчёты налогов, ФСЗН, КУДиР, 1С-выгрузки и печатные формы ТН-2/ТТН-1 носят справочный характер. Перед подачей деклараций и отгрузкой товара сверяйте цифры с первичными документами, НК РБ и актуальным перечнем ЭТН (Пост. № 250 / № 528).\n\n" +
+                       "Приватность и сеть:\n" +
+                       "• Ваши отчёты, выписки и PIN ЭЦП не покидают компьютер.\n" +
+                       "• 1 раз в сутки выполняется анонимная проверка новой версии (без ПДн/УНП/сумм), а также загрузка курсов НБРБ и пинг доступности госпорталов.",
+                FontSize = 12,
+                Foreground = GetBrush("#3A3A3C"),
+                TextWrapping = TextWrapping.Wrap,
+                LineHeight = 18
+            });
+            var linksRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
+            var btnSite = CreateCompactActionButton("🌐 Сайт buhly.by", "#EBF3FF", "#007AFF");
+            btnSite.Margin = new Thickness(0, 0, 8, 0);
+            btnSite.Click += delegate { try { Process.Start(new ProcessStartInfo("https://buhly.by/privacy.html") { UseShellExecute = true }); } catch { } };
+            var btnGit = CreateCompactActionButton("💻 GitHub (MIT)", "#F2F2F7", "#1C1C1E");
+            btnGit.Margin = new Thickness(0, 0, 8, 0);
+            btnGit.Click += delegate { try { Process.Start(new ProcessStartInfo("https://github.com/narard/buhly-rb") { UseShellExecute = true }); } catch { } };
+            var btnClose = CreateCompactActionButton("Закрыть", "#007AFF", "#FFFFFF");
+            btnClose.Click += delegate { win.Close(); };
+            linksRow.Children.Add(btnSite);
+            linksRow.Children.Add(btnGit);
+            linksRow.Children.Add(btnClose);
+            stack.Children.Add(linksRow);
+            card.Child = stack;
+            root.Children.Add(card);
+            win.Content = root;
+            win.ShowDialog();
         }
 
         private Button CreateIOSButton(string text, string hexColor, Action onClick)
@@ -738,10 +921,12 @@ namespace GovPortalsApp
                 {
                     sw.Stop();
                     ms = sw.ElapsedMilliseconds;
-                    var resp = wex.Response as HttpWebResponse;
-                    if (resp != null && (int)resp.StatusCode >= 200 && (int)resp.StatusCode < 400)
+                    using (var resp = wex.Response as HttpWebResponse)
                     {
-                        ok = true;
+                        if (resp != null && (int)resp.StatusCode >= 200 && (int)resp.StatusCode < 400)
+                        {
+                            ok = true;
+                        }
                     }
                 }
                 catch

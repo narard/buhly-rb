@@ -7,8 +7,10 @@ standard library only with strict TLS certificate validation.
 
 import argparse
 import datetime
+import html
 import json
 import os
+import re
 import ssl
 import sys
 import urllib.error
@@ -37,11 +39,15 @@ def load_queue(path):
         data = json.load(fh)
     if not isinstance(data, list):
         raise ValueError("Queue JSON must be an array of post objects.")
+    seen_ids = set()
     for idx, item in enumerate(data):
         if not isinstance(item, dict):
             raise ValueError("Queue item at index {0} must be an object.".format(idx))
         if not item.get("id") or not isinstance(item.get("id"), str):
             raise ValueError("Queue item at index {0} missing string 'id'.".format(idx))
+        if item["id"] in seen_ids:
+            raise ValueError("Duplicate post id '{0}' in queue.".format(item["id"]))
+        seen_ids.add(item["id"])
         if not item.get("text") or not isinstance(item.get("text"), str):
             raise ValueError("Queue item '{0}' missing string 'text'.".format(item["id"]))
     return data
@@ -112,6 +118,68 @@ def call_telegram_api(token, method, payload, timeout, strict_ctx):
         return False, None, "Telegram request error ({0})".format(type(err).__name__)
 
 
+def normalize_plain_text(raw_html):
+    text = html.unescape(re.sub(r"<[^>]+>", " ", raw_html or ""))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def resolve_channel_username(token, channel_id, timeout, strict_ctx):
+    if channel_id.startswith("@"):
+        return channel_id.lstrip("@").strip()
+    ok, result, _ = call_telegram_api(
+        token,
+        "getChat",
+        {"chat_id": channel_id},
+        timeout=timeout,
+        strict_ctx=strict_ctx,
+    )
+    if ok and isinstance(result, dict):
+        return (result.get("username") or "").strip()
+    return ""
+
+
+def fetch_recent_channel_texts(username, timeout, strict_ctx):
+    if not username:
+        return []
+    url = "https://t.me/s/{0}".format(username)
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; BuhlyAutoPoster/1.0)"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=strict_ctx) as resp:
+            page = resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        return []
+
+    texts = []
+    for match in re.finditer(
+        r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+        page,
+        re.S,
+    ):
+        clean = normalize_plain_text(match.group(1))
+        if clean:
+            texts.append(clean)
+    return texts
+
+
+def is_post_already_on_channel(post_text, channel_texts):
+    if not channel_texts:
+        return False
+    norm = normalize_plain_text(post_text)
+    if len(norm) < 30:
+        return False
+    prefix = norm[:80]
+    for ch_text in channel_texts:
+        if ch_text == norm:
+            return True
+        if len(prefix) >= 40 and ch_text.startswith(prefix):
+            return True
+    return False
+
+
 def select_post(queue, sent_ids, requested_id, force):
     target_id = (requested_id or "auto").strip()
     if target_id == "auto":
@@ -129,6 +197,16 @@ def select_post(queue, sent_ids, requested_id, force):
             return item, None
 
     raise KeyError("Post id '{0}' not found in queue.".format(target_id))
+
+
+def _parse_edit_message_id(raw_value):
+    text = (raw_value or "0").strip()
+    if not text:
+        return 0
+    val = int(text)
+    if val < 0:
+        raise argparse.ArgumentTypeError("edit-message-id must be >= 0")
+    return val
 
 
 def parse_args(argv):
@@ -157,7 +235,7 @@ def parse_args(argv):
     )
     parser.add_argument(
         "--edit-message-id",
-        type=int,
+        type=_parse_edit_message_id,
         default=0,
         help="If > 0, edit an existing channel message_id instead of sendMessage",
     )
@@ -188,6 +266,34 @@ def main(argv=None):
 
     state = load_state(args.state)
     sent_ids = list(state.get("sent_ids", []))
+    sent_messages = state.get("sent_messages")
+    if not isinstance(sent_messages, dict):
+        sent_messages = {}
+
+    tg_token = os.environ.get("TG_BOT_TOKEN", "").strip()
+    tg_channel = os.environ.get("TG_CHANNEL_ID", "").strip()
+
+    # Secondary duplicate protection: if state cache was evicted/empty, inspect recent
+    # public channel messages before choosing the next post to publish.
+    if args.edit_message_id <= 0 and not args.force and tg_token and tg_channel:
+        username = resolve_channel_username(tg_token, tg_channel, args.timeout, strict_ctx)
+        recent_texts = fetch_recent_channel_texts(username, args.timeout, strict_ctx)
+        if recent_texts:
+            state_dirty = False
+            for item in queue:
+                if item["id"] not in sent_ids and is_post_already_on_channel(item["text"], recent_texts):
+                    print(
+                        "[DEDUP] Post '{0}' already present on @{1}; syncing state.".format(
+                            item["id"], username
+                        )
+                    )
+                    sent_ids.append(item["id"])
+                    state_dirty = True
+            if state_dirty:
+                state["sent_ids"] = sent_ids
+                state["sent_messages"] = sent_messages
+                state["updated_at_msk"] = now_msk_iso()
+                save_state(args.state, state)
 
     try:
         post, notice = select_post(queue, sent_ids, args.post_id, args.force)
@@ -202,9 +308,6 @@ def main(argv=None):
     post_id = post["id"]
     should_pin = bool(post.get("pin", False))
     preview = post["text"][:120].replace("\n", "\\n")
-
-    tg_token = os.environ.get("TG_BOT_TOKEN", "").strip()
-    tg_channel = os.environ.get("TG_CHANNEL_ID", "").strip()
 
     if not tg_token or not tg_channel:
         action = "edit message_id={0}".format(args.edit_message_id) if args.edit_message_id > 0 else "publish"
@@ -294,7 +397,12 @@ def main(argv=None):
 
     if post_id not in sent_ids:
         sent_ids.append(post_id)
+    sent_messages[post_id] = {
+        "message_id": message_id,
+        "sent_at_msk": now_msk_iso(),
+    }
     state["sent_ids"] = sent_ids
+    state["sent_messages"] = sent_messages
     state["updated_at_msk"] = now_msk_iso()
     save_state(args.state, state)
     print("State saved to {0} (sent_ids={1}).".format(args.state, len(sent_ids)))

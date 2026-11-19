@@ -15,6 +15,31 @@ namespace GovPortalsApp
         private StackPanel unpResultStack;
         private TextBox unpInputBox;
 
+        private StackPanel wizardBodyPanel;
+        private TextBlock wizardHeaderTitle;
+        private TextBlock wizardHeaderBadge;
+        private bool wizardExpanded = true;
+        private bool wizardUserToggled = false;
+        private bool wizardChecking = false;
+        private Button wizardStepAvestBtn;
+        private Button wizardStepNtBtn;
+        private Button wizardStepAvTunBtn;
+        private Action wizardStepAvestAction;
+        private Action wizardStepNtAction;
+        private Action wizardStepAvTunAction;
+        private ProgressBar wizardProgressBar;
+        private TextBlock wizardStatusText;
+        private Button wizardRecheckBtn;
+
+        private void SafeToolsUi(Action action)
+        {
+            if (action == null) return;
+            if (Dispatcher != null && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+            {
+                Dispatcher.BeginInvoke(action);
+            }
+        }
+
         private void BuildToolsTab(StackPanel container)
         {
             container.Children.Add(CreateUnpCheckerCard());
@@ -93,7 +118,7 @@ namespace GovPortalsApp
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     var r = UnpChecker.Lookup(q);
-                    Dispatcher.BeginInvoke(new Action(delegate
+                    SafeToolsUi(delegate
                     {
                         if (checkBtn != null) checkBtn.IsEnabled = true;
                         unpResultStack.Children.Clear();
@@ -179,7 +204,7 @@ namespace GovPortalsApp
                         copyBtn.Height = 34;
                         copyBtn.FontSize = 12;
                         unpResultStack.Children.Add(copyBtn);
-                    }));
+                    });
                 });
             };
 
@@ -229,96 +254,289 @@ namespace GovPortalsApp
             };
 
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock
+
+            var headerGrid = new Grid { Cursor = Cursors.Hand };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            wizardHeaderTitle = new TextBlock
             {
-                Text = "📦  Мастер настройки для нового ПК",
+                Text = "▼  Мастер настройки для нового ПК",
                 FontSize = 16,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("#1C1C1E"),
-                Margin = new Thickness(0, 0, 0, 4)
-            });
-            stack.Children.Add(new TextBlock
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            wizardHeaderBadge = new TextBlock
+            {
+                Text = "⏳ Проверка...",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#8E8E93"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            Grid.SetColumn(wizardHeaderTitle, 0);
+            Grid.SetColumn(wizardHeaderBadge, 1);
+            headerGrid.Children.Add(wizardHeaderTitle);
+            headerGrid.Children.Add(wizardHeaderBadge);
+
+            headerGrid.MouseLeftButtonUp += delegate
+            {
+                wizardUserToggled = true;
+                SetWizardExpanded(!wizardExpanded);
+            };
+            stack.Children.Add(headerGrid);
+
+            wizardBodyPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            wizardBodyPanel.Children.Add(new TextBlock
             {
                 Text = "Если компьютер чистый и программы еще не установлены:",
                 FontSize = 12,
                 Foreground = GetBrush("#636366"),
-                Margin = new Thickness(0, 0, 0, 10)
+                Margin = new Thickness(0, 0, 0, 8)
             });
 
-            // Step 1: Avest
-            bool avestOk = SystemDiagnoser.IsAvestInstalled();
-            stack.Children.Add(CreateWizardStep("1. ПО «Авест» (ГосСУОК):",
-                avestOk ? "Установлено ✓" : "Скачать и установить (38 МБ)",
-                avestOk,
-                delegate
-                {
-                    if (avestOk) return;
-                    ShowToast("📥 Загрузка ПО ГосСУОК с официального сервера nces.by...");
-                    ComponentInstaller.DownloadAndInstallGossuok(
-                        delegate(string s, int p) { },
-                        delegate(bool ok, string m)
-                        {
-                            Dispatcher.Invoke(new Action(delegate
-                            {
-                                ShowToast(ok ? "✓ " + m : "⚠️ " + m);
-                                RefreshStatuses();
-                            }));
-                        }
-                    );
-                }));
+            wizardBodyPanel.Children.Add(CreateWizardStep("1. ПО «Авест» (ГосСУОК):", "⏳ Проверка...", false, out wizardStepAvestBtn, delegate
+            {
+                if (wizardStepAvestAction != null) wizardStepAvestAction();
+            }));
+            wizardBodyPanel.Children.Add(CreateWizardStep("2. NTClientSoftware (МНС):", "⏳ Проверка...", false, out wizardStepNtBtn, delegate
+            {
+                if (wizardStepNtAction != null) wizardStepNtAction();
+            }));
+            wizardBodyPanel.Children.Add(CreateWizardStep("3. AvTunProxy (ФСЗН):", "⏳ Проверка...", false, out wizardStepAvTunBtn, delegate
+            {
+                if (wizardStepAvTunAction != null) wizardStepAvTunAction();
+            }));
 
-            // Step 2: NTClient
-            string ntVer = SystemDiagnoser.GetNTClientVersion();
-            bool ntInstalled = ntVer != "Не установлена";
-            string localNT = ntInstalled ? null : ComponentInstaller.FindLocalNTClientInstaller();
-            string ntActionText = ntInstalled ? ntVer + " ✓" : (localNT != null ? "Запустить с диска ⚡" : "Инструкция и сайт НЦЭУ");
-            stack.Children.Add(CreateWizardStep("2. NTClientSoftware (МНС):",
-                ntActionText,
-                ntInstalled,
-                delegate
-                {
-                    if (ntInstalled) return;
-                    if (localNT != null)
-                    {
-                        try
-                        {
-                            Process.Start(localNT);
-                            ShowToast("⚡ Запуск найденного установщика: " + Path.GetFileName(localNT));
-                        }
-                        catch (Exception ex) { ShowToast("Ошибка запуска: " + ex.Message); }
-                    }
-                    else
-                    {
-                        OpenBrowser("https://nces.by/service/po/");
-                        ShowToast("🌐 Открыт сайт НЦЭУ. Для загрузки укажите телефон для получения СМС.");
-                    }
-                }));
+            wizardProgressBar = new ProgressBar
+            {
+                Height = 6,
+                Minimum = 0,
+                Maximum = 100,
+                Value = 0,
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 10, 0, 4),
+                Foreground = GetBrush("#007AFF")
+            };
+            wizardBodyPanel.Children.Add(wizardProgressBar);
 
-            // Step 3: AvTunProxy
-            string avVer = SystemDiagnoser.GetAvTunProxyVersion();
-            bool avInstalled = avVer != "Не установлена";
-            stack.Children.Add(CreateWizardStep("3. AvTunProxy (ФСЗН):",
-                avInstalled ? avVer + " ✓" : "Скачать и установить (8 МБ)",
-                avInstalled,
-                delegate
-                {
-                    if (avInstalled) return;
-                    ShowToast("📥 Загрузка AvTunProxy с avtunproxy.by...");
-                    ComponentInstaller.DownloadAndInstallAvTunProxy(
-                        delegate(string s, int p) { },
-                        delegate(bool ok, string m)
-                        {
-                            Dispatcher.Invoke(new Action(delegate
-                            {
-                                ShowToast(ok ? "✓ " + m : "⚠️ " + m);
-                                RefreshStatuses();
-                            }));
-                        }
-                    );
-                }));
+            wizardStatusText = new TextBlock
+            {
+                Text = "",
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium,
+                Foreground = GetBrush("#007AFF"),
+                TextWrapping = TextWrapping.Wrap,
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            wizardBodyPanel.Children.Add(wizardStatusText);
 
+            wizardRecheckBtn = CreateSmallPillButton("🔄 Проверить компоненты заново", "#EBF3FF", "#007AFF");
+            wizardRecheckBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            wizardRecheckBtn.Margin = new Thickness(0, 8, 0, 0);
+            wizardRecheckBtn.Click += delegate
+            {
+                RefreshToolsComponentsAsync(true);
+            };
+            wizardBodyPanel.Children.Add(wizardRecheckBtn);
+
+            stack.Children.Add(wizardBodyPanel);
             border.Child = stack;
+
+            // Run component detection asynchronously so MainWindow constructor stays instant
+            RefreshToolsComponentsAsync(false);
+
             return border;
+        }
+
+        private void SetWizardExpanded(bool expanded)
+        {
+            wizardExpanded = expanded;
+            if (wizardBodyPanel != null)
+            {
+                wizardBodyPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (wizardHeaderTitle != null)
+            {
+                wizardHeaderTitle.Text = (expanded ? "▼" : "▶") + "  Мастер настройки для нового ПК";
+            }
+        }
+
+        private void RefreshToolsComponentsAsync(bool keepCurrentExpandState)
+        {
+            if (wizardChecking) return;
+            wizardChecking = true;
+            if (wizardRecheckBtn != null) wizardRecheckBtn.IsEnabled = false;
+            if (wizardHeaderBadge != null)
+            {
+                wizardHeaderBadge.Text = "⏳ Проверка...";
+                wizardHeaderBadge.Foreground = GetBrush("#8E8E93");
+            }
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool avestOk = false;
+                string ntVer = "Не установлена";
+                bool ntInstalled = false;
+                string localNT = null;
+                string avVer = "Не установлена";
+                bool avInstalled = false;
+
+                try
+                {
+                    avestOk = SystemDiagnoser.IsAvestInstalled();
+                    ntVer = SystemDiagnoser.GetNTClientVersion();
+                    ntInstalled = ntVer != "Не установлена";
+                    localNT = ntInstalled ? null : ComponentInstaller.FindLocalNTClientInstaller();
+                    avVer = SystemDiagnoser.GetAvTunProxyVersion();
+                    avInstalled = avVer != "Не установлена";
+                }
+                catch { }
+
+                SafeToolsUi(delegate
+                {
+                    try
+                    {
+                        ApplyWizardStepState(wizardStepAvestBtn, avestOk ? "Установлено ✓" : "Скачать и установить (38 МБ)", avestOk);
+                        wizardStepAvestAction = delegate
+                        {
+                            if (avestOk) return;
+                            if (wizardStepAvestBtn != null) wizardStepAvestBtn.IsEnabled = false;
+                            if (wizardProgressBar != null)
+                            {
+                                wizardProgressBar.Value = 0;
+                                wizardProgressBar.Visibility = Visibility.Visible;
+                            }
+                            if (wizardStatusText != null)
+                            {
+                                wizardStatusText.Text = "Подключение к nces.by...";
+                                wizardStatusText.Foreground = GetBrush("#007AFF");
+                                wizardStatusText.Visibility = Visibility.Visible;
+                            }
+                            ShowToast("📥 Загрузка ПО ГосСУОК с официального сервера nces.by...");
+                            ComponentInstaller.DownloadAndInstallGossuok(
+                                delegate(string s, int p)
+                                {
+                                    SafeToolsUi(delegate
+                                    {
+                                        if (wizardProgressBar != null) wizardProgressBar.Value = p;
+                                        if (wizardStatusText != null) wizardStatusText.Text = s;
+                                    });
+                                },
+                                delegate(bool ok, string m)
+                                {
+                                    SafeToolsUi(delegate
+                                    {
+                                        if (wizardStepAvestBtn != null) wizardStepAvestBtn.IsEnabled = true;
+                                        if (wizardStatusText != null)
+                                        {
+                                            wizardStatusText.Text = (ok ? "✓ " : "⚠️ ") + m;
+                                            wizardStatusText.Foreground = GetBrush(ok ? "#16A34A" : "#FF3B30");
+                                        }
+                                        ShowToast(ok ? "✓ " + m : "⚠️ " + m);
+                                        RefreshStatuses();
+                                        RefreshToolsComponentsAsync(true);
+                                    });
+                                }
+                            );
+                        };
+
+                        string ntActionText = ntInstalled ? ntVer + " ✓" : (localNT != null ? "Запустить с диска ⚡" : "Инструкция и сайт НЦЭУ");
+                        ApplyWizardStepState(wizardStepNtBtn, ntActionText, ntInstalled);
+                        wizardStepNtAction = delegate
+                        {
+                            if (ntInstalled) return;
+                            if (localNT != null)
+                            {
+                                try
+                                {
+                                    using (var p = Process.Start(localNT)) { }
+                                    ShowToast("⚡ Запуск найденного установщика: " + Path.GetFileName(localNT));
+                                }
+                                catch (Exception ex) { ShowToast("Ошибка запуска: " + ex.Message); }
+                            }
+                            else
+                            {
+                                OpenBrowser("https://nces.by/service/po/");
+                                ShowToast("🌐 Открыт сайт НЦЭУ. Для загрузки укажите телефон для получения СМС.");
+                            }
+                        };
+
+                        ApplyWizardStepState(wizardStepAvTunBtn, avInstalled ? avVer + " ✓" : "Скачать и установить (8 МБ)", avInstalled);
+                        wizardStepAvTunAction = delegate
+                        {
+                            if (avInstalled) return;
+                            if (wizardStepAvTunBtn != null) wizardStepAvTunBtn.IsEnabled = false;
+                            if (wizardProgressBar != null)
+                            {
+                                wizardProgressBar.Value = 0;
+                                wizardProgressBar.Visibility = Visibility.Visible;
+                            }
+                            if (wizardStatusText != null)
+                            {
+                                wizardStatusText.Text = "Подключение к avtunproxy.by...";
+                                wizardStatusText.Foreground = GetBrush("#007AFF");
+                                wizardStatusText.Visibility = Visibility.Visible;
+                            }
+                            ShowToast("📥 Загрузка AvTunProxy с avtunproxy.by...");
+                            ComponentInstaller.DownloadAndInstallAvTunProxy(
+                                delegate(string s, int p)
+                                {
+                                    SafeToolsUi(delegate
+                                    {
+                                        if (wizardProgressBar != null) wizardProgressBar.Value = p;
+                                        if (wizardStatusText != null) wizardStatusText.Text = s;
+                                    });
+                                },
+                                delegate(bool ok, string m)
+                                {
+                                    SafeToolsUi(delegate
+                                    {
+                                        if (wizardStepAvTunBtn != null) wizardStepAvTunBtn.IsEnabled = true;
+                                        if (wizardStatusText != null)
+                                        {
+                                            wizardStatusText.Text = (ok ? "✓ " : "⚠️ ") + m;
+                                            wizardStatusText.Foreground = GetBrush(ok ? "#16A34A" : "#FF3B30");
+                                        }
+                                        ShowToast(ok ? "✓ " + m : "⚠️ " + m);
+                                        RefreshStatuses();
+                                        RefreshToolsComponentsAsync(true);
+                                    });
+                                }
+                            );
+                        };
+
+                        bool allInstalled = avestOk && ntInstalled && avInstalled;
+                        if (wizardHeaderBadge != null)
+                        {
+                            wizardHeaderBadge.Text = allInstalled ? "Все 3 установлены ✓" : "Требуется настройка";
+                            wizardHeaderBadge.Foreground = GetBrush(allInstalled ? "#16A34A" : "#D97706");
+                        }
+
+                        if (!keepCurrentExpandState && !wizardUserToggled)
+                        {
+                            SetWizardExpanded(!allInstalled);
+                        }
+                    }
+                    finally
+                    {
+                        wizardChecking = false;
+                        if (wizardRecheckBtn != null) wizardRecheckBtn.IsEnabled = true;
+                    }
+                });
+            });
+        }
+
+        private void ApplyWizardStepState(Button btn, string actionText, bool isOk)
+        {
+            if (btn == null) return;
+            btn.Content = actionText;
+            btn.Foreground = isOk ? GetBrush("#34C759") : GetBrush("#007AFF");
+            btn.Cursor = isOk ? Cursors.Arrow : Cursors.Hand;
         }
 
         private Border CreateNetworkRollbackCard()
@@ -334,17 +552,51 @@ namespace GovPortalsApp
             };
 
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock
+
+            bool rollbackExpanded = false;
+            var headerGrid = new Grid { Cursor = Cursors.Hand };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var headerTitle = new TextBlock
             {
-                Text = "🛡️  Откат сетевых настроек из резервной копии",
+                Text = "▼ Откат сетевых настроек и Edge из бэкапа",
                 FontSize = 15,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("#1C1C1E"),
-                Margin = new Thickness(0, 0, 0, 4)
-            });
-            stack.Children.Add(new TextBlock
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var toggleHint = new TextBlock
             {
-                Text = "Если нужно вернуть исходный корпоративный прокси (AutoConfigURL / PAC) и файл hosts до изменений Buhly:",
+                Text = "Развернуть",
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium,
+                Foreground = GetBrush("#007AFF"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(headerTitle, 0);
+            Grid.SetColumn(toggleHint, 1);
+            headerGrid.Children.Add(headerTitle);
+            headerGrid.Children.Add(toggleHint);
+            stack.Children.Add(headerGrid);
+
+            var bodyStack = new StackPanel
+            {
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            headerGrid.MouseLeftButtonUp += delegate
+            {
+                rollbackExpanded = !rollbackExpanded;
+                bodyStack.Visibility = rollbackExpanded ? Visibility.Visible : Visibility.Collapsed;
+                headerTitle.Text = (rollbackExpanded ? "▲" : "▼") + " Откат сетевых настроек и Edge из бэкапа";
+                toggleHint.Text = rollbackExpanded ? "Свернуть" : "Развернуть";
+            };
+
+            bodyStack.Children.Add(new TextBlock
+            {
+                Text = "Восстанавливает исходные настройки до изменений Buhly: корпоративный прокси (AutoConfigURL / PAC), файл hosts, параметры зоны надёжных сайтов IE (Zones\\2) и настройки режима IE в Microsoft Edge (Preferences и политики реестра):",
                 FontSize = 12,
                 Foreground = GetBrush("#636366"),
                 TextWrapping = TextWrapping.Wrap,
@@ -359,36 +611,37 @@ namespace GovPortalsApp
                 Visibility = Visibility.Collapsed,
                 Margin = new Thickness(0, 0, 0, 10)
             };
-            stack.Children.Add(resultLabel);
+            bodyStack.Children.Add(resultLabel);
 
             Button rollbackBtn = null;
-            rollbackBtn = CreateIOSButton("↩️  Откатить прокси (PAC) и hosts из бэкапа", "#636366", delegate
+            rollbackBtn = CreateIOSButton("↩️  Откатить PAC, hosts, Zones\\2 и Edge из бэкапа", "#636366", delegate
             {
                 rollbackBtn.IsEnabled = false;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     string details;
                     bool ok = SystemDiagnoser.RestoreProxyAndHostsFromBackup(out details);
-                    Dispatcher.BeginInvoke(new Action(delegate
+                    SafeToolsUi(delegate
                     {
                         rollbackBtn.IsEnabled = true;
                         resultLabel.Text = details;
                         resultLabel.Foreground = GetBrush(ok ? "#16A34A" : "#DC2626");
                         resultLabel.Visibility = Visibility.Visible;
                         RefreshStatuses();
-                        ShowToast(ok ? "✓ Настройки прокси и hosts откачены из бэкапа" : "⚠️ Откат завершён с замечаниями");
-                    }));
+                        ShowToast(ok ? "✓ Настройки сети и Edge откачены из бэкапа" : "⚠️ Откат завершён с замечаниями");
+                    });
                 });
             });
             rollbackBtn.Height = 38;
             rollbackBtn.FontSize = 13;
-            stack.Children.Add(rollbackBtn);
+            bodyStack.Children.Add(rollbackBtn);
 
+            stack.Children.Add(bodyStack);
             border.Child = stack;
             return border;
         }
 
-        private Grid CreateWizardStep(string label, string actionText, bool isOk, Action onClick)
+        private Grid CreateWizardStep(string label, string actionText, bool isOk, out Button actionBtn, Action onClick)
         {
             var g = new Grid { Margin = new Thickness(0, 4, 0, 4) };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -402,7 +655,7 @@ namespace GovPortalsApp
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            var btn = new Button
+            actionBtn = new Button
             {
                 Content = actionText,
                 FontSize = 12,
@@ -415,13 +668,13 @@ namespace GovPortalsApp
             };
             if (onClick != null)
             {
-                btn.Click += delegate { onClick(); };
+                actionBtn.Click += delegate { onClick(); };
             }
 
             Grid.SetColumn(lbl, 0);
-            Grid.SetColumn(btn, 1);
+            Grid.SetColumn(actionBtn, 1);
             g.Children.Add(lbl);
-            g.Children.Add(btn);
+            g.Children.Add(actionBtn);
             return g;
         }
     }

@@ -210,9 +210,11 @@ def save_state(state_path, state):
     parent = os.path.dirname(os.path.abspath(state_path))
     if parent and not os.path.exists(parent):
         os.makedirs(parent, exist_ok=True)
-    with open(state_path, "w", encoding="utf-8") as fh:
+    tmp_path = state_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fh:
         json.dump(state, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
+    os.replace(tmp_path, state_path)
 
 
 def format_down_message(portal, hhmm):
@@ -273,6 +275,12 @@ def parse_args(argv):
     parser.add_argument("--timeout", type=int, default=10, help="HTTP timeout in seconds (default: 10)")
     parser.add_argument("--retries", type=int, default=3, help="Retry attempts per portal (default: 3)")
     parser.add_argument("--backoff", type=int, default=5, help="Backoff seconds between retries (default: 5)")
+    parser.add_argument(
+        "--confirm-delay",
+        type=int,
+        default=10,
+        help="Extra confirmation wait in seconds before marking a portal DOWN (default: 10)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Do not send Telegram messages")
     return parser.parse_args(argv)
 
@@ -293,6 +301,10 @@ def main(argv=None):
 
     for portal in PORTALS:
         pid = portal["id"]
+        prev_entry = prev_portals.get(pid) or {}
+        prev_status = prev_entry.get("status")
+        last_transition = prev_entry.get("last_transition_msk")
+
         result = check_portal_with_retries(
             portal,
             retries=args.retries,
@@ -300,10 +312,33 @@ def main(argv=None):
             timeout=args.timeout,
             strict_ctx=strict_ctx,
         )
+
+        # Confirming retry before switching status to DOWN (filters out single Azure/GitHub IP glitches)
+        if not result["up"] and prev_status != "DOWN" and args.confirm_delay > 0:
+            print(
+                "  [{0}] initial retries failed; waiting {1}s for confirming check before marking DOWN...".format(
+                    portal["host"], args.confirm_delay
+                )
+            )
+            time.sleep(args.confirm_delay)
+            confirm_result = probe_portal_once(portal, args.timeout, strict_ctx)
+            confirm_result["attempts"] = result["attempts"] + 1
+            if confirm_result["up"]:
+                print(
+                    "  [{0}] confirming check succeeded ({1} ms); transient glitch ignored.".format(
+                        portal["host"], confirm_result["latency_ms"]
+                    )
+                )
+                result = confirm_result
+            else:
+                print(
+                    "  [{0}] confirming check failed ({1}); DOWN confirmed.".format(
+                        portal["host"], confirm_result["error"]
+                    )
+                )
+                result = confirm_result
+
         new_status = "UP" if result["up"] else "DOWN"
-        prev_entry = prev_portals.get(pid) or {}
-        prev_status = prev_entry.get("status")
-        last_transition = prev_entry.get("last_transition_msk")
 
         print(
             "- {0} ({1}): {2} | latency={3}ms | ssl={4} | prev={5}".format(

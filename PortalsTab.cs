@@ -30,6 +30,17 @@ namespace GovPortalsApp
         private System.Windows.Shapes.Ellipse dotPortalVAT;
         private TextBlock statusPortalEpasluga;
         private System.Windows.Shapes.Ellipse dotPortalEpasluga;
+        private Button portalsFixBtn;
+        private bool _isRepairing = false;
+
+        private void RunOnUi(Action action)
+        {
+            if (action == null) return;
+            if (Dispatcher != null && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+            {
+                Dispatcher.BeginInvoke(action);
+            }
+        }
 
         private void BuildPortalsTab(StackPanel container)
         {
@@ -49,11 +60,7 @@ namespace GovPortalsApp
                 "Авторизация юрлиц и ИП через ЕС ИФЮЛ (nalog.gov.by)",
                 "Войти по ЭЦП в МНС", "#007AFF", delegate
                 {
-                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenMNS();
-                    ShowToast(string.IsNullOrEmpty(conflict)
-                        ? "🚀 Открываем Личный кабинет МНС..."
-                        : "🚀 Открываем МНС (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalMNS, out dotPortalMNS);
             Grid.SetRow(cardMNS, 0);
             Grid.SetColumn(cardMNS, 0);
@@ -64,11 +71,7 @@ namespace GovPortalsApp
                 "Отчеты ПУ-3, 4-Фонд и извещения (portal2.ssf.gov.by)",
                 "Войти по ЭЦП в ФСЗН", "#34C759", delegate
                 {
-                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenFSZN();
-                    ShowToast(string.IsNullOrEmpty(conflict)
-                        ? "🚀 Открываем Корпоративный портал ФСЗН..."
-                        : "🚀 Открываем ФСЗН (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalFSZN, out dotPortalFSZN);
             Grid.SetRow(cardFSZN, 0);
             Grid.SetColumn(cardFSZN, 2);
@@ -79,11 +82,7 @@ namespace GovPortalsApp
                 "Электронные счета-фактуры по НДС (режим IE + ActiveX в 1 клик)",
                 "Войти на портал ЭСЧФ", "#5856D6", delegate
                 {
-                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenVAT();
-                    ShowToast(string.IsNullOrEmpty(conflict)
-                        ? "🚀 Запускаем портал ЭСЧФ (с поддержкой ActiveX)..."
-                        : "🚀 Запускаем ЭСЧФ (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalVAT, out dotPortalVAT);
             Grid.SetRow(cardVAT, 1);
             Grid.SetColumn(cardVAT, 0);
@@ -94,11 +93,7 @@ namespace GovPortalsApp
                 "Электронные услуги НЦЭУ и справки для бизнеса по ЭЦП",
                 "Войти на Е-Паслуга", "#0A84FF", delegate
                 {
-                    string conflict = SystemDiagnoser.GetRunningConflictingApps();
                     OpenEpasluga();
-                    ShowToast(string.IsNullOrEmpty(conflict)
-                        ? "🚀 Открываем портал Е-Паслуга..."
-                        : "🚀 Открываем Е-Паслуга (если ЭЦП занята — закройте " + conflict + ")");
                 }, out statusPortalEpasluga, out dotPortalEpasluga);
             Grid.SetRow(cardEpasluga, 1);
             Grid.SetColumn(cardEpasluga, 2);
@@ -204,15 +199,15 @@ namespace GovPortalsApp
                         ComponentInstaller.DownloadAndInstallGossuok(
                             delegate(string status, int pct)
                             {
-                                Dispatcher.Invoke(new Action(delegate
+                                RunOnUi(delegate
                                 {
                                     progressBar.Value = pct;
                                     statusLabel.Text = status;
-                                }));
+                                });
                             },
                             delegate(bool success, string msg)
                             {
-                                Dispatcher.Invoke(new Action(delegate
+                                RunOnUi(delegate
                                 {
                                     btnInstall.IsEnabled = true;
                                     if (success)
@@ -227,7 +222,7 @@ namespace GovPortalsApp
                                         statusLabel.Text = "⚠️ " + msg;
                                         statusLabel.Foreground = GetBrush("#FF3B30");
                                     }
-                                }));
+                                });
                             }
                         );
                     });
@@ -514,7 +509,7 @@ namespace GovPortalsApp
             btnGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             btnGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
 
-            var fixBtn = CreateIOSButton("⚡  Исправить всё", "#FF9500", delegate
+            portalsFixBtn = CreateIOSButton("⚡  Исправить всё", "#FF9500", delegate
             {
                 TriggerRepairAll();
             });
@@ -524,9 +519,9 @@ namespace GovPortalsApp
                 ShowDetailedReportWindow();
             });
 
-            Grid.SetColumn(fixBtn, 0);
+            Grid.SetColumn(portalsFixBtn, 0);
             Grid.SetColumn(detailsBtn, 2);
-            btnGrid.Children.Add(fixBtn);
+            btnGrid.Children.Add(portalsFixBtn);
             btnGrid.Children.Add(detailsBtn);
             stack.Children.Add(btnGrid);
 
@@ -536,18 +531,54 @@ namespace GovPortalsApp
 
         private void TriggerRepairAll()
         {
+            if (_isRepairing) return;
+            _isRepairing = true;
+
+            if (portalsFixBtn != null)
+            {
+                portalsFixBtn.IsEnabled = false;
+                portalsFixBtn.Content = "⏳ Исправление...";
+            }
             if (statusNTClient != null) statusNTClient.Text = "Перезапуск и проверка...";
             if (dotNTClient != null) dotNTClient.Fill = GetBrush("#FF9500");
             ShowToast("⚡ Перезапуск служб ЭЦП и настройка туннеля...");
             ThreadPool.QueueUserWorkItem(delegate
             {
-                SystemDiagnoser.RepairAll();
-                Dispatcher.Invoke(new Action(delegate
+                bool hostsOk = true;
+                try
                 {
-                    RefreshStatuses();
-                    CheckAllPortalsOnline();
-                    ShowToast("✓ Службы перезапущены, порт проверен, туннель активен!");
-                }));
+                    hostsOk = SystemDiagnoser.RepairAll();
+                }
+                finally
+                {
+                    if (Dispatcher != null && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+                    {
+                        RunOnUi(delegate
+                        {
+                            try
+                            {
+                                if (portalsFixBtn != null)
+                                {
+                                    portalsFixBtn.IsEnabled = true;
+                                    portalsFixBtn.Content = "⚡  Исправить всё";
+                                }
+                                RefreshStatuses();
+                                CheckAllPortalsOnline();
+                                ShowToast(hostsOk
+                                    ? "✓ Службы перезапущены, порт проверен, туннель активен!"
+                                    : "⚠️ Службы перезапущены, но файл hosts не изменён (отменено UAC / нет прав администратора)");
+                            }
+                            finally
+                            {
+                                _isRepairing = false;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        _isRepairing = false;
+                    }
+                }
             });
         }
 
@@ -596,11 +627,14 @@ namespace GovPortalsApp
 
         private void ShowDetailedReportWindow()
         {
+            double maxH = SystemParameters.WorkArea.Height * 0.85;
+            double maxW = SystemParameters.WorkArea.Width * 0.90;
             var win = new Window
             {
                 Title = "Buhly • Детальный отчет системы",
-                Width = 480,
-                Height = 600,
+                Width = Math.Min(480, maxW),
+                Height = Math.Min(600, maxH),
+                MaxHeight = maxH,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = this,
                 Background = GetBrush("#F2F2F7")
@@ -652,7 +686,7 @@ namespace GovPortalsApp
                 bool pac = SystemDiagnoser.IsPacEnabled();
                 var certs = SystemDiagnoser.GetConnectedGovCertificates();
 
-                Dispatcher.BeginInvoke(new Action(delegate
+                RunOnUi(delegate
                 {
                     cardStack.Children.Clear();
                     cardStack.Children.Add(CreateReportItem("🕒 Системное время:", timeDetails, timeOk));
@@ -700,7 +734,7 @@ namespace GovPortalsApp
                             });
                         }
                     }
-                }));
+                });
             });
 
             card.Child = cardStack;
@@ -737,62 +771,178 @@ namespace GovPortalsApp
 
         private void OpenMNS()
         {
-            ShowToast("🏛️ Подключение к личному кабинету МНС...");
+            string conflict = SystemDiagnoser.GetRunningConflictingApps();
+            ShowToast("🏛️ Проверка компонентов и подключение к МНС...");
             ThreadPool.QueueUserWorkItem(delegate
             {
+                bool hasNt = SystemDiagnoser.FindNTClientPath() != null || SystemDiagnoser.IsPort8084Healthy();
+                if (!hasNt)
+                {
+                    RunOnUi(delegate
+                    {
+                        ShowToast("⚠️ Не найден NTClientSoftware (МНС) — установите во вкладке «УНП и ПК»");
+                        var res = MessageBox.Show(
+                            this,
+                            "Служба NTClientSoftware (МНС) не обнаружена на этом ПК.\n" +
+                            "Без неё авторизация по ЭЦП на портале МНС не заработает (откроется пустая страница).\n\n" +
+                            "Установите NTClientSoftware во вкладке «УНП и ПК» → «Мастер настройки для нового ПК».\n\n" +
+                            "Всё равно открыть страницу МНС в браузере?",
+                            "Buhly — Проверка компонентов МНС",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning,
+                            MessageBoxResult.No);
+                        if (res == MessageBoxResult.Yes)
+                        {
+                            OpenBrowser("https://lkfl.portal.nalog.gov.by/esifuyl");
+                            RefreshStatuses();
+                        }
+                    });
+                    return;
+                }
+
                 string hd;
                 if (!SystemDiagnoser.IsPort8084Healthy() || !SystemDiagnoser.CheckHostsFile(out hd))
                 {
                     SystemDiagnoser.RepairAll();
                 }
-                OpenBrowser("https://lkfl.portal.nalog.gov.by/esifuyl");
-                Dispatcher.Invoke(new Action(delegate { RefreshStatuses(); }));
+                RunOnUi(delegate
+                {
+                    OpenBrowser("https://lkfl.portal.nalog.gov.by/esifuyl");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем Личный кабинет МНС..."
+                        : "🚀 Открываем МНС (если ЭЦП занята — закройте " + conflict + ")");
+                    RefreshStatuses();
+                });
             });
         }
 
         private void OpenFSZN()
         {
-            ShowToast("📑 Подключение к порталу ФСЗН 2.0...");
+            string conflict = SystemDiagnoser.GetRunningConflictingApps();
+            ShowToast("📑 Проверка компонентов и подключение к ФСЗН 2.0...");
             ThreadPool.QueueUserWorkItem(delegate
             {
                 bool hasAvTun = SystemDiagnoser.FindAvTunProxyPath() != null || SystemDiagnoser.IsAvTunProxyRunning();
-                if (hasAvTun)
+                if (!hasAvTun)
                 {
-                    WinINetHelper.EnablePac("http://127.0.0.1:10224/proxy.pac");
+                    RunOnUi(delegate
+                    {
+                        ShowToast("⚠️ Не найден AvTunProxy (ФСЗН) — установите во вкладке «УНП и ПК»");
+                        var res = MessageBox.Show(
+                            this,
+                            "Шлюз AvTunProxy (ФСЗН) не обнаружен на этом ПК.\n" +
+                            "Без него вход по ЭЦП на корпоративный портал ФСЗН 2.0 не сработает.\n\n" +
+                            "Установите AvTunProxy в 1 клик во вкладке «УНП и ПК» → «Мастер настройки для нового ПК».\n\n" +
+                            "Всё равно открыть страницу ФСЗН в браузере?",
+                            "Buhly — Проверка компонентов ФСЗН",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning,
+                            MessageBoxResult.No);
+                        if (res == MessageBoxResult.Yes)
+                        {
+                            EdgeHelper.EnsureTrustedSitesAndActiveX();
+                            OpenBrowser("https://portal2.ssf.gov.by/mainPage/");
+                            RefreshStatuses();
+                        }
+                    });
+                    return;
                 }
+
+                WinINetHelper.EnablePac("http://127.0.0.1:10224/proxy.pac");
                 EdgeHelper.EnsureTrustedSitesAndActiveX();
-                if (hasAvTun && !SystemDiagnoser.IsAvTunProxyRunning())
+                if (!SystemDiagnoser.IsAvTunProxyRunning())
                 {
                     SystemDiagnoser.RepairAll();
                 }
-                OpenBrowser("https://portal2.ssf.gov.by/mainPage/");
-                Dispatcher.Invoke(new Action(delegate { RefreshStatuses(); }));
+                RunOnUi(delegate
+                {
+                    OpenBrowser("https://portal2.ssf.gov.by/mainPage/");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем Корпоративный портал ФСЗН..."
+                        : "🚀 Открываем ФСЗН (если ЭЦП занята — закройте " + conflict + ")");
+                    RefreshStatuses();
+                });
             });
         }
 
         private void OpenEpasluga()
         {
-            ShowToast("🌐 Подключение к порталу Е-Паслуга...");
+            string conflict = SystemDiagnoser.GetRunningConflictingApps();
+            ShowToast("🌐 Проверка компонентов и подключение к Е-Паслуга...");
             ThreadPool.QueueUserWorkItem(delegate
             {
+                bool hasNt = SystemDiagnoser.FindNTClientPath() != null || SystemDiagnoser.IsPort8084Healthy();
+                if (!hasNt)
+                {
+                    RunOnUi(delegate
+                    {
+                        ShowToast("⚠️ Не найден NTClientSoftware — установите во вкладке «УНП и ПК»");
+                        var res = MessageBox.Show(
+                            this,
+                            "Служба NTClientSoftware (МНС / НЦЭУ) не обнаружена на этом ПК.\n" +
+                            "Без неё авторизация по ЭЦП на портале Е-Паслуга может не сработать.\n\n" +
+                            "Установите NTClientSoftware во вкладке «УНП и ПК» → «Мастер настройки для нового ПК».\n\n" +
+                            "Всё равно открыть портал Е-Паслуга в браузере?",
+                            "Buhly — Проверка компонентов Е-Паслуга",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning,
+                            MessageBoxResult.No);
+                        if (res == MessageBoxResult.Yes)
+                        {
+                            OpenBrowser("https://e-pasluga.by/");
+                            RefreshStatuses();
+                        }
+                    });
+                    return;
+                }
+
                 string hd;
                 if (!SystemDiagnoser.IsPort8084Healthy() || !SystemDiagnoser.CheckHostsFile(out hd))
                 {
                     SystemDiagnoser.RepairAll();
                 }
-                OpenBrowser("https://e-pasluga.by/");
-                Dispatcher.Invoke(new Action(delegate { RefreshStatuses(); }));
+                RunOnUi(delegate
+                {
+                    OpenBrowser("https://e-pasluga.by/");
+                    ShowToast(string.IsNullOrEmpty(conflict)
+                        ? "🚀 Открываем портал Е-Паслуга..."
+                        : "🚀 Открываем Е-Паслуга (если ЭЦП занята — закройте " + conflict + ")");
+                    RefreshStatuses();
+                });
             });
         }
 
         private void OpenVAT()
         {
+            string conflict = SystemDiagnoser.GetRunningConflictingApps();
             ShowToast("🚀 Подготовка и запуск ЭСЧФ в Microsoft Edge...");
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
+                    bool edgeRunning = EdgeHelper.IsEdgeRunning();
+                    bool prefsHadVat = EdgeHelper.HasVatInEdgePreferences();
                     EdgeHelper.EnsureVatInEdgeIEMode();
+                    bool prefsHasVatAfter = EdgeHelper.HasVatInEdgePreferences();
+                    bool needEdgeRestartHint = edgeRunning && !prefsHadVat && !prefsHasVatAfter;
+
+                    if (needEdgeRestartHint)
+                    {
+                        RunOnUi(delegate
+                        {
+                            MessageBox.Show(
+                                this,
+                                "Microsoft Edge сейчас запущен (в т.ч. возможен фоновый режим Startup Boost в системном трее), а сайт vat.gov.by ещё не прописан в его профиле Preferences.\n\n" +
+                                "На домашнем ПК политика реестра для режима IE может не примениться без полного перезапуска Edge.\n\n" +
+                                "Если портал ЭСЧФ откроется без значка режима IE:\n" +
+                                "1. Закройте все окна Microsoft Edge.\n" +
+                                "2. Полностью завершите фоновый Edge через значок в трее (возле часов) или Диспетчер задач (msedge.exe).\n" +
+                                "3. Нажмите «Войти на портал ЭСЧФ» повторно — Buhly пропишет vat.gov.by в профиль Edge.",
+                                "Buhly — Режим IE в Microsoft Edge",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        });
+                    }
 
                     var edgeCandidates = new string[]
                     {
@@ -803,29 +953,35 @@ namespace GovPortalsApp
                     {
                         if (File.Exists(edge))
                         {
-                            Process.Start(edge, "http://vat.gov.by/mainPage/");
-                            Dispatcher.Invoke(new Action(delegate
+                            using (var p = Process.Start(edge, "http://vat.gov.by/mainPage/")) { }
+                            RunOnUi(delegate
                             {
-                                ShowToast("🚀 ЭСЧФ запущен в Microsoft Edge (режим IE)!");
+                                ShowToast(needEdgeRestartHint
+                                    ? "⚠️ Закройте Edge полностью (в т.ч. в трее), если режим IE не применился"
+                                    : (string.IsNullOrEmpty(conflict)
+                                        ? "🚀 ЭСЧФ запущен в Microsoft Edge (режим IE)!"
+                                        : "🚀 ЭСЧФ запущен (если ЭЦП занята — закройте " + conflict + ")"));
                                 RefreshStatuses();
-                            }));
+                            });
                             return;
                         }
                     }
 
-                    Process.Start(new ProcessStartInfo("microsoft-edge:http://vat.gov.by/mainPage/") { UseShellExecute = true });
-                    Dispatcher.Invoke(new Action(delegate
+                    using (var p = Process.Start(new ProcessStartInfo("microsoft-edge:http://vat.gov.by/mainPage/") { UseShellExecute = true })) { }
+                    RunOnUi(delegate
                     {
-                        ShowToast("🚀 Запускаем ЭСЧФ в Microsoft Edge...");
+                        ShowToast(string.IsNullOrEmpty(conflict)
+                            ? "🚀 Запускаем ЭСЧФ в Microsoft Edge..."
+                            : "🚀 Запускаем ЭСЧФ (если ЭЦП занята — закройте " + conflict + ")");
                         RefreshStatuses();
-                    }));
+                    });
                 }
                 catch (Exception ex)
                 {
-                    Dispatcher.Invoke(new Action(delegate
+                    RunOnUi(delegate
                     {
                         ShowToast("Ошибка запуска: " + ex.Message);
-                    }));
+                    });
                 }
             });
         }

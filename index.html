@@ -4,33 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров</title>
-  <meta name="description" content="Простой локальный помощник для малого бизнеса РБ на WB и Ozon и бухгалтеров: накладные из Excel, сверка отчётов с банком, расчёт налога и вход на порталы МНС/ЭСЧФ.">
+  <meta name="description" content="Простой локальный помощник для малого бизнеса РБ на WB и Ozon и бухгалтеров: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход на порталы МНС/ЭСЧФ.">
   <meta name="keywords" content="buhly, wildberries беларусь налоги, ozon отчет рб, тн-2 генератор, vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, кудир рб, ввозной ндс рф, эцп авест">
   <meta name="google-site-verification" content="WD-6rHtHfFlNpetvUoZ7PJtIo6KkqRYPiqFOh4MdhPQ">
   <meta name="yandex-verification" content="153895d755675f1a">
+  <link rel="icon" href="favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
-  <meta property="og:description" content="Накладные ТН/ТТН из Excel, сверка WB/Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
+  <meta property="og:description" content="Накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://buhly.by/">
   <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
-  <meta name="twitter:description" content="Накладные ТН/ТТН из Excel, сверка WB/Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
+  <meta name="twitter:description" content="Накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <link rel="canonical" href="https://buhly.by/">
-
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 
   <!-- Schema.org -->
   <script type="application/ld+json">
@@ -40,7 +32,7 @@
       {
         "@type": "SoftwareApplication",
         "name": "Buhly",
-        "softwareVersion": "3.1.0.0",
+        "softwareVersion": "3.1.1.0",
         "operatingSystem": "Windows 10, Windows 11",
         "applicationCategory": "BusinessApplication",
         "license": "https://opensource.org/licenses/MIT",
@@ -49,7 +41,7 @@
           "price": "0",
           "priceCurrency": "BYN"
         },
-        "description": "Бесплатный локальный помощник для продавцов WB/Ozon в Беларуси и бухгалтеров: накладные, сверка отчётов с банком, налоги и вход на госпорталы.",
+        "description": "Бесплатный локальный помощник для продавцов WB/Ozon в Беларуси и бухгалтеров: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, налоги и вход на госпорталы.",
         "downloadUrl": "https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip"
       },
       {
@@ -80,17 +72,17 @@
 <body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
 
   <!-- Navigation -->
-  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between gap-4">
-    <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
         B
       </div>
-      <div>
+      <div class="min-w-0">
         <div class="flex items-center gap-2">
           <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
-          <span class="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">v3.1</span>
+          <span class="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">v3.1.1</span>
         </div>
-        <span class="text-xs text-neutral-500 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
+        <span class="text-xs text-neutral-600 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
       </div>
     </div>
     <div class="flex items-center flex-wrap gap-2 sm:gap-3">
@@ -112,56 +104,61 @@
   <!-- Hero Section -->
   <main class="max-w-5xl mx-auto w-full px-6 pt-6 pb-12 text-center">
 
-    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5">
-      <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3.5 py-1.5 rounded-full mb-5">
+      <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
       <span>Бесплатно • Windows 10/11 • 1 файл без установки</span>
     </div>
 
-    <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-neutral-900 max-w-4xl mx-auto leading-tight">
+    <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-neutral-900 max-w-4xl mx-auto leading-tight break-words">
       Простой помощник для продавцов WB / Ozon в Беларуси и <span class="text-blue-600">бухгалтеров, которые их ведут</span>
     </h1>
 
     <p class="text-base sm:text-lg text-neutral-600 max-w-2xl mx-auto mt-5 leading-relaxed">
-      Убирает ручную рутину: накладные из екселя поставки, сверка отчётов с выпиской банка, понятный расчёт налога и вход на порталы МНС / ЭСЧФ в один клик.
+      Убирает ручную рутину: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, понятный расчёт налога и вход на порталы МНС / ЭСЧФ в один клик.
     </p>
 
     <!-- Download CTA -->
     <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        <span>Скачать Buhly (ZIP, 229 КБ)</span>
+      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
+        <svg class="w-5 h-5 shrink-0" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <span>Скачать Buhly (ZIP, ~266 КБ)</span>
       </a>
-      <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
+      <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center gap-2">
         <span>Канал в Telegram</span>
       </a>
-      <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center space-x-2">
+      <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center gap-2">
         <span>Чат с автором</span>
       </a>
     </div>
 
-    <p class="mt-3 text-xs text-neutral-500">
-      Внутри: только <b>Buhly.exe</b> (~602 КБ), <b>README</b> и <b>LICENSE (MIT)</b> •
+    <p class="mt-3 text-xs text-neutral-600">
+      Внутри: только <b>Buhly.exe</b> (~725 КБ), <b>README</b> и <b>LICENSE (MIT)</b> •
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.exe" data-goal="download_exe" class="text-blue-600 hover:underline">Прямой .exe</a> •
       <a href="https://buhly.by/Release/SHA256SUMS.txt" class="text-blue-600 hover:underline">SHA-256</a>
     </p>
+
+    <div class="mt-4 max-w-2xl mx-auto rounded-2xl bg-white border border-neutral-200/80 px-4 py-3 text-xs text-neutral-600 text-left shadow-sm">
+      <b class="text-neutral-900">Если Windows SmartScreen покажет предупреждение:</b>
+      файл пока распространяется без коммерческой цифровой подписи (каждый релиз отправляется на проверку в <b>Microsoft WDSI</b>). Для запуска: <b>1)</b> нажмите <b>«Подробнее»</b> → <b>2)</b> выберите <b>«Выполнить в любом случае»</b>.
+    </div>
 
     <!-- Screenshots Switcher -->
     <div class="mt-10 bg-white rounded-3xl p-4 sm:p-5 shadow-lg border border-neutral-200/80 text-left">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100">
         <div>
           <span class="font-bold text-base text-neutral-900">Как выглядит внутри</span>
-          <span class="block text-xs text-neutral-500">Внутри есть кнопка «Попробовать на демо-данных» — можно пощёлкать без своих отчётов</span>
+          <span class="block text-xs text-neutral-600">Внутри есть кнопка «Попробовать на демо-данных» — можно пощёлкать без своих отчётов</span>
         </div>
-        <div class="flex flex-wrap gap-1.5 bg-[#F2F2F7] p-1 rounded-xl" id="shot-tabs">
-          <button type="button" onclick="showShot('overview')" id="tab-overview" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition">Сводка и сроки</button>
-          <button type="button" onclick="showShot('analytics')" id="tab-analytics" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Отчёты и налоги</button>
-          <button type="button" onclick="showShot('waybills')" id="tab-waybills" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Накладные ТН/ТТН</button>
+        <div class="flex flex-wrap gap-1.5 bg-[#F2F2F7] p-1 rounded-xl" id="shot-tabs" role="tablist" aria-label="Скриншоты интерфейса Buhly">
+          <button type="button" onclick="showShot('overview')" id="tab-overview" role="tab" aria-selected="true" aria-controls="shot-panel" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition">Сводка и сроки</button>
+          <button type="button" onclick="showShot('analytics')" id="tab-analytics" role="tab" aria-selected="false" aria-controls="shot-panel" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Отчёты и налоги</button>
+          <button type="button" onclick="showShot('waybills')" id="tab-waybills" role="tab" aria-selected="false" aria-controls="shot-panel" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition">Накладные ТН/ТТН</button>
         </div>
       </div>
 
-      <div class="mt-4">
-        <img id="shot-img" src="screenshots/buhly_v3_overview.png" alt="Интерфейс Buhly — Сводка, компании и сроки" class="w-full rounded-2xl border border-neutral-200/80">
-        <p id="shot-caption" class="mt-3 text-xs text-neutral-500 text-center">
+      <div class="mt-4" id="shot-panel" role="tabpanel" aria-labelledby="tab-overview">
+        <img id="shot-img" src="screenshots/buhly_v3_overview.png" width="1005" height="702" alt="Интерфейс Buhly — Сводка, компании и сроки" class="w-full h-auto rounded-2xl border border-neutral-200/80">
+        <p id="shot-caption" class="mt-3 text-xs text-neutral-600 text-center">
           Сводка: список ваших компаний, курсы Нацбанка, статус флешки ЭЦП и календарь сроков уплаты.
         </p>
       </div>
@@ -175,7 +172,7 @@
       <h2 class="text-2xl sm:text-3xl font-extrabold text-center text-neutral-900 mb-3">
         Кому и чем помогает Buhly
       </h2>
-      <p class="text-center text-neutral-500 max-w-xl mx-auto mb-10 text-sm sm:text-base">
+      <p class="text-center text-neutral-600 max-w-xl mx-auto mb-10 text-sm sm:text-base">
         Это не замена 1С и не большой комбайн, а простой ежедневный помощник без лишних кнопок.
       </p>
 
@@ -188,10 +185,10 @@
           <h3 class="font-extrabold text-xl text-neutral-900 mb-4">Кто сам ведёт свою бухгалтерию</h3>
           <ul class="space-y-3.5 text-sm text-neutral-700 leading-relaxed">
             <li>
-              <b class="text-neutral-900">Накладные из екселя поставки:</b> закидываешь файл WB, подставляешь реквизиты — получаешь готовую ТН/ТТН под печать (есть настройка отступов под готовые бланки).
+              <b class="text-neutral-900">Накладные ТН-2/ТТН-1 из поставок WB:</b> загружаешь файл поставки Wildberries, подставляешь реквизиты — получаешь готовую накладную под печать (есть настройка отступов под готовые бланки БСО).
             </li>
             <li>
-              <b class="text-neutral-900">Сверка «начислили / пришло» и налог:</b> загружаешь отчёт WB/Ozon и выписку банка — видно, сколько реально дошло до счёта и с какой суммы считается налог (УСН или ИП + ФСЗН).
+              <b class="text-neutral-900">Финансовая сверка WB и Ozon с банком:</b> загружаешь отчёт маркетплейса и выписку банка — видно, сколько реально дошло до счёта и с какой суммы считается налог (УСН или ИП + ФСЗН).
             </li>
             <li>
               <b class="text-neutral-900">Расшифровка «Как посчитано?»:</b> по каждой цифре можно открыть расчёт по строчкам, чтобы перепроверить себя, а не верить программе на слово.
@@ -235,9 +232,9 @@
         <div>
           <h2 class="text-xl font-extrabold text-neutral-900 mb-3">Почему программе можно доверять</h2>
           <ul class="space-y-2.5 text-sm text-neutral-600 leading-relaxed">
-            <li>• <b>Работает только на вашем ПК:</b> никаких облаков, аккаунтов и телеметрии. Выписки, суммы, накладные и пароли от ЭЦП никуда не отправляются.</li>
-            <li>• <b>Только официальные адреса:</b> в интернет программа обращается только за курсами НБРБ и чтобы открыть порталы налоговой, ФСЗН и ЭСЧФ.</li>
-            <li>• <b>Открытый код и проверки:</b> исходники выложены на GitHub, политика приватности оформлена по Закону РБ № 99-З. Бинарник уже направлен на проверку в Microsoft (WDSI) и в программу бесплатной подписи open-source софта SignPath Foundation.</li>
+            <li>• <b>Учётные данные — только на вашем ПК:</b> никаких облаков, аккаунтов и ПДн-телеметрии. Выписки, суммы, накладные и пароли от ЭЦП никуда не отправляются.</li>
+            <li>• <b>Прозрачные сетевые обращения:</b> при запуске 1 раз в сутки выполняется анонимная проверка новой версии на Cloudflare Worker / GitHub (без ПДн и файлов), а также проверка доступности 4 госпорталов (МНС, ФСЗН, ЭСЧФ, Е-Паслуга) и загрузка курсов НБРБ (плюс ручная проверка УНП по базе МНС).</li>
+            <li>• <b>Открытый код и проверки:</b> исходники выложены на GitHub (MIT), политика приватности оформлена по Закону РБ № 99-З. Чистые релизные сборки отправляются на анализ в Microsoft (WDSI); бесплатную open-source подпись кода (SignPath Foundation) планируется переподать после роста сообщества (звёзд и обзоров).</li>
           </ul>
         </div>
 
@@ -248,11 +245,11 @@
           <div class="mt-3 space-y-2">
             <p>0 внешних библиотек — собирается штатным компилятором Windows (<code class="bg-neutral-100 px-1 rounded">build.bat</code>). Перед правкой <code class="bg-neutral-100 px-1 rounded">hosts</code> или Edge всегда создаётся <code class="bg-neutral-100 px-1 rounded">.bak</code>-бэкап.</p>
             <div class="flex items-center gap-2 bg-[#F2F2F7] rounded-xl px-3 py-2">
-              <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all">D32BD5DC092C32612A837D5C06A0CF54F30AF16CED94F8F11AC99C4D4C7A63D8</code>
+              <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all min-w-0 flex-1 p-0">3492CE31334AE18B2E2DC30DD80EF787D53BB97905BBBB7E71F90B6918D44BB0</code>
               <button type="button" onclick="copyHash()" id="copy-hash-btn" class="shrink-0 text-[11px] font-semibold bg-white text-blue-600 px-2.5 py-1 rounded-lg border border-neutral-200">Копировать</button>
             </div>
-            <p class="text-[11px] text-neutral-500">
-              Code Signing Policy: Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath.io</a>, using a certificate by <a href="https://signpath.org" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath Foundation</a>.
+            <p class="text-[11px] text-neutral-600">
+              Цифровая подпись: планируется повторная подача в <a href="https://signpath.org" target="_blank" rel="noopener" class="text-blue-600 hover:underline">SignPath Foundation</a> после набора публичных сигналов доверия (GitHub Stars, обзоры) или публикация через Microsoft Store (MSIX).
             </p>
           </div>
         </details>
@@ -322,31 +319,97 @@
       }
     };
 
+    var shotKeys = ['overview', 'analytics', 'waybills'];
+
     function showShot(key) {
       var item = shots[key];
       if (!item) return;
       document.getElementById('shot-img').src = item.src;
       document.getElementById('shot-img').alt = item.alt;
       document.getElementById('shot-caption').textContent = item.caption;
-      ['overview', 'analytics', 'waybills'].forEach(function (id) {
+      var panel = document.getElementById('shot-panel');
+      if (panel) panel.setAttribute('aria-labelledby', 'tab-' + key);
+      shotKeys.forEach(function (id) {
         var btn = document.getElementById('tab-' + id);
         if (!btn) return;
         if (id === key) {
           btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition';
+          btn.setAttribute('aria-selected', 'true');
         } else {
           btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition';
+          btn.setAttribute('aria-selected', 'false');
         }
       });
     }
 
+    (function () {
+      var tablist = document.getElementById('shot-tabs');
+      if (!tablist) return;
+      tablist.addEventListener('keydown', function (e) {
+        var active = document.activeElement;
+        if (!active || !active.id || active.id.indexOf('tab-') !== 0) return;
+        var currentKey = active.id.replace('tab-', '');
+        var idx = shotKeys.indexOf(currentKey);
+        if (idx === -1) return;
+        var nextIdx = idx;
+        if (e.key === 'ArrowRight') nextIdx = (idx + 1) % shotKeys.length;
+        else if (e.key === 'ArrowLeft') nextIdx = (idx - 1 + shotKeys.length) % shotKeys.length;
+        else if (e.key === 'Home') nextIdx = 0;
+        else if (e.key === 'End') nextIdx = shotKeys.length - 1;
+        else return;
+        e.preventDefault();
+        var nextKey = shotKeys[nextIdx];
+        showShot(nextKey);
+        var nextBtn = document.getElementById('tab-' + nextKey);
+        if (nextBtn) nextBtn.focus();
+      });
+    })();
+
+    function markHashCopied() {
+      var b = document.getElementById('copy-hash-btn');
+      if (!b) return;
+      b.textContent = 'Скопировано ✓';
+      setTimeout(function () { b.textContent = 'Копировать'; }, 2000);
+    }
+
+    function fallbackCopyText(text) {
+      var ok = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) {
+        ok = false;
+      }
+      if (!ok) {
+        try {
+          var el = document.getElementById('sha-exe');
+          var range = document.createRange();
+          range.selectNodeContents(el);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (e) {}
+      }
+      if (ok) markHashCopied();
+    }
+
     function copyHash() {
-      var text = document.getElementById('sha-exe').textContent.trim();
+      var el = document.getElementById('sha-exe');
+      if (!el) return;
+      var text = el.textContent.trim();
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function () {
-          var b = document.getElementById('copy-hash-btn');
-          b.textContent = 'Скопировано ✓';
-          setTimeout(function () { b.textContent = 'Копировать'; }, 2000);
+        navigator.clipboard.writeText(text).then(markHashCopied, function () {
+          fallbackCopyText(text);
         });
+      } else {
+        fallbackCopyText(text);
       }
     }
 
@@ -368,6 +431,17 @@
         try {
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
       };
 
       var links = document.querySelectorAll('a[href]');
@@ -378,6 +452,8 @@
           if (!goal) {
             if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
               goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
             } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
               goal = 'tg_chat';
             } else if (href.indexOf('t.me/buhly_by') !== -1) {
@@ -390,7 +466,7 @@
 
           if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
             var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
-            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
             if (isInternal || isGithubPage) {
               try {
                 var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';

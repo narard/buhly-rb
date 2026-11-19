@@ -19,8 +19,10 @@ namespace GovPortalsApp
         private TextBlock registryDuplicateText;
         private List<CertInfo> registryCurrentDuplicates = new List<CertInfo>();
         private List<CertInfo> registryLastMerged = new List<CertInfo>();
-        private bool registryFilterExpiringOnly = false;
-        private Button registryFilterBtn;
+        private ComboBox registryFilterCombo;
+        private TextBox registrySearchBox;
+        private TextBlock registrySearchPlaceholder;
+        private Button registrySearchClearBtn;
         private Button registryRestoreHiddenBtn;
 
         private void BuildRegistryTab(StackPanel container)
@@ -61,29 +63,140 @@ namespace GovPortalsApp
             };
             hStack.Children.Add(registrySummaryText);
 
+            // Row 1: 2 primary buttons
             var btnRow = new Grid();
             btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            btnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var scanBtn = CreateIOSButton("🔄 Из Windows", "#007AFF", delegate
+            var scanBtn = CreateIOSButton("🔄 Обновить", "#007AFF", delegate
             {
                 RefreshRegistryTab(true);
                 ShowToast("✓ Ключи подтянуты из хранилища Windows");
             });
             scanBtn.Height = 36;
-            scanBtn.FontSize = 12;
+            scanBtn.FontSize = 12.5;
 
-            var copyBtn = CreateIOSButton("📋 Сводка сроков", "#34C759", delegate
+            var exportBtn = CreateIOSButton("📊 Экспорт в Excel/CSV", "#5856D6", delegate
+            {
+                ExportRegistryDialog();
+            });
+            exportBtn.Height = 36;
+            exportBtn.FontSize = 12.5;
+
+            Grid.SetColumn(scanBtn, 0);
+            Grid.SetColumn(exportBtn, 2);
+            btnRow.Children.Add(scanBtn);
+            btnRow.Children.Add(exportBtn);
+            hStack.Children.Add(btnRow);
+
+            // Row 2: Search input + compact filter ComboBox
+            var filterRow = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+            filterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            filterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            filterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(185) });
+
+            var searchBorder = new Border
+            {
+                Background = GetBrush("#F2F2F7"),
+                CornerRadius = new CornerRadius(10),
+                BorderBrush = GetBrush("#D1D1D6"),
+                BorderThickness = new Thickness(1),
+                Height = 36,
+                Padding = new Thickness(10, 0, 6, 0)
+            };
+            var searchGrid = new Grid();
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            registrySearchPlaceholder = new TextBlock
+            {
+                Text = "🔍 Поиск по названию или владельцу...",
+                FontSize = 12,
+                Foreground = GetBrush("#8E8E93"),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false
+            };
+
+            registrySearchBox = new TextBox
+            {
+                FontSize = 12.5,
+                Foreground = GetBrush("#1C1C1E"),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+
+            registrySearchClearBtn = new Button
+            {
+                Content = "✕",
+                FontSize = 11,
+                Foreground = GetBrush("#8E8E93"),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(6, 2, 6, 2),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed,
+                ToolTip = "Очистить поиск"
+            };
+            registrySearchClearBtn.Click += delegate
+            {
+                registrySearchBox.Text = "";
+                registrySearchBox.Focus();
+            };
+
+            registrySearchBox.TextChanged += delegate
+            {
+                bool empty = string.IsNullOrEmpty(registrySearchBox.Text);
+                registrySearchPlaceholder.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+                registrySearchClearBtn.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+                RenderRegistryList(registryLastMerged);
+            };
+
+            Grid.SetColumn(registrySearchPlaceholder, 0);
+            Grid.SetColumn(registrySearchBox, 0);
+            Grid.SetColumn(registrySearchClearBtn, 1);
+            searchGrid.Children.Add(registrySearchPlaceholder);
+            searchGrid.Children.Add(registrySearchBox);
+            searchGrid.Children.Add(registrySearchClearBtn);
+            searchBorder.Child = searchGrid;
+
+            registryFilterCombo = new ComboBox
+            {
+                Height = 36,
+                FontSize = 12,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            registryFilterCombo.Items.Add("Все ключи");
+            registryFilterCombo.Items.Add("В USB сейчас");
+            registryFilterCombo.Items.Add("Истекающие ≤30 дн.");
+            registryFilterCombo.SelectedIndex = 0;
+            registryFilterCombo.SelectionChanged += delegate
+            {
+                RenderRegistryList(registryLastMerged);
+            };
+
+            Grid.SetColumn(searchBorder, 0);
+            Grid.SetColumn(registryFilterCombo, 2);
+            filterRow.Children.Add(searchBorder);
+            filterRow.Children.Add(registryFilterCombo);
+            hStack.Children.Add(filterRow);
+
+            var subActionsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+
+            var copyBtn = CreateSmallPillButton("📋 Сводка в буфер", "#F2F2F7", "#1C1C1E");
+            copyBtn.Margin = new Thickness(0, 0, 8, 0);
+            copyBtn.Click += delegate
             {
                 var all = CertRegistryManager.LoadRegistry();
                 if (all.Count == 0)
                 {
-                    ShowToast("Реестр пока пуст — вставьте ключ или нажмите «Из Windows»");
+                    ShowToast("Реестр пока пуст — вставьте ключ или нажмите «Обновить»");
                     return;
                 }
                 var sb = new StringBuilder();
@@ -95,41 +208,10 @@ namespace GovPortalsApp
                 }
                 try { Clipboard.SetText(sb.ToString()); ShowToast("✓ Сводка скопирована в буфер обмена"); }
                 catch { ShowToast("Не удалось скопировать в буфер"); }
-            });
-            copyBtn.Height = 36;
-            copyBtn.FontSize = 12;
-
-            var exportBtn = CreateIOSButton("📥 Экспорт CSV/Excel", "#5856D6", delegate
-            {
-                ExportRegistryDialog();
-            });
-            exportBtn.Height = 36;
-            exportBtn.FontSize = 12;
-
-            registryFilterBtn = CreateCompactActionButton("⚠️ Истекающие ≤30 дн.", "#F2F2F7", "#1C1C1E");
-            registryFilterBtn.Height = 36;
-            registryFilterBtn.Padding = new Thickness(12, 0, 12, 0);
-            registryFilterBtn.Click += delegate
-            {
-                registryFilterExpiringOnly = !registryFilterExpiringOnly;
-                registryFilterBtn.Background = GetBrush(registryFilterExpiringOnly ? "#FFF3CD" : "#F2F2F7");
-                registryFilterBtn.Foreground = GetBrush(registryFilterExpiringOnly ? "#B45309" : "#1C1C1E");
-                RenderRegistryList(registryLastMerged);
             };
-
-            Grid.SetColumn(scanBtn, 0);
-            Grid.SetColumn(copyBtn, 2);
-            Grid.SetColumn(exportBtn, 4);
-            Grid.SetColumn(registryFilterBtn, 6);
-            btnRow.Children.Add(scanBtn);
-            btnRow.Children.Add(copyBtn);
-            btnRow.Children.Add(exportBtn);
-            btnRow.Children.Add(registryFilterBtn);
-            hStack.Children.Add(btnRow);
+            subActionsPanel.Children.Add(copyBtn);
 
             registryRestoreHiddenBtn = CreateSmallPillButton("↩️ Показать скрытые ключи", "#F2F2F7", "#636366");
-            registryRestoreHiddenBtn.Margin = new Thickness(0, 8, 0, 0);
-            registryRestoreHiddenBtn.HorizontalAlignment = HorizontalAlignment.Left;
             registryRestoreHiddenBtn.Visibility = Visibility.Collapsed;
             registryRestoreHiddenBtn.Click += delegate
             {
@@ -137,7 +219,8 @@ namespace GovPortalsApp
                 RefreshRegistryTab(true);
                 ShowToast("✓ Скрытые ключи восстановлены");
             };
-            hStack.Children.Add(registryRestoreHiddenBtn);
+            subActionsPanel.Children.Add(registryRestoreHiddenBtn);
+            hStack.Children.Add(subActionsPanel);
 
             headerCard.Child = hStack;
             container.Children.Add(headerCard);
@@ -254,12 +337,15 @@ namespace GovPortalsApp
                 var fresh = SystemDiagnoser.GetAllGovCertificates(!scanAllWindowsStore);
                 var merged = CertRegistryManager.MergeAndGetAll(fresh);
 
-                Dispatcher.BeginInvoke(new Action(delegate
+                if (Dispatcher != null && !Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
                 {
-                    registryLastMerged = merged;
-                    RenderRegistryList(merged);
-                    RefreshOverviewAlerts();
-                }));
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        registryLastMerged = merged;
+                        RenderRegistryList(merged);
+                        RefreshOverviewAlerts();
+                    }));
+                }
             });
         }
 
@@ -339,15 +425,35 @@ namespace GovPortalsApp
                 }
             }
 
+            int filterIdx = registryFilterCombo != null ? registryFilterCombo.SelectedIndex : 0;
+            string searchQ = registrySearchBox != null ? (registrySearchBox.Text ?? "").Trim() : "";
+
             var displayList = new List<CertInfo>();
             foreach (var c in merged)
             {
-                if (registryFilterExpiringOnly && c.DaysRemaining > 30) continue;
+                if (filterIdx == 1 && !c.IsPhysicallyConnected) continue;
+                if (filterIdx == 2 && c.DaysRemaining > 30) continue;
+                if (!string.IsNullOrEmpty(searchQ))
+                {
+                    bool matchOrg = !string.IsNullOrEmpty(c.OrgName) && c.OrgName.IndexOf(searchQ, StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool matchPerson = !string.IsNullOrEmpty(c.PersonName) && c.PersonName.IndexOf(searchQ, StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!matchOrg && !matchPerson) continue;
+                }
                 displayList.Add(c);
             }
 
             if (displayList.Count == 0)
             {
+                string emptyMsg;
+                if (!string.IsNullOrEmpty(searchQ))
+                    emptyMsg = string.Format("По запросу «{0}» ключи не найдены.", searchQ);
+                else if (filterIdx == 1)
+                    emptyMsg = "Сейчас к ПК не подключен ни один USB-ключ ЭЦП.";
+                else if (filterIdx == 2)
+                    emptyMsg = "Нет ключей со сроком ≤30 дней — всё в порядке ✓";
+                else
+                    emptyMsg = "В базе пока нет ни одного ключа.\nВставьте USB-токен Avest или нажмите «🔄 Обновить», чтобы подтянуть уже установленные на этом ПК сертификаты.";
+
                 var emptyCard = new Border
                 {
                     Background = Brushes.White,
@@ -358,9 +464,7 @@ namespace GovPortalsApp
                 };
                 emptyCard.Child = new TextBlock
                 {
-                    Text = registryFilterExpiringOnly
-                        ? "Нет ключей со сроком ≤30 дней — всё в порядке ✓"
-                        : "В базе пока нет ни одного ключа.\nВставьте USB-токен Avest или нажмите «🔄 Из Windows», чтобы подтянуть уже установленные на этом ПК сертификаты.",
+                    Text = emptyMsg,
                     FontSize = 12,
                     Foreground = GetBrush("#636366"),
                     TextWrapping = TextWrapping.Wrap

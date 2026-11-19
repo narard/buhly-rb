@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Windows;
 using Microsoft.Win32;
 
 namespace GovPortalsApp
@@ -105,6 +109,8 @@ namespace GovPortalsApp
                 bool restorePacFlagOn = hadFlagsBackup && File.ReadAllText(flagsBak, Encoding.UTF8).Trim() == "1";
 
                 bool restoredSomething = false;
+                bool removedBuhlyPac = false;
+                bool hasThirdPartyProxy = false;
 
                 using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
                 {
@@ -115,7 +121,11 @@ namespace GovPortalsApp
                         {
                             if (savedPac == "__NONE__" || string.IsNullOrEmpty(savedPac))
                             {
-                                if (currentPac != null) key.DeleteValue("AutoConfigURL", false);
+                                if (currentPac != null)
+                                {
+                                    key.DeleteValue("AutoConfigURL", false);
+                                    if (currentPac.Contains("127.0.0.1:10224")) removedBuhlyPac = true;
+                                }
                                 restoredSomething = true;
                             }
                             else
@@ -127,27 +137,46 @@ namespace GovPortalsApp
                         else if (!string.IsNullOrEmpty(currentPac) && currentPac.Contains("127.0.0.1:10224"))
                         {
                             key.DeleteValue("AutoConfigURL", false);
+                            removedBuhlyPac = true;
                             restoredSomething = true;
                         }
+
+                        var finalPac = key.GetValue("AutoConfigURL") as string;
+                        var proxyEnableObj = key.GetValue("ProxyEnable");
+                        bool manualProxyOn = (proxyEnableObj is int && (int)proxyEnableObj == 1);
+                        bool thirdPartyPac = !string.IsNullOrEmpty(finalPac) && !finalPac.Contains("127.0.0.1:10224");
+                        hasThirdPartyProxy = thirdPartyPac || manualProxyOn;
                     }
                 }
 
-                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections", true))
+                // Only touch Connections PAC bit (8) if we actually have a flags backup OR we just removed Buhly's PAC
+                // and no third-party proxy/PAC is configured.
+                if (hadFlagsBackup || (removedBuhlyPac && !hasThirdPartyProxy))
                 {
-                    if (key != null)
+                    using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections", true))
                     {
-                        var names = new string[] { "DefaultConnectionSettings", "SavedLegacySettings" };
-                        foreach (var name in names)
+                        if (key != null)
                         {
-                            var val = key.GetValue(name) as byte[];
-                            if (val != null && val.Length > 8)
+                            var names = new string[] { "DefaultConnectionSettings", "SavedLegacySettings" };
+                            foreach (var name in names)
                             {
-                                if (restorePacFlagOn)
-                                    val[8] = (byte)(val[8] | 8);
-                                else
-                                    val[8] = (byte)(val[8] & ~8);
-                                key.SetValue(name, val, RegistryValueKind.Binary);
-                                restoredSomething = true;
+                                var val = key.GetValue(name) as byte[];
+                                if (val != null && val.Length > 8)
+                                {
+                                    if (hadFlagsBackup)
+                                    {
+                                        if (restorePacFlagOn)
+                                            val[8] = (byte)(val[8] | 8);
+                                        else if (!hasThirdPartyProxy)
+                                            val[8] = (byte)(val[8] & ~8);
+                                    }
+                                    else if (removedBuhlyPac && !hasThirdPartyProxy)
+                                    {
+                                        val[8] = (byte)(val[8] & ~8);
+                                    }
+                                    key.SetValue(name, val, RegistryValueKind.Binary);
+                                    restoredSomething = true;
+                                }
                             }
                         }
                     }
@@ -166,7 +195,7 @@ namespace GovPortalsApp
                 {
                     details = restoredSomething
                         ? "PAC-туннель Buhly (127.0.0.1:10224) отключён"
-                        : "Бэкап PAC не требовался (настройки не менялись)";
+                        : "Бэкап PAC не требовался (настройки не менялись или используется сторонний прокси)";
                 }
                 return true;
             }
@@ -375,11 +404,54 @@ namespace GovPortalsApp
 
     public class EdgeHelper
     {
-        private static string GetSiteListXmlPath()
+        private static readonly string[] TrackedZone2Flags = new string[] { "1001", "1004", "1200", "1405", "2201" };
+
+        private static string GetBuhlyDataDir()
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "ie_site_list.xml");
+            return dir;
+        }
+
+        private static string GetSiteListXmlPath()
+        {
+            return Path.Combine(GetBuhlyDataDir(), "ie_site_list.xml");
+        }
+
+        private static string GetEdgePreferencesPath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Edge\User Data\Default\Preferences");
+        }
+
+        public static bool IsEdgeRunning()
+        {
+            var procs = Process.GetProcessesByName("msedge");
+            try
+            {
+                return procs.Length > 0;
+            }
+            finally
+            {
+                foreach (var p in procs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
+            }
+        }
+
+        public static bool HasVatInEdgePreferences()
+        {
+            try
+            {
+                var prefPath = GetEdgePreferencesPath();
+                if (!File.Exists(prefPath)) return false;
+                var text = File.ReadAllText(prefPath, Encoding.UTF8);
+                return text.Contains("vat.gov.by/mainPage") && text.Contains("vat.gov.by/eInvoice");
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static void EnsureTrustedSitesAndActiveX()
@@ -412,6 +484,23 @@ namespace GovPortalsApp
                 {
                     if (zone2 != null)
                     {
+                        // Save original Zones\2 flags once before modifying
+                        var zonesBak = Path.Combine(GetBuhlyDataDir(), "zones2_backup.txt");
+                        if (!File.Exists(zonesBak))
+                        {
+                            try
+                            {
+                                var bakLines = new List<string>();
+                                foreach (var flag in TrackedZone2Flags)
+                                {
+                                    object rawVal = zone2.GetValue(flag);
+                                    bakLines.Add(flag + "=" + (rawVal != null ? rawVal.ToString() : "__MISSING__"));
+                                }
+                                File.WriteAllLines(zonesBak, bakLines.ToArray(), Encoding.UTF8);
+                            }
+                            catch { }
+                        }
+
                         // Allow signed ActiveX controls needed by BelPKI/AvCSP without lowering unsafe/unsigned protections
                         var signedFlags = new string[] { "1001", "1200", "1405", "2201" };
                         foreach (var flag in signedFlags)
@@ -426,6 +515,132 @@ namespace GovPortalsApp
             catch { }
         }
 
+        public static bool RestoreZones2FromBackup(out string details)
+        {
+            try
+            {
+                var zonesBak = Path.Combine(GetBuhlyDataDir(), "zones2_backup.txt");
+                if (!File.Exists(zonesBak))
+                {
+                    details = "Бэкап зоны IE (Zones\\2) не найден (настройки не менялись)";
+                    return true;
+                }
+
+                using (var zone2 = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings\Zones\2", true))
+                {
+                    if (zone2 != null)
+                    {
+                        var lines = File.ReadAllLines(zonesBak, Encoding.UTF8);
+                        foreach (var raw in lines)
+                        {
+                            if (string.IsNullOrEmpty(raw)) continue;
+                            int eq = raw.IndexOf('=');
+                            if (eq <= 0) continue;
+                            string flag = raw.Substring(0, eq).Trim();
+                            string val = raw.Substring(eq + 1).Trim();
+                            if (Array.IndexOf(TrackedZone2Flags, flag) < 0) continue;
+
+                            if (val == "__MISSING__")
+                            {
+                                zone2.DeleteValue(flag, false);
+                            }
+                            else
+                            {
+                                int num;
+                                if (int.TryParse(val, out num))
+                                {
+                                    zone2.SetValue(flag, num, RegistryValueKind.DWord);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                details = "Параметры зоны надёжных сайтов IE (Zones\\2) восстановлены из бэкапа";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                details = "Ошибка отката Zones\\2: " + ex.Message;
+                return false;
+            }
+        }
+
+        public static bool RestoreEdgeFromBackup(out string details)
+        {
+            var notes = new List<string>();
+            bool allOk = true;
+
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Policies\Microsoft\Edge", true))
+                {
+                    if (key != null)
+                    {
+                        bool removedPolicy = false;
+                        if (key.GetValue("InternetExplorerIntegrationSiteList") != null)
+                        {
+                            key.DeleteValue("InternetExplorerIntegrationSiteList", false);
+                            removedPolicy = true;
+                        }
+                        if (key.GetValue("InternetExplorerIntegrationLevel") != null)
+                        {
+                            key.DeleteValue("InternetExplorerIntegrationLevel", false);
+                            removedPolicy = true;
+                        }
+                        if (key.GetValue("InternetExplorerIntegrationReloadInIEModeAllowed") != null)
+                        {
+                            key.DeleteValue("InternetExplorerIntegrationReloadInIEModeAllowed", false);
+                            removedPolicy = true;
+                        }
+                        notes.Add(removedPolicy
+                            ? "Политики режима IE для Edge удалены из реестра"
+                            : "Политики режима IE для Edge не были заданы");
+                    }
+                    else
+                    {
+                        notes.Add("Политики режима IE для Edge отсутствуют");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                notes.Add("Ошибка очистки политик Edge: " + ex.Message);
+                allOk = false;
+            }
+
+            try
+            {
+                var prefPath = GetEdgePreferencesPath();
+                var bakPath = prefPath + ".buhly.bak";
+                if (File.Exists(bakPath))
+                {
+                    if (IsEdgeRunning())
+                    {
+                        notes.Add("⚠️ Microsoft Edge запущен (в т.ч. возможно в фоне/трее) — закройте Edge полностью и повторите откат для восстановления Preferences");
+                        allOk = false;
+                    }
+                    else
+                    {
+                        File.Copy(bakPath, prefPath, true);
+                        notes.Add("Профиль Edge (Preferences) восстановлен из бэкапа");
+                    }
+                }
+                else
+                {
+                    notes.Add("Бэкап Edge Preferences не найден (файл профиля не изменялся)");
+                }
+            }
+            catch (Exception ex)
+            {
+                notes.Add("Ошибка восстановления Edge Preferences: " + ex.Message);
+                allOk = false;
+            }
+
+            details = string.Join("\n", notes.ToArray());
+            return allOk;
+        }
+
         public static bool IsVatConfigured()
         {
             try
@@ -438,18 +653,18 @@ namespace GovPortalsApp
                         var siteList = key.GetValue("InternetExplorerIntegrationSiteList") as string;
                         if (level is int && (int)level == 1 && !string.IsNullOrEmpty(siteList))
                         {
-                            string localSiteList = siteList.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)
-                                ? siteList.Substring(8).Replace('/', '\\')
-                                : siteList;
+                            string localSiteList = siteList;
+                            Uri parsedUri;
+                            if (Uri.TryCreate(siteList, UriKind.Absolute, out parsedUri) && parsedUri.IsFile)
+                            {
+                                localSiteList = parsedUri.LocalPath;
+                            }
                             if (File.Exists(localSiteList)) return true;
                         }
                     }
                 }
 
-                var prefPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Edge\User Data\Default\Preferences");
-                if (!File.Exists(prefPath)) return false;
-                var text = File.ReadAllText(prefPath, Encoding.UTF8);
-                return text.Contains("vat.gov.by/mainPage") && text.Contains("vat.gov.by/eInvoice");
+                return HasVatInEdgePreferences();
             }
             catch { return false; }
         }
@@ -465,8 +680,8 @@ namespace GovPortalsApp
                     "<site-list version=\"1\">\r\n" +
                     "  <created-by>\r\n" +
                     "    <tool>Buhly</tool>\r\n" +
-                    "    <version>3.0.0.0</version>\r\n" +
-                    "    <date-created>20261116</date-created>\r\n" +
+                    "    <version>3.1</version>\r\n" +
+                    "    <date-created>20261119</date-created>\r\n" +
                     "  </created-by>\r\n" +
                     "  <site url=\"vat.gov.by\">\r\n" +
                     "    <compat-mode>IE11</compat-mode>\r\n" +
@@ -475,7 +690,7 @@ namespace GovPortalsApp
                     "</site-list>\r\n";
                 File.WriteAllText(xmlPath, xmlContent, Encoding.UTF8);
 
-                string fileUri = "file:///" + xmlPath.Replace("\\", "/");
+                string fileUri = new Uri(xmlPath).AbsoluteUri;
                 using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge"))
                 {
                     if (key != null)
@@ -487,9 +702,9 @@ namespace GovPortalsApp
                 }
 
                 // Secondary fallback ONLY when Edge is not running (never kill user's open browser!)
-                if (Process.GetProcessesByName("msedge").Length == 0)
+                if (!IsEdgeRunning())
                 {
-                    var prefPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Edge\User Data\Default\Preferences");
+                    var prefPath = GetEdgePreferencesPath();
                     if (File.Exists(prefPath))
                     {
                         var text = File.ReadAllText(prefPath, Encoding.UTF8);
@@ -699,6 +914,41 @@ namespace GovPortalsApp
             }
         }
 
+        private static bool FilesHaveSameContent(string pathA, string pathB)
+        {
+            try
+            {
+                if (!File.Exists(pathA) || !File.Exists(pathB)) return false;
+                var infoA = new FileInfo(pathA);
+                var infoB = new FileInfo(pathB);
+                if (infoA.Length != infoB.Length) return false;
+                byte[] bytesA = File.ReadAllBytes(pathA);
+                byte[] bytesB = File.ReadAllBytes(pathB);
+                if (bytesA.Length != bytesB.Length) return false;
+                for (int i = 0; i < bytesA.Length; i++)
+                {
+                    if (bytesA[i] != bytesB[i]) return false;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void FlushDnsCache()
+        {
+            try
+            {
+                using (var p = Process.Start(new ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false }))
+                {
+                    if (p != null) p.WaitForExit(3000);
+                }
+            }
+            catch { }
+        }
+
         public static bool CleanHostsFile()
         {
             try
@@ -734,21 +984,33 @@ namespace GovPortalsApp
                 try
                 {
                     File.Copy(cleanPath, hostsPath, true);
-                    Process.Start(new ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
+                    FlushDnsCache();
                     return true;
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    var psi = new ProcessStartInfo("cmd.exe", "/c copy /y \"" + cleanPath + "\" \"" + hostsPath + "\" & ipconfig /flushdns")
+                    try
                     {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    };
-                    var p = Process.Start(psi);
-                    if (p != null) p.WaitForExit(10000);
-                    string dummy;
-                    return CheckHostsFile(out dummy);
+                        var psi = new ProcessStartInfo("cmd.exe", "/c copy /y \"" + cleanPath + "\" \"" + hostsPath + "\" && ipconfig /flushdns")
+                        {
+                            UseShellExecute = true,
+                            Verb = "runas",
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        };
+                        using (var p = Process.Start(psi))
+                        {
+                            if (p == null) return false;
+                            if (!p.WaitForExit(15000)) return false;
+                            if (p.ExitCode != 0) return false;
+                        }
+                        string dummy;
+                        return CheckHostsFile(out dummy);
+                    }
+                    catch (Win32Exception)
+                    {
+                        // User declined UAC elevation prompt
+                        return false;
+                    }
                 }
             }
             catch
@@ -773,22 +1035,41 @@ namespace GovPortalsApp
                 try
                 {
                     File.Copy(hostsBak, hostsPath, true);
-                    Process.Start(new ProcessStartInfo("ipconfig", "/flushdns") { CreateNoWindow = true, UseShellExecute = false });
+                    FlushDnsCache();
                     details = "Файл hosts восстановлен из бэкапа";
                     return true;
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    var psi = new ProcessStartInfo("cmd.exe", "/c copy /y \"" + hostsBak + "\" \"" + hostsPath + "\" & ipconfig /flushdns")
+                    try
                     {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    };
-                    var p = Process.Start(psi);
-                    if (p != null) p.WaitForExit(10000);
-                    details = "Файл hosts восстановлен из бэкапа";
-                    return true;
+                        var psi = new ProcessStartInfo("cmd.exe", "/c copy /y \"" + hostsBak + "\" \"" + hostsPath + "\" && ipconfig /flushdns")
+                        {
+                            UseShellExecute = true,
+                            Verb = "runas",
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        };
+                        using (var p = Process.Start(psi))
+                        {
+                            if (p == null || !p.WaitForExit(15000) || p.ExitCode != 0)
+                            {
+                                details = "Не удалось восстановить hosts (ошибка команды или таймаут)";
+                                return false;
+                            }
+                        }
+                        if (!FilesHaveSameContent(hostsBak, hostsPath))
+                        {
+                            details = "Файл hosts не был восстановлен (нет прав администратора)";
+                            return false;
+                        }
+                        details = "Файл hosts восстановлен из бэкапа";
+                        return true;
+                    }
+                    catch (Win32Exception)
+                    {
+                        details = "Восстановление hosts отменено пользователем (UAC)";
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)
@@ -804,8 +1085,12 @@ namespace GovPortalsApp
             bool pacOk = WinINetHelper.RestorePacFromBackup(out pacMsg);
             string hostsMsg;
             bool hostsOk = RestoreHostsFromBackup(out hostsMsg);
-            details = pacMsg + "\n" + hostsMsg;
-            return pacOk && hostsOk;
+            string zonesMsg;
+            bool zonesOk = EdgeHelper.RestoreZones2FromBackup(out zonesMsg);
+            string edgeMsg;
+            bool edgeOk = EdgeHelper.RestoreEdgeFromBackup(out edgeMsg);
+            details = pacMsg + "\n" + hostsMsg + "\n" + zonesMsg + "\n" + edgeMsg;
+            return pacOk && hostsOk && zonesOk && edgeOk;
         }
 
         public static bool CheckTimeSync(out string details)
@@ -825,9 +1110,9 @@ namespace GovPortalsApp
                         if (!string.IsNullOrEmpty(dateStr))
                         {
                             DateTime serverTime;
-                            if (DateTime.TryParse(dateStr, out serverTime))
+                            if (DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out serverTime))
                             {
-                                var diffSeconds = Math.Abs((DateTime.UtcNow - serverTime.ToUniversalTime()).TotalSeconds);
+                                var diffSeconds = Math.Abs((DateTime.UtcNow - serverTime).TotalSeconds);
                                 if (diffSeconds > 180)
                                 {
                                     details = string.Format("Рассинхрон {0} сек! (часы спешат/отстают)", (int)diffSeconds);
@@ -867,7 +1152,17 @@ namespace GovPortalsApp
         public static bool IsAvTunProxyRunning()
         {
             var procs = Process.GetProcessesByName("avtunproxy");
-            return procs.Length > 0;
+            try
+            {
+                return procs.Length > 0;
+            }
+            finally
+            {
+                foreach (var p in procs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
+            }
         }
 
         public static bool IsPacEnabled()
@@ -898,9 +1193,10 @@ namespace GovPortalsApp
         public static List<CertInfo> GetAllGovCertificates(bool requirePhysicalUsb)
         {
             var list = new List<CertInfo>();
+            X509Store store = null;
             try
             {
-                var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+                store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
                 store.Open(OpenFlags.ReadOnly);
                 foreach (var cert in store.Certificates)
                 {
@@ -932,47 +1228,77 @@ namespace GovPortalsApp
                         });
                     }
                 }
-                store.Close();
             }
             catch { }
+            finally
+            {
+                if (store != null)
+                {
+                    try { store.Close(); } catch { }
+                    var disp = store as IDisposable;
+                    if (disp != null)
+                    {
+                        try { disp.Dispose(); } catch { }
+                    }
+                }
+            }
             return list;
         }
 
+        // Важно: никогда не вызывать Process.Kill() для EDeclaration (АРМ «Плательщик») и MngCert,
+        // чтобы не потерять несохранённые декларации — только предупреждать пользователя.
         public static string GetRunningConflictingApps()
         {
             var found = new List<string>();
             var conflictingNames = new string[] { "EDeclaration", "MngCert" };
             foreach (var name in conflictingNames)
             {
+                Process[] procs = null;
                 try
                 {
-                    if (Process.GetProcessesByName(name).Length > 0)
+                    procs = Process.GetProcessesByName(name);
+                    if (procs.Length > 0)
                         found.Add(name == "EDeclaration" ? "АРМ Плательщик" : name);
                 }
                 catch { }
+                finally
+                {
+                    if (procs != null)
+                    {
+                        foreach (var p in procs)
+                        {
+                            try { p.Dispose(); } catch { }
+                        }
+                    }
+                }
             }
             return string.Join(", ", found.ToArray());
         }
 
-        public static void CheckAndResolveProcessConflicts()
+        public static bool RepairAll()
         {
-            // Intentionally non-destructive: never call Process.Kill() on EDeclaration/MngCert
-            // so unsaved declarations are never lost.
-        }
-
-        public static void RepairAll()
-        {
-            // Gracefully restart only NTClientSoftware (never kill EDeclaration)
-            foreach (var p in Process.GetProcessesByName("NTClientSoftware"))
+            // Gracefully restart only NTClientSoftware (never kill EDeclaration/MngCert)
+            var ntProcs = Process.GetProcessesByName("NTClientSoftware");
+            try
             {
-                try
+                foreach (var p in ntProcs)
                 {
-                    if (p.CloseMainWindow())
+                    try
                     {
-                        p.WaitForExit(1200);
+                        if (p.CloseMainWindow())
+                        {
+                            p.WaitForExit(1200);
+                        }
                     }
+                    catch { }
                 }
-                catch { }
+            }
+            finally
+            {
+                foreach (var p in ntProcs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
             }
             Thread.Sleep(400);
 
@@ -986,7 +1312,7 @@ namespace GovPortalsApp
                     {
                         WorkingDirectory = Path.GetDirectoryName(ntPath)
                     };
-                    Process.Start(psi);
+                    using (var p = Process.Start(psi)) { }
                 }
                 catch { }
             }
@@ -1003,7 +1329,7 @@ namespace GovPortalsApp
                         {
                             WorkingDirectory = Path.GetDirectoryName(avPath)
                         };
-                        Process.Start(psi);
+                        using (var p = Process.Start(psi)) { }
                     }
                     catch { }
                 }
@@ -1015,10 +1341,11 @@ namespace GovPortalsApp
                 WinINetHelper.EnablePac("http://127.0.0.1:10224/proxy.pac");
             }
             EdgeHelper.EnsureTrustedSitesAndActiveX();
+            bool hostsOk = true;
             string hostsDummy;
             if (!CheckHostsFile(out hostsDummy))
             {
-                CleanHostsFile();
+                hostsOk = CleanHostsFile();
             }
 
             // Smart wait for NTClient to bind port 8084 (up to 4 sec)
@@ -1027,11 +1354,16 @@ namespace GovPortalsApp
                 if (IsPort8084Healthy()) break;
                 Thread.Sleep(500);
             }
+
+            return hostsOk;
         }
     }
 
     public static class ComponentInstaller
     {
+        private const long MaxZipUnpackedBytes = 250L * 1024L * 1024L;
+        private const int MaxZipEntries = 2000;
+
         private static List<string> GetUserSearchDirs()
         {
             var dirs = new List<string>();
@@ -1040,6 +1372,121 @@ namespace GovPortalsApp
             var desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             if (Directory.Exists(desk)) dirs.Add(desk);
             return dirs;
+        }
+
+        private static void ExtractZipSafely(string zipPath, string extractPath)
+        {
+            Directory.CreateDirectory(extractPath);
+            string fullRoot = Path.GetFullPath(extractPath);
+            if (!fullRoot.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                fullRoot += Path.DirectorySeparatorChar;
+
+            long totalWritten = 0;
+            int count = 0;
+            byte[] buffer = new byte[81920];
+
+            using (var archive = ZipFile.OpenRead(zipPath))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    count++;
+                    if (count > MaxZipEntries)
+                        throw new InvalidOperationException("Архив содержит слишком много файлов.");
+                    if (entry.Length > MaxZipUnpackedBytes)
+                        throw new InvalidOperationException("Размер файла в архиве превышает безопасный лимит 250 МБ.");
+
+                    string destPath = Path.GetFullPath(Path.Combine(fullRoot, entry.FullName));
+                    if (!destPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("Обнаружен некорректный путь в архиве.");
+
+                    if (string.IsNullOrEmpty(entry.Name))
+                    {
+                        Directory.CreateDirectory(destPath);
+                        continue;
+                    }
+
+                    string parentDir = Path.GetDirectoryName(destPath);
+                    if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                        Directory.CreateDirectory(parentDir);
+
+                    using (var inStream = entry.Open())
+                    using (var outStream = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        int read;
+                        while ((read = inStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            totalWritten += read;
+                            if (totalWritten > MaxZipUnpackedBytes)
+                                throw new InvalidOperationException("Суммарный размер распакованных данных превысил лимит 250 МБ (защита от ZIP-бомбы).");
+                            outStream.Write(buffer, 0, read);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool VerifyAndConfirmSignedExecutable(string exePath, out string errorMsg)
+        {
+            errorMsg = null;
+            bool hasSignature = false;
+            try
+            {
+                using (var cert = X509Certificate.CreateFromSignedFile(exePath))
+                {
+                    if (cert != null && !string.IsNullOrEmpty(cert.Subject))
+                    {
+                        hasSignature = true;
+                    }
+                }
+            }
+            catch (CryptographicException)
+            {
+                hasSignature = false;
+            }
+            catch
+            {
+                hasSignature = false;
+            }
+
+            if (hasSignature) return true;
+
+            string fileName = Path.GetFileName(exePath);
+            string warnText = string.Format(
+                "Файл «{0}» не имеет цифровой подписи издателя (Authenticode).\n\n" +
+                "Путь: {1}\n\n" +
+                "Запуск неподписанного файла может быть небезопасен, если он скачан не с официального сайта.\n" +
+                "Вы уверены, что хотите запустить этот установщик?",
+                fileName, exePath);
+
+            MessageBoxResult res = MessageBoxResult.No;
+            try
+            {
+                var app = Application.Current;
+                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                {
+                    app.Dispatcher.Invoke(new Action(delegate
+                    {
+                        Window owner = app.MainWindow;
+                        if (owner != null && owner.IsVisible)
+                            res = MessageBox.Show(owner, warnText, "Buhly — Проверка цифровой подписи", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                        else
+                            res = MessageBox.Show(warnText, "Buhly — Проверка цифровой подписи", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                    }));
+                }
+                else
+                {
+                    res = MessageBox.Show(warnText, "Buhly — Проверка цифровой подписи", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                }
+            }
+            catch
+            {
+                res = MessageBoxResult.No;
+            }
+
+            if (res == MessageBoxResult.Yes) return true;
+
+            errorMsg = string.Format("Файл «{0}» не имеет цифровой подписи Authenticode — запуск отменён.", fileName);
+            return false;
         }
 
         public static string FindLocalGossuokInstaller()
@@ -1091,7 +1538,7 @@ namespace GovPortalsApp
                             {
                                 try { Directory.Delete(extractPath, true); } catch { }
                             }
-                            ZipFile.ExtractToDirectory(localFile, extractPath);
+                            ExtractZipSafely(localFile, extractPath);
                             var exeFiles = Directory.GetFiles(extractPath, "AvPKISetup*.exe", SearchOption.AllDirectories);
                             targetExe = exeFiles.Length > 0 ? exeFiles[0] : null;
                             if (targetExe == null)
@@ -1103,8 +1550,15 @@ namespace GovPortalsApp
 
                         if (targetExe != null && File.Exists(targetExe))
                         {
+                            if (onProgress != null) onProgress("Проверка цифровой подписи установщика...", 85);
+                            string sigErr;
+                            if (!VerifyAndConfirmSignedExecutable(targetExe, out sigErr))
+                            {
+                                if (onCompleted != null) onCompleted(false, sigErr);
+                                return;
+                            }
                             if (onProgress != null) onProgress("Запуск мастера установки ГосСУОК...", 100);
-                            Process.Start(new ProcessStartInfo(targetExe) { UseShellExecute = true });
+                            using (var p = Process.Start(new ProcessStartInfo(targetExe) { UseShellExecute = true })) { }
                             if (onCompleted != null) onCompleted(true, "Установщик запущен! Завершите установку и вставьте ключ.");
                             return;
                         }
@@ -1131,7 +1585,7 @@ namespace GovPortalsApp
                     catch { }
 
                     if (onProgress != null) onProgress("Открытие официальной загрузки nces.by в браузере...", 100);
-                    Process.Start(new ProcessStartInfo(urlToOpen) { UseShellExecute = true });
+                    using (var p = Process.Start(new ProcessStartInfo(urlToOpen) { UseShellExecute = true })) { }
                     if (onCompleted != null) onCompleted(true, "Загрузка открыта в вашем браузере. После скачивания нажмите кнопку ещё раз для запуска!");
                 }
                 catch (Exception ex)
@@ -1150,15 +1604,22 @@ namespace GovPortalsApp
                     var localFile = FindLocalAvTunInstaller();
                     if (localFile != null && File.Exists(localFile))
                     {
+                        if (onProgress != null) onProgress("Проверка цифровой подписи установщика...", 75);
+                        string sigErr;
+                        if (!VerifyAndConfirmSignedExecutable(localFile, out sigErr))
+                        {
+                            if (onCompleted != null) onCompleted(false, sigErr);
+                            return;
+                        }
                         if (onProgress != null) onProgress("Запуск установщика AvTunProxy...", 100);
-                        Process.Start(new ProcessStartInfo(localFile) { UseShellExecute = true });
+                        using (var p = Process.Start(new ProcessStartInfo(localFile) { UseShellExecute = true })) { }
                         if (onCompleted != null) onCompleted(true, "Установщик AvTunProxy запущен! Завершите установку.");
                         return;
                     }
 
                     if (onProgress != null) onProgress("Открытие официальной загрузки avtunproxy.by в браузере...", 100);
                     var url = "https://avtunproxy.by/download/AvTunProxy-latest.exe";
-                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                    using (var p = Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })) { }
                     if (onCompleted != null) onCompleted(true, "Загрузка открыта в вашем браузере. После скачивания нажмите кнопку ещё раз для запуска!");
                 }
                 catch (Exception ex)

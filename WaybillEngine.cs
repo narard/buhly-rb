@@ -32,6 +32,8 @@ namespace GovPortalsApp
         public string NormalizedName { get; set; }
         public decimal Price { get; set; }
         public int Qty { get; set; }
+        public int CargoPlaces { get; set; }
+        public decimal CargoMassKg { get; set; }
     }
 
     public class GroupedWaybillItem
@@ -45,6 +47,8 @@ namespace GovPortalsApp
         public string VatRateLabel { get; set; }
         public decimal VatAmount { get; set; }
         public decimal TotalWithVat { get; set; }
+        public int CargoPlaces { get; set; }
+        public decimal CargoMassKg { get; set; }
         public string Article { get; set; }
         public string Note { get; set; }
         public bool HasRoundingDiff { get; set; }
@@ -77,10 +81,13 @@ namespace GovPortalsApp
         public List<string> SupplyIds { get; set; }
         public List<WbSourceItem> SourceItems { get; set; }
         public List<GroupedWaybillItem> GroupedItems { get; set; }
+        public List<string> Warnings { get; set; }
         public int TotalQty { get; set; }
         public decimal TotalNoVat { get; set; }
         public decimal TotalVat { get; set; }
         public decimal TotalWithVat { get; set; }
+        public int TotalCargoPlaces { get; set; }
+        public decimal TotalCargoMassKg { get; set; }
         public bool IsFboDetected { get; set; }
         public int MissingPriceCount { get; set; }
         public int RoundingWarningCount { get; set; }
@@ -92,6 +99,7 @@ namespace GovPortalsApp
             SupplyIds = new List<string>();
             SourceItems = new List<WbSourceItem>();
             GroupedItems = new List<GroupedWaybillItem>();
+            Warnings = new List<string>();
         }
     }
 
@@ -117,6 +125,7 @@ namespace GovPortalsApp
         public string DriverInfo { get; set; }
         public string LoadingPoint { get; set; }
         public string UnloadingPoint { get; set; }
+        public string TransportCustomer { get; set; }
         public bool UseNormalizationRules { get; set; }
         public bool SortDescendingByName { get; set; }
         public string RulesText { get; set; }
@@ -145,6 +154,7 @@ namespace GovPortalsApp
             DriverInfo = "";
             LoadingPoint = "";
             UnloadingPoint = "";
+            TransportCustomer = "";
             UseNormalizationRules = false;
             SortDescendingByName = true;
             RulesText = "";
@@ -304,6 +314,7 @@ namespace GovPortalsApp
                 p.PrintMode = PrintModeFull;
             if (p.TopMarginMm < 0 || p.TopMarginMm > 100) p.TopMarginMm = 10.0;
             if (p.LeftMarginMm < 0 || p.LeftMarginMm > 100) p.LeftMarginMm = 15.0;
+            if (p.TransportCustomer == null) p.TransportCustomer = "";
         }
 
         public static WaybillProfile LoadProfile()
@@ -361,27 +372,37 @@ namespace GovPortalsApp
             signerLine = "";
             try
             {
-                var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-                store.Open(OpenFlags.ReadOnly);
-
+                X509Store store = null;
                 X509Certificate2 bestCert = null;
-                foreach (var cert in store.Certificates)
+                try
                 {
-                    var issuer = cert.Issuer ?? "";
-                    if (!(issuer.Contains("ГосСУОК") || issuer.Contains("pki.gov.by") || issuer.Contains("НЦЭУ")))
-                        continue;
-                    if (cert.NotAfter <= DateTime.Now) continue;
+                    store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+                    store.Open(OpenFlags.ReadOnly);
 
-                    bool inUsb = CryptoHelper.IsTokenPhysicallyInserted(cert);
-                    if (inUsb)
+                    foreach (var cert in store.Certificates)
                     {
-                        bestCert = cert;
-                        break;
+                        var issuer = cert.Issuer ?? "";
+                        if (!(issuer.Contains("ГосСУОК") || issuer.Contains("pki.gov.by") || issuer.Contains("НЦЭУ")))
+                            continue;
+                        if (cert.NotAfter <= DateTime.Now) continue;
+
+                        bool inUsb = CryptoHelper.IsTokenPhysicallyInserted(cert);
+                        if (inUsb)
+                        {
+                            bestCert = cert;
+                            break;
+                        }
+                        if (bestCert == null)
+                            bestCert = cert;
                     }
-                    if (bestCert == null)
-                        bestCert = cert;
                 }
-                try { store.Close(); } catch { }
+                finally
+                {
+                    if (store != null)
+                    {
+                        try { store.Close(); } catch { }
+                    }
+                }
 
                 if (bestCert == null) return false;
 
@@ -494,7 +515,7 @@ namespace GovPortalsApp
                 if (string.IsNullOrEmpty(fallbackSupplyId))
                     fallbackSupplyId = fileNameNoExt.ToUpperInvariant();
 
-                var rows = ReadFirstSheetRows(file);
+                var rows = ReadFirstSheetRows(file, result.Warnings);
                 if (rows.Count == 0) continue;
 
                 int headerIdx = -1;
@@ -691,6 +712,8 @@ namespace GovPortalsApp
             grp.VatRateLabel = string.IsNullOrEmpty(vatMode) ? "Без НДС" : vatMode;
             if (grp.Qty < 0) grp.Qty = 0;
             if (grp.InputUnitPrice < 0m) grp.InputUnitPrice = 0m;
+            if (grp.CargoPlaces < 0) grp.CargoPlaces = 0;
+            if (grp.CargoMassKg < 0m) grp.CargoMassKg = 0m;
 
             decimal inputPrice = Math.Round(grp.InputUnitPrice, 2, MidpointRounding.AwayFromZero);
             grp.HasRoundingDiff = false;
@@ -745,6 +768,8 @@ namespace GovPortalsApp
             result.TotalNoVat = 0m;
             result.TotalVat = 0m;
             result.TotalWithVat = 0m;
+            result.TotalCargoPlaces = 0;
+            result.TotalCargoMassKg = 0m;
             result.MissingPriceCount = 0;
             result.RoundingWarningCount = 0;
 
@@ -755,9 +780,64 @@ namespace GovPortalsApp
                 result.TotalNoVat += grp.TotalNoVat;
                 result.TotalVat += grp.VatAmount;
                 result.TotalWithVat += grp.TotalWithVat;
+                result.TotalCargoPlaces += grp.CargoPlaces;
+                result.TotalCargoMassKg += grp.CargoMassKg;
                 if (grp.InputUnitPrice <= 0m) result.MissingPriceCount++;
                 if (grp.HasRoundingDiff) result.RoundingWarningCount++;
             }
+        }
+
+        public static List<string> DetectTraceableKeywords(IEnumerable<GroupedWaybillItem> items)
+        {
+            var hits = new List<string>();
+            if (items == null) return hits;
+
+            // Ключевые слова для товаров, подлежащих прослеживаемости и/или маркировке СИ в РБ (Пост. Совмина № 250 / № 528)
+            var patterns = new KeyValuePair<string, string>[]
+            {
+                new KeyValuePair<string, string>("холодильник", @"(?:^|[^а-яa-z0-9])холодильник"),
+                new KeyValuePair<string, string>("морозильник", @"(?:^|[^а-яa-z0-9])морозиль"),
+                new KeyValuePair<string, string>("стиральная машина", @"(?:^|[^а-яa-z0-9])стиральн\w*\s+машин"),
+                new KeyValuePair<string, string>("посудомоечная машина", @"(?:^|[^а-яa-z0-9])посудомоеч\w*\s+машин"),
+                new KeyValuePair<string, string>("пылесос", @"(?:^|[^а-яa-z0-9])(?:робот-)?пылесос"),
+                new KeyValuePair<string, string>("утюг", @"(?:^|[^а-яa-z0-9])утюг"),
+                new KeyValuePair<string, string>("чайник", @"(?:^|[^а-яa-z0-9])(?:электро)?чайник"),
+                new KeyValuePair<string, string>("мультиварка", @"(?:^|[^а-яa-z0-9])мультиварк"),
+                new KeyValuePair<string, string>("микроволновка", @"(?:^|[^а-яa-z0-9])микроволнов"),
+                new KeyValuePair<string, string>("фен", @"(?:^|[^а-яa-z0-9])фен(?:ы|ов|ом|ам|ами|ах|а|у|е)?(?:[^а-яa-z0-9]|$)"),
+                new KeyValuePair<string, string>("кофеварка/кофемашина", @"(?:^|[^а-яa-z0-9])кофе(?:варк|машин)"),
+                new KeyValuePair<string, string>("блендер", @"(?:^|[^а-яa-z0-9])блендер"),
+                new KeyValuePair<string, string>("миксер", @"(?:^|[^а-яa-z0-9])миксер"),
+                new KeyValuePair<string, string>("тостер", @"(?:^|[^а-яa-z0-9])тостер"),
+                new KeyValuePair<string, string>("электробритва/триммер", @"(?:^|[^а-яa-z0-9])(?:электробритв|триммер)"),
+                new KeyValuePair<string, string>("электроинструмент", @"(?:^|[^а-яa-z0-9])(?:шуруповерт|перфоратор|дрель|дрели|дрелью)"),
+                new KeyValuePair<string, string>("телевизор/монитор", @"(?:^|[^а-яa-z0-9])(?:телевизор|монитор)"),
+                new KeyValuePair<string, string>("шина/покрышка", @"(?:^|[^а-яa-z0-9])(?:авто)?шин(?:а|ы|у|е|ой|ами|ах)?(?:[^а-яa-z0-9]|$)|(?:^|[^а-яa-z0-9])покрышк"),
+                new KeyValuePair<string, string>("велосипед", @"(?:^|[^а-яa-z0-9])велосипед"),
+                new KeyValuePair<string, string>("обувь", @"(?:^|[^а-яa-z0-9])(?:обув|кроссовк|ботин|сапог|сапож|туфл|босонож|кеды|сандал|тапоч|сланц)"),
+                new KeyValuePair<string, string>("одежда", @"(?:^|[^а-яa-z0-9])(?:одежд|куртк|пальт|пуховик|шуба|шубы|дублен|рубашк|сорочк|блузк|футболк|брюки|брюк|джинс|юбк|платье|платья|свитер|джемпер|костюм|колгот)"),
+                new KeyValuePair<string, string>("часы наручные/смарт-часы", @"(?:^|[^а-яa-z0-9])(?:смарт-?час|наручн\w*\s+час)"),
+                new KeyValuePair<string, string>("парфюмерия", @"(?:^|[^а-яa-z0-9])(?:парфюм|туалетн\w*\s+вод|духи|духов)(?:[^а-яa-z0-9]|$)")
+            };
+
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var it in items)
+            {
+                if (it == null || string.IsNullOrWhiteSpace(it.Name)) continue;
+                string nameTrim = it.Name.Trim();
+                if (!seenNames.Add(nameTrim)) continue;
+
+                string lower = nameTrim.ToLowerInvariant().Replace('ё', 'е');
+                for (int i = 0; i < patterns.Length; i++)
+                {
+                    if (Regex.IsMatch(lower, patterns[i].Value))
+                    {
+                        hits.Add(string.Format("{0} (признак: {1})", nameTrim, patterns[i].Key));
+                        break;
+                    }
+                }
+            }
+            return hits;
         }
 
         private static string ExtractSupplyNumber(string text)
@@ -778,19 +858,69 @@ namespace GovPortalsApp
             if (string.IsNullOrWhiteSpace(raw)) return false;
             string cleaned = raw.Trim()
                 .Replace("\u00A0", "")
-                .Replace(" ", "")
-                .Replace(",", ".");
-            cleaned = Regex.Replace(cleaned, @"[^0-9.\-]", "");
-            return decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out val);
+                .Replace("\u202F", "")
+                .Replace(" ", "");
+            cleaned = Regex.Replace(cleaned, @"[^0-9.,\-+]", "");
+            if (string.IsNullOrEmpty(cleaned)) return false;
+
+            int lastDot = cleaned.LastIndexOf('.');
+            int lastComma = cleaned.LastIndexOf(',');
+            if (lastDot >= 0 && lastComma >= 0)
+            {
+                if (lastDot > lastComma)
+                {
+                    // Format like "1,234.56" -> commas are thousands separators
+                    cleaned = cleaned.Replace(",", "");
+                }
+                else
+                {
+                    // Format like "1.234,56" -> dots are thousands separators
+                    cleaned = cleaned.Replace(".", "").Replace(",", ".");
+                }
+            }
+            else if (lastComma >= 0)
+            {
+                int firstComma = cleaned.IndexOf(',');
+                if (firstComma != lastComma)
+                    cleaned = cleaned.Replace(",", "");
+                else
+                    cleaned = cleaned.Replace(",", ".");
+            }
+            else if (lastDot >= 0)
+            {
+                int firstDot = cleaned.IndexOf('.');
+                if (firstDot != lastDot)
+                    cleaned = cleaned.Replace(".", "");
+            }
+
+            return decimal.TryParse(cleaned, NumberStyles.Number | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out val);
+        }
+
+        private static ZipArchiveEntry FindZipEntryIgnoreCase(ZipArchive zip, string relativePath)
+        {
+            if (zip == null || string.IsNullOrEmpty(relativePath)) return null;
+            string normTarget = relativePath.Replace('\\', '/').TrimStart('/');
+            foreach (var entry in zip.Entries)
+            {
+                string normEntry = (entry.FullName ?? "").Replace('\\', '/').TrimStart('/');
+                if (string.Equals(normEntry, normTarget, StringComparison.OrdinalIgnoreCase))
+                    return entry;
+            }
+            return null;
         }
 
         private static List<Dictionary<int, string>> ReadFirstSheetRows(string xlsxPath)
+        {
+            return ReadFirstSheetRows(xlsxPath, null);
+        }
+
+        private static List<Dictionary<int, string>> ReadFirstSheetRows(string xlsxPath, List<string> warnings)
         {
             var result = new List<Dictionary<int, string>>();
             using (var zip = ZipFile.OpenRead(xlsxPath))
             {
                 var sharedStrings = new List<string>();
-                var ssEntry = zip.GetEntry("xl/sharedStrings.xml");
+                var ssEntry = FindZipEntryIgnoreCase(zip, "xl/sharedStrings.xml");
                 if (ssEntry != null)
                 {
                     using (var s = ssEntry.Open())
@@ -807,14 +937,15 @@ namespace GovPortalsApp
                 }
 
                 string sheetPath = ResolveFirstSheetPath(zip);
-                var sheetEntry = zip.GetEntry(sheetPath);
+                var sheetEntry = FindZipEntryIgnoreCase(zip, sheetPath);
                 if (sheetEntry == null)
                     throw new InvalidDataException("Не найден лист в Excel файле: " + Path.GetFileName(xlsxPath));
 
+                int uncachedFormulaCount = 0;
                 using (var s = sheetEntry.Open())
                 {
                     var doc = XDocument.Load(s);
-                    var sheetData = doc.Root.Element(MainNs + "sheetData");
+                    var sheetData = doc.Root != null ? doc.Root.Element(MainNs + "sheetData") : null;
                     if (sheetData == null) return result;
 
                     foreach (var rowEl in sheetData.Elements(MainNs + "row"))
@@ -827,11 +958,27 @@ namespace GovPortalsApp
                             int colIdx = refAttr != null ? ColumnLettersToIndex(refAttr.Value) : autoCol;
                             autoCol = colIdx + 1;
 
+                            if (cEl.Element(MainNs + "f") != null)
+                            {
+                                var vCheck = cEl.Element(MainNs + "v");
+                                var isCheck = cEl.Element(MainNs + "is");
+                                if ((vCheck == null || string.IsNullOrEmpty(vCheck.Value)) && isCheck == null)
+                                    uncachedFormulaCount++;
+                            }
+
                             string val = ReadCellText(cEl, sharedStrings);
                             rowDict[colIdx] = val;
                         }
                         result.Add(rowDict);
                     }
+                }
+
+                if (uncachedFormulaCount > 0 && warnings != null)
+                {
+                    warnings.Add(string.Format(
+                        "В файле «{0}» найдено {1} ячеек с формулами без сохранённых значений (рекомендуется пересохранить файл в Excel).",
+                        Path.GetFileName(xlsxPath),
+                        uncachedFormulaCount));
                 }
             }
             return result;
@@ -839,13 +986,59 @@ namespace GovPortalsApp
 
         private static string ResolveFirstSheetPath(ZipArchive zip)
         {
-            if (zip.GetEntry("xl/worksheets/sheet1.xml") != null)
+            try
+            {
+                var wbEntry = FindZipEntryIgnoreCase(zip, "xl/workbook.xml");
+                var relsEntry = FindZipEntryIgnoreCase(zip, "xl/_rels/workbook.xml.rels");
+                if (wbEntry != null && relsEntry != null)
+                {
+                    XDocument wbDoc;
+                    using (var s = wbEntry.Open())
+                        wbDoc = XDocument.Load(s);
+
+                    XNamespace relDocNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+                    var sheetsEl = wbDoc.Root != null ? wbDoc.Root.Element(MainNs + "sheets") : null;
+                    var firstSheet = sheetsEl != null ? sheetsEl.Elements(MainNs + "sheet").FirstOrDefault() : null;
+                    var rIdAttr = firstSheet != null ? firstSheet.Attribute(relDocNs + "id") : null;
+                    if (rIdAttr != null && !string.IsNullOrEmpty(rIdAttr.Value))
+                    {
+                        string rId = rIdAttr.Value;
+                        XDocument relsDoc;
+                        using (var rs = relsEntry.Open())
+                            relsDoc = XDocument.Load(rs);
+
+                        if (relsDoc.Root != null)
+                        {
+                            foreach (var rel in relsDoc.Root.Elements())
+                            {
+                                if (rel.Name.LocalName != "Relationship") continue;
+                                var idAttr = rel.Attribute("Id");
+                                var targetAttr = rel.Attribute("Target");
+                                if (idAttr != null && targetAttr != null &&
+                                    string.Equals(idAttr.Value, rId, StringComparison.Ordinal))
+                                {
+                                    string target = targetAttr.Value.Replace('\\', '/').Trim();
+                                    string resolved = target.StartsWith("/")
+                                        ? target.TrimStart('/')
+                                        : (target.StartsWith("xl/", StringComparison.OrdinalIgnoreCase) ? target : "xl/" + target.TrimStart('/'));
+                                    if (FindZipEntryIgnoreCase(zip, resolved) != null)
+                                        return resolved;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (FindZipEntryIgnoreCase(zip, "xl/worksheets/sheet1.xml") != null)
                 return "xl/worksheets/sheet1.xml";
             foreach (var entry in zip.Entries)
             {
-                if (entry.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase) &&
-                    entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-                    return entry.FullName;
+                string norm = (entry.FullName ?? "").Replace('\\', '/').TrimStart('/');
+                if (norm.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase) &&
+                    norm.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    return norm;
             }
             return "xl/worksheets/sheet1.xml";
         }
@@ -917,163 +1110,214 @@ namespace GovPortalsApp
                 Directory.CreateDirectory(dir);
 
             string tempPath = outputPath + ".tmp";
-            using (var tplStream = OpenTemplateStream(isTtn1))
-            using (var mem = new MemoryStream())
+            bool moved = false;
+            try
             {
-                tplStream.CopyTo(mem);
-                mem.Position = 0;
-
-                using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.ReadWrite))
+                using (var tplStream = OpenTemplateStream(isTtn1))
+                using (var mem = new MemoryStream())
                 {
-                    mem.CopyTo(fs);
-                }
-            }
+                    tplStream.CopyTo(mem);
+                    mem.Position = 0;
 
-            using (var zip = ZipFile.Open(tempPath, ZipArchiveMode.Update))
-            {
-                var sheetEntry = zip.GetEntry("xl/worksheets/sheet1.xml");
-                if (sheetEntry == null)
-                    throw new InvalidDataException("Повреждён шаблон накладной (отсутствует sheet1.xml).");
-
-                XDocument doc;
-                using (var s = sheetEntry.Open())
-                {
-                    doc = XDocument.Load(s, LoadOptions.PreserveWhitespace);
+                    using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.ReadWrite))
+                    {
+                        mem.CopyTo(fs);
+                    }
                 }
 
-                var sheetData = doc.Root.Element(MainNs + "sheetData");
-                var rowsByNum = new Dictionary<int, XElement>();
-                foreach (var rowEl in sheetData.Elements(MainNs + "row"))
+                using (var zip = ZipFile.Open(tempPath, ZipArchiveMode.Update))
                 {
-                    var rAttr = rowEl.Attribute("r");
-                    int rn;
-                    if (rAttr != null && int.TryParse(rAttr.Value, out rn))
-                        rowsByNum[rn] = rowEl;
-                }
+                    var sheetEntry = zip.GetEntry("xl/worksheets/sheet1.xml");
+                    if (sheetEntry == null)
+                        throw new InvalidDataException("Повреждён шаблон накладной (отсутствует sheet1.xml).");
 
-                // Capture clean visible style map from row 22 before writing
-                var row22Styles = CaptureRowStyles(rowsByNum[22]);
+                    XDocument doc;
+                    using (var s = sheetEntry.Open())
+                    {
+                        doc = XDocument.Load(s, LoadOptions.PreserveWhitespace);
+                    }
 
-                // 1. Header fields
-                SetCellString(rowsByNum, 4, "Z", (profile.SenderUnp ?? "").Trim());
-                SetCellString(rowsByNum, 4, "AS", (profile.ReceiverUnp ?? "").Trim());
+                    var sheetData = doc.Root.Element(MainNs + "sheetData");
+                    var rowsByNum = new Dictionary<int, XElement>();
+                    foreach (var rowEl in sheetData.Elements(MainNs + "row"))
+                    {
+                        var rAttr = rowEl.Attribute("r");
+                        int rn;
+                        if (rAttr != null && int.TryParse(rAttr.Value, out rn))
+                            rowsByNum[rn] = rowEl;
+                    }
 
-                if (isTtn1)
-                {
-                    SetCellString(rowsByNum, 7, "R", (profile.VehicleInfo ?? "").Trim());
-                    SetCellString(rowsByNum, 7, "BO", (profile.DriverInfo ?? "").Trim());
-                    string loadPt = !string.IsNullOrWhiteSpace(profile.LoadingPoint) ? profile.LoadingPoint.Trim() : (profile.SenderInfo ?? "").Trim();
-                    string unloadPt = !string.IsNullOrWhiteSpace(profile.UnloadingPoint) ? profile.UnloadingPoint.Trim() : (profile.ReceiverInfo ?? "").Trim();
-                    SetCellString(rowsByNum, 9, "R", loadPt);
-                    SetCellString(rowsByNum, 10, "R", unloadPt);
-                    SetCellString(rowsByNum, 210, "X", (profile.DriverInfo ?? "").Trim());
-                }
+                    // Capture clean visible style map from row 22 before writing
+                    var row22Styles = CaptureRowStyles(rowsByNum[22]);
 
-                SetCellString(rowsByNum, 12, "AB", docDate.ToString("dd"));
-                SetCellString(rowsByNum, 12, "AI", GenitiveMonthsRu[docDate.Month]);
-                SetCellString(rowsByNum, 12, "BI", docDate.ToString("yy"));
+                    // 1. Header fields
+                    SetCellString(rowsByNum, 4, "Z", (profile.SenderUnp ?? "").Trim());
+                    SetCellString(rowsByNum, 4, "AS", (profile.ReceiverUnp ?? "").Trim());
 
-                SetCellString(rowsByNum, 13, "R", (profile.SenderInfo ?? "").Trim());
-                SetCellString(rowsByNum, 15, "R", (profile.ReceiverInfo ?? "").Trim());
+                    if (isTtn1)
+                    {
+                        SetCellString(rowsByNum, 7, "R", (profile.VehicleInfo ?? "").Trim());
+                        SetCellString(rowsByNum, 7, "BO", (profile.DriverInfo ?? "").Trim());
+                        string loadPt = !string.IsNullOrWhiteSpace(profile.LoadingPoint) ? profile.LoadingPoint.Trim() : (profile.SenderInfo ?? "").Trim();
+                        string unloadPt = !string.IsNullOrWhiteSpace(profile.UnloadingPoint) ? profile.UnloadingPoint.Trim() : (profile.ReceiverInfo ?? "").Trim();
+                        SetCellString(rowsByNum, 9, "R", loadPt);
+                        SetCellString(rowsByNum, 10, "R", unloadPt);
+                        SetCellString(rowsByNum, 11, "AF", (profile.TransportCustomer ?? "").Trim());
+                        SetCellString(rowsByNum, 210, "X", (profile.DriverInfo ?? "").Trim());
+                    }
 
-                string suppliesStr = data.SupplyIds.Count > 0 ? string.Join(", ", data.SupplyIds) : "";
-                string basisPrefix = (profile.BasisPrefix ?? "").Trim();
-                string basisText = string.IsNullOrEmpty(suppliesStr)
-                    ? basisPrefix
-                    : (string.IsNullOrEmpty(basisPrefix) ? "сборочные задания №: " + suppliesStr : basisPrefix + ", сборочные задания №: " + suppliesStr);
-                SetCellString(rowsByNum, 17, "T", basisText);
+                    SetCellString(rowsByNum, 12, "AB", docDate.ToString("dd"));
+                    SetCellString(rowsByNum, 12, "AI", GenitiveMonthsRu[docDate.Month]);
+                    SetCellString(rowsByNum, 12, "BI", docDate.ToString("yy"));
 
-                // 2. Item rows 22 .. 199
-                int count = data.GroupedItems.Count;
-                bool hasVat = ParseVatRate(profile.VatMode) > 0m || data.TotalVat > 0m;
-                for (int i = 0; i < count; i++)
-                {
-                    int rowNum = 22 + i;
-                    var item = data.GroupedItems[i];
-                    var rowEl = rowsByNum[rowNum];
-                    rowEl.SetAttributeValue("hidden", null);
-                    rowEl.SetAttributeValue("ht", "11.5");
-                    rowEl.SetAttributeValue("customHeight", "1");
-                    ApplyRowStyles(rowEl, rowNum, row22Styles);
+                    SetCellString(rowsByNum, 13, "R", (profile.SenderInfo ?? "").Trim());
+                    SetCellString(rowsByNum, 15, "R", (profile.ReceiverInfo ?? "").Trim());
 
-                    SetCellString(rowsByNum, rowNum, "A", item.Name);
-                    SetCellString(rowsByNum, rowNum, "W", item.Unit);
-                    SetCellNumber(rowsByNum, rowNum, "AG", item.Qty);
-                    SetCellDecimal(rowsByNum, rowNum, "AP", item.UnitPrice);
-                    SetCellDecimal(rowsByNum, rowNum, "AZ", item.TotalNoVat);
-                    SetCellString(rowsByNum, rowNum, "BK", item.VatRateLabel);
-                    if (hasVat)
-                        SetCellDecimal(rowsByNum, rowNum, "BT", item.VatAmount);
+                    string suppliesStr = data.SupplyIds.Count > 0 ? string.Join(", ", data.SupplyIds) : "";
+                    string basisPrefix = (profile.BasisPrefix ?? "").Trim();
+                    string basisText = string.IsNullOrEmpty(suppliesStr)
+                        ? basisPrefix
+                        : (string.IsNullOrEmpty(basisPrefix) ? "сборочные задания №: " + suppliesStr : basisPrefix + ", сборочные задания №: " + suppliesStr);
+                    SetCellString(rowsByNum, 17, "T", basisText);
+
+                    // 2. Item rows 22 .. 199
+                    int count = data.GroupedItems.Count;
+                    bool hasVat = ParseVatRate(profile.VatMode) > 0m || data.TotalVat > 0m;
+                    for (int i = 0; i < count; i++)
+                    {
+                        int rowNum = 22 + i;
+                        var item = data.GroupedItems[i];
+                        var rowEl = rowsByNum[rowNum];
+                        rowEl.SetAttributeValue("hidden", null);
+                        rowEl.SetAttributeValue("ht", "11.5");
+                        rowEl.SetAttributeValue("customHeight", "1");
+                        ApplyRowStyles(rowEl, rowNum, row22Styles);
+
+                        if (isTtn1)
+                        {
+                            SetCellString(rowsByNum, rowNum, "A", item.Name);
+                            SetCellString(rowsByNum, rowNum, "T", item.Unit);
+                            SetCellNumber(rowsByNum, rowNum, "AA", item.Qty);
+                            SetCellDecimal(rowsByNum, rowNum, "AH", item.UnitPrice);
+                            SetCellDecimal(rowsByNum, rowNum, "AQ", item.TotalNoVat);
+                            SetCellString(rowsByNum, rowNum, "AZ", item.VatRateLabel);
+                            if (hasVat)
+                                SetCellDecimal(rowsByNum, rowNum, "BG", item.VatAmount);
+                            else
+                                SetCellString(rowsByNum, rowNum, "BG", "-");
+                            SetCellDecimal(rowsByNum, rowNum, "BP", item.TotalWithVat);
+                            SetCellNumber(rowsByNum, rowNum, "BY", item.CargoPlaces);
+                            SetCellDecimal(rowsByNum, rowNum, "CF", item.CargoMassKg);
+                            SetCellString(rowsByNum, rowNum, "CM", item.Note ?? "");
+                        }
+                        else
+                        {
+                            SetCellString(rowsByNum, rowNum, "A", item.Name);
+                            SetCellString(rowsByNum, rowNum, "W", item.Unit);
+                            SetCellNumber(rowsByNum, rowNum, "AG", item.Qty);
+                            SetCellDecimal(rowsByNum, rowNum, "AP", item.UnitPrice);
+                            SetCellDecimal(rowsByNum, rowNum, "AZ", item.TotalNoVat);
+                            SetCellString(rowsByNum, rowNum, "BK", item.VatRateLabel);
+                            if (hasVat)
+                                SetCellDecimal(rowsByNum, rowNum, "BT", item.VatAmount);
+                            else
+                                SetCellString(rowsByNum, rowNum, "BT", "-");
+                            SetCellDecimal(rowsByNum, rowNum, "CC", item.TotalWithVat);
+                            SetCellString(rowsByNum, rowNum, "CN", item.Note ?? "");
+                        }
+                    }
+
+                    // Clear & hide unused rows
+                    for (int rowNum = 22 + count; rowNum <= 199; rowNum++)
+                    {
+                        XElement rowEl;
+                        if (!rowsByNum.TryGetValue(rowNum, out rowEl)) continue;
+                        rowEl.SetAttributeValue("hidden", "1");
+                        foreach (var c in rowEl.Elements(MainNs + "c"))
+                            ClearCellValue(c);
+                    }
+
+                    // 3. Totals & Footer (rows 200..221)
+                    if (isTtn1)
+                    {
+                        SetCellNumber(rowsByNum, 200, "AA", data.TotalQty);
+                        SetCellDecimal(rowsByNum, 200, "AQ", data.TotalNoVat);
+                        if (hasVat)
+                            SetCellDecimal(rowsByNum, 200, "BG", data.TotalVat);
+                        else
+                            SetCellString(rowsByNum, 200, "BG", "-");
+                        SetCellDecimal(rowsByNum, 200, "BP", data.TotalWithVat);
+                        SetCellNumber(rowsByNum, 200, "BY", data.TotalCargoPlaces);
+                        SetCellDecimal(rowsByNum, 200, "CF", data.TotalCargoMassKg);
+                        SetCellString(rowsByNum, 220, "AK", FormatPlacesWordsRu(data.TotalCargoPlaces));
+                        SetCellString(rowsByNum, 221, "AK", FormatMassWordsRu(data.TotalCargoMassKg));
+                    }
                     else
-                        SetCellString(rowsByNum, rowNum, "BT", "-");
-                    SetCellDecimal(rowsByNum, rowNum, "CC", item.TotalWithVat);
+                    {
+                        SetCellNumber(rowsByNum, 200, "AG", data.TotalQty);
+                        SetCellDecimal(rowsByNum, 200, "AZ", data.TotalNoVat);
+                        if (hasVat)
+                            SetCellDecimal(rowsByNum, 200, "BT", data.TotalVat);
+                        else
+                            SetCellString(rowsByNum, 200, "BT", "-");
+                        SetCellDecimal(rowsByNum, 200, "CC", data.TotalWithVat);
+                    }
+
+                    // VAT in words (S201 / BX201)
+                    if (!hasVat || data.TotalVat <= 0m)
+                    {
+                        SetCellString(rowsByNum, 201, "S", "Ноль");
+                        SetCellString(rowsByNum, 201, "BX", "00");
+                    }
+                    else
+                    {
+                        string vatRubWords, vatKop;
+                        SplitMoneyToWordsRu(data.TotalVat, out vatRubWords, out vatKop);
+                        SetCellString(rowsByNum, 201, "S", vatRubWords);
+                        SetCellString(rowsByNum, 201, "BX", vatKop);
+                    }
+
+                    // Total in words (W203 / BX203)
+                    string totalRubWords, totalKop;
+                    SplitMoneyToWordsRu(data.TotalWithVat, out totalRubWords, out totalKop);
+                    SetCellString(rowsByNum, 203, "W", totalRubWords);
+                    SetCellString(rowsByNum, 203, "BX", totalKop);
+
+                    // Signatures
+                    SetCellString(rowsByNum, 205, "R", (profile.Signer ?? "").Trim());
+                    SetCellString(rowsByNum, 207, "V", (profile.Signer ?? "").Trim());
+
+                    // Page margins from profile (mm -> inches)
+                    ApplyPageMarginsMm(doc.Root, profile.TopMarginMm, profile.LeftMarginMm);
+
+                    if (isBso)
+                    {
+                        ClearStaticCellsForBso(doc.Root, rowsByNum, count, isTtn1);
+                        StripBordersAndFillsForBso(zip);
+                    }
+
+                    // Ensure all mc:Ignorable prefixes remain declared on root
+                    EnsureIgnorableNamespaces(doc.Root, new string[] { "x14ac", "xr", "xr2", "xr3" });
+
+                    sheetEntry.Delete();
+                    var newEntry = zip.CreateEntry("xl/worksheets/sheet1.xml", CompressionLevel.Optimal);
+                    using (var sw = new StreamWriter(newEntry.Open(), new UTF8Encoding(false)))
+                    {
+                        doc.Save(sw, SaveOptions.DisableFormatting);
+                    }
                 }
 
-                // Clear & hide unused rows
-                for (int rowNum = 22 + count; rowNum <= 199; rowNum++)
+                if (File.Exists(outputPath)) File.Delete(outputPath);
+                File.Move(tempPath, outputPath);
+                moved = true;
+            }
+            finally
+            {
+                if (!moved && File.Exists(tempPath))
                 {
-                    XElement rowEl;
-                    if (!rowsByNum.TryGetValue(rowNum, out rowEl)) continue;
-                    rowEl.SetAttributeValue("hidden", "1");
-                    foreach (var c in rowEl.Elements(MainNs + "c"))
-                        ClearCellValue(c);
-                }
-
-                // 3. Totals & Footer (rows 200..207)
-                SetCellNumber(rowsByNum, 200, "AG", data.TotalQty);
-                SetCellDecimal(rowsByNum, 200, "AZ", data.TotalNoVat);
-                if (hasVat)
-                    SetCellDecimal(rowsByNum, 200, "BT", data.TotalVat);
-                else
-                    SetCellString(rowsByNum, 200, "BT", "-");
-                SetCellDecimal(rowsByNum, 200, "CC", data.TotalWithVat);
-
-                // VAT in words (S201 / BX201)
-                if (!hasVat || data.TotalVat <= 0m)
-                {
-                    SetCellString(rowsByNum, 201, "S", "Ноль");
-                    SetCellString(rowsByNum, 201, "BX", "00");
-                }
-                else
-                {
-                    string vatRubWords, vatKop;
-                    SplitMoneyToWordsRu(data.TotalVat, out vatRubWords, out vatKop);
-                    SetCellString(rowsByNum, 201, "S", vatRubWords);
-                    SetCellString(rowsByNum, 201, "BX", vatKop);
-                }
-
-                // Total in words (W203 / BX203)
-                string totalRubWords, totalKop;
-                SplitMoneyToWordsRu(data.TotalWithVat, out totalRubWords, out totalKop);
-                SetCellString(rowsByNum, 203, "W", totalRubWords);
-                SetCellString(rowsByNum, 203, "BX", totalKop);
-
-                // Signatures
-                SetCellString(rowsByNum, 205, "R", (profile.Signer ?? "").Trim());
-                SetCellString(rowsByNum, 207, "V", (profile.Signer ?? "").Trim());
-
-                // Page margins from profile (mm -> inches)
-                ApplyPageMarginsMm(doc.Root, profile.TopMarginMm, profile.LeftMarginMm);
-
-                if (isBso)
-                {
-                    ClearStaticCellsForBso(doc.Root, rowsByNum, count, isTtn1);
-                    StripBordersAndFillsForBso(zip);
-                }
-
-                // Ensure all mc:Ignorable prefixes remain declared on root
-                EnsureIgnorableNamespaces(doc.Root, new string[] { "x14ac", "xr", "xr2", "xr3" });
-
-                sheetEntry.Delete();
-                var newEntry = zip.CreateEntry("xl/worksheets/sheet1.xml", CompressionLevel.Optimal);
-                using (var sw = new StreamWriter(newEntry.Open(), new UTF8Encoding(false)))
-                {
-                    doc.Save(sw, SaveOptions.DisableFormatting);
+                    try { File.Delete(tempPath); } catch { }
                 }
             }
-
-            if (File.Exists(outputPath)) File.Delete(outputPath);
-            File.Move(tempPath, outputPath);
         }
 
         private static void EnsureIgnorableNamespaces(XElement root, string[] candidatePrefixes)
@@ -1131,20 +1375,37 @@ namespace GovPortalsApp
                 "Z4", "AS4",
                 "AB12", "AI12", "BI12",
                 "R13", "R15", "T17",
-                "AG200", "AZ200", "BT200", "CC200",
                 "S201", "BX201",
                 "W203", "BX203",
                 "R205", "V207"
             };
+            string[] itemCols;
             if (isTtn1)
             {
                 keepRefs.Add("R7");
                 keepRefs.Add("BO7");
                 keepRefs.Add("R9");
                 keepRefs.Add("R10");
+                keepRefs.Add("AF11");
+                keepRefs.Add("AA200");
+                keepRefs.Add("AQ200");
+                keepRefs.Add("BG200");
+                keepRefs.Add("BP200");
+                keepRefs.Add("BY200");
+                keepRefs.Add("CF200");
                 keepRefs.Add("X210");
+                keepRefs.Add("AK220");
+                keepRefs.Add("AK221");
+                itemCols = new string[] { "A", "T", "AA", "AH", "AQ", "AZ", "BG", "BP", "BY", "CF", "CM" };
             }
-            string[] itemCols = { "A", "W", "AG", "AP", "AZ", "BK", "BT", "CC" };
+            else
+            {
+                keepRefs.Add("AG200");
+                keepRefs.Add("AZ200");
+                keepRefs.Add("BT200");
+                keepRefs.Add("CC200");
+                itemCols = new string[] { "A", "W", "AG", "AP", "AZ", "BK", "BT", "CC", "CN" };
+            }
             for (int i = 0; i < itemCount; i++)
             {
                 int rn = 22 + i;
@@ -1315,7 +1576,16 @@ namespace GovPortalsApp
                 sb.Append("<col min=\"6\" max=\"6\" width=\"10\" customWidth=\"1\"/>");
                 sb.Append("<col min=\"7\" max=\"7\" width=\"11\" customWidth=\"1\"/>");
                 sb.Append("<col min=\"8\" max=\"8\" width=\"12\" customWidth=\"1\"/>");
-                sb.Append("<col min=\"9\" max=\"9\" width=\"14\" customWidth=\"1\"/>");
+                if (isTtn1)
+                {
+                    sb.Append("<col min=\"9\" max=\"9\" width=\"9\" customWidth=\"1\"/>");
+                    sb.Append("<col min=\"10\" max=\"10\" width=\"10\" customWidth=\"1\"/>");
+                    sb.Append("<col min=\"11\" max=\"11\" width=\"14\" customWidth=\"1\"/>");
+                }
+                else
+                {
+                    sb.Append("<col min=\"9\" max=\"9\" width=\"14\" customWidth=\"1\"/>");
+                }
                 sb.Append("</cols>");
                 sb.Append("<sheetData>");
 
@@ -1329,17 +1599,28 @@ namespace GovPortalsApp
                 if (isTtn1 && profile != null)
                 {
                     string transLine = "Автомобиль: " + (profile.VehicleInfo ?? "") + "  |  Водитель: " + (profile.DriverInfo ?? "");
+                    if (!string.IsNullOrWhiteSpace(profile.TransportCustomer))
+                        transLine += "  |  Заказчик: " + profile.TransportCustomer.Trim();
                     sb.Append("<row r=\"5\" ht=\"15\" customHeight=\"1\">").Append(InlineCell("A5", 2, transLine)).Append("</row>");
                     headerRow = 7;
                 }
 
-                string[] headers =
-                {
-                    "Наименование товара", "Ед. изм.", "Кол-во", "Цена, руб. коп.",
-                    "Стоимость, руб. коп.", "Ставка НДС, %", "Сумма НДС, руб. коп.",
-                    "Стоимость с НДС, руб. коп.", "Примечание"
-                };
-                string[] cols = { "A", "B", "C", "D", "E", "F", "G", "H", "I" };
+                string[] headers = isTtn1
+                    ? new string[]
+                    {
+                        "Наименование товара", "Ед. изм.", "Кол-во", "Цена, руб. коп.",
+                        "Стоимость, руб. коп.", "Ставка НДС, %", "Сумма НДС, руб. коп.",
+                        "Стоимость с НДС, руб. коп.", "Кол-во груз. мест", "Масса груза, кг", "Примечание"
+                    }
+                    : new string[]
+                    {
+                        "Наименование товара", "Ед. изм.", "Кол-во", "Цена, руб. коп.",
+                        "Стоимость, руб. коп.", "Ставка НДС, %", "Сумма НДС, руб. коп.",
+                        "Стоимость с НДС, руб. коп.", "Примечание"
+                    };
+                string[] cols = isTtn1
+                    ? new string[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" }
+                    : new string[] { "A", "B", "C", "D", "E", "F", "G", "H", "I" };
 
                 sb.Append("<row r=\"" + headerRow + "\" ht=\"28\" customHeight=\"1\">");
                 for (int c = 0; c < headers.Length; c++)
@@ -1348,7 +1629,7 @@ namespace GovPortalsApp
 
                 int numRow = headerRow + 1;
                 sb.Append("<row r=\"" + numRow + "\" ht=\"14\" customHeight=\"1\">");
-                for (int c = 0; c < 9; c++)
+                for (int c = 0; c < cols.Length; c++)
                     sb.Append(NumericCell(cols[c] + numRow, 3, (c + 1).ToString(CultureInfo.InvariantCulture)));
                 sb.Append("</row>");
 
@@ -1367,7 +1648,16 @@ namespace GovPortalsApp
                     else
                         sb.Append(InlineCell("G" + curRow, 5, "-"));
                     sb.Append(NumericCell("H" + curRow, 6, Math.Round(it.TotalWithVat, 2, MidpointRounding.AwayFromZero).ToString("0.00", CultureInfo.InvariantCulture)));
-                    sb.Append(InlineCell("I" + curRow, 4, it.Note ?? ""));
+                    if (isTtn1)
+                    {
+                        sb.Append(NumericCell("I" + curRow, 5, it.CargoPlaces.ToString(CultureInfo.InvariantCulture)));
+                        sb.Append(NumericCell("J" + curRow, 6, Math.Round(it.CargoMassKg, 2, MidpointRounding.AwayFromZero).ToString("0.00", CultureInfo.InvariantCulture)));
+                        sb.Append(InlineCell("K" + curRow, 4, it.Note ?? ""));
+                    }
+                    else
+                    {
+                        sb.Append(InlineCell("I" + curRow, 4, it.Note ?? ""));
+                    }
                     sb.Append("</row>");
                     curRow++;
                 }
@@ -1385,7 +1675,16 @@ namespace GovPortalsApp
                 else
                     sb.Append(InlineCell("G" + curRow, 7, "-"));
                 sb.Append(NumericCell("H" + curRow, 8, Math.Round(data.TotalWithVat, 2, MidpointRounding.AwayFromZero).ToString("0.00", CultureInfo.InvariantCulture)));
-                sb.Append(InlineCell("I" + curRow, 7, ""));
+                if (isTtn1)
+                {
+                    sb.Append(NumericCell("I" + curRow, 7, data.TotalCargoPlaces.ToString(CultureInfo.InvariantCulture)));
+                    sb.Append(NumericCell("J" + curRow, 8, Math.Round(data.TotalCargoMassKg, 2, MidpointRounding.AwayFromZero).ToString("0.00", CultureInfo.InvariantCulture)));
+                    sb.Append(InlineCell("K" + curRow, 7, ""));
+                }
+                else
+                {
+                    sb.Append(InlineCell("I" + curRow, 7, ""));
+                }
                 sb.Append("</row>");
                 curRow += 2;
 
@@ -1399,6 +1698,13 @@ namespace GovPortalsApp
                 sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Всего сумма НДС: " + vatWords + " руб. " + vatKop + " коп.")).Append("</row>");
                 curRow++;
                 sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Всего стоимость с НДС: " + totWords + " руб. " + totKop + " коп.")).Append("</row>");
+                if (isTtn1)
+                {
+                    curRow++;
+                    sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Всего количество грузовых мест: " + FormatPlacesWordsRu(data.TotalCargoPlaces))).Append("</row>");
+                    curRow++;
+                    sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Всего масса груза: " + FormatMassWordsRu(data.TotalCargoMassKg))).Append("</row>");
+                }
                 curRow += 2;
                 string signer = profile != null ? (profile.Signer ?? "").Trim() : "";
                 sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Сдал грузоотправитель: " + signer + "   __________________")).Append("</row>");
@@ -1406,9 +1712,10 @@ namespace GovPortalsApp
                 sb.Append("<row r=\"" + curRow + "\" ht=\"16\" customHeight=\"1\">").Append(InlineCell("A" + curRow, 2, "Принял грузополучатель: ____________________________")).Append("</row>");
 
                 sb.Append("</sheetData>");
+                string lastCol = isTtn1 ? "K" : "I";
                 sb.Append("<mergeCells count=\"" + (headerRow - 2) + "\">");
                 for (int mr = 1; mr <= headerRow - 2; mr++)
-                    sb.Append("<mergeCell ref=\"A" + mr + ":I" + mr + "\"/>");
+                    sb.Append("<mergeCell ref=\"A" + mr + ":" + lastCol + mr + "\"/>");
                 sb.Append("</mergeCells>");
                 sb.Append(string.Format(CultureInfo.InvariantCulture,
                     "<pageMargins left=\"{0:0.######}\" right=\"0.39\" top=\"{1:0.######}\" bottom=\"0.39\" header=\"0.2\" footer=\"0.2\"/>",
@@ -1552,8 +1859,13 @@ namespace GovPortalsApp
 
         public static string NumberToWordsRu(long number)
         {
+            return NumberToWordsRu(number, false);
+        }
+
+        private static string NumberToWordsRu(long number, bool feminineUnits)
+        {
             if (number == 0) return "ноль";
-            if (number < 0) return "минус " + NumberToWordsRu(-number);
+            if (number < 0) return "минус " + NumberToWordsRu(-number, feminineUnits);
 
             string[] unitsMasc = { "", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять" };
             string[] unitsFem = { "", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять" };
@@ -1580,10 +1892,47 @@ namespace GovPortalsApp
             long rest = number % 1000L;
             if (rest > 0)
             {
-                AppendTriad(parts, (int)rest, false, unitsMasc, unitsFem, teens, tens, hundreds);
+                AppendTriad(parts, (int)rest, feminineUnits, unitsMasc, unitsFem, teens, tens, hundreds);
             }
 
             return string.Join(" ", parts);
+        }
+
+        public static string FormatPlacesWordsRu(int places)
+        {
+            long p = places < 0 ? 0 : places;
+            string words = NumberToWordsRu(p, false);
+            if (p % 100 != 11 && p % 10 == 1 && words.EndsWith("один", StringComparison.Ordinal))
+            {
+                words = words.Substring(0, words.Length - 4) + "одно";
+            }
+            if (words.Length > 0)
+                words = char.ToUpper(words[0], new CultureInfo("ru-RU")) + words.Substring(1);
+            return words + " " + PluralRu(p, "место", "места", "мест");
+        }
+
+        public static string FormatMassWordsRu(decimal massKg)
+        {
+            if (massKg <= 0m) return "Ноль килограммов";
+            long totalGrams = (long)Math.Round(massKg * 1000m, 0, MidpointRounding.AwayFromZero);
+            if (totalGrams <= 0L) return "Ноль килограммов";
+
+            long tonnes = totalGrams / 1000000L;
+            long kg = (totalGrams % 1000000L) / 1000L;
+            long grams = totalGrams % 1000L;
+
+            var parts = new List<string>();
+            if (tonnes > 0)
+                parts.Add(NumberToWordsRu(tonnes, true) + " " + PluralRu(tonnes, "тонна", "тонны", "тонн"));
+            if (kg > 0)
+                parts.Add(NumberToWordsRu(kg, false) + " " + PluralRu(kg, "килограмм", "килограмма", "килограммов"));
+            if (grams > 0)
+                parts.Add(NumberToWordsRu(grams, false) + " " + PluralRu(grams, "грамм", "грамма", "граммов"));
+
+            string joined = string.Join(" ", parts);
+            if (joined.Length > 0)
+                joined = char.ToUpper(joined[0], new CultureInfo("ru-RU")) + joined.Substring(1);
+            return joined;
         }
 
         private static void AppendTriad(List<string> parts, int n, bool feminine, string[] uM, string[] uF, string[] teens, string[] tens, string[] hundreds)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -22,6 +23,9 @@ namespace GovPortalsApp
         private TextBlock ovCertAlertText;
         private Border ovCertAlertBox;
         private StackPanel ovCalendarRowsStack;
+        private StackPanel ovCalendarFutureStack;
+        private Button ovBtnToggleFutureCalendar;
+        private bool _ovCalendarFutureExpanded = false;
 
         private System.Windows.Shapes.Ellipse ovDotMns;
         private TextBlock ovPingMns;
@@ -105,52 +109,64 @@ namespace GovPortalsApp
                 }));
             });
 
-            // HEADER CARD: Active Profile + Quick Actions
+            // HEADER CARD: Compact Regime / UNP Badge + Profile Manager
             var topCard = new Border
             {
                 Background = Brushes.White,
-                CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(18),
-                Margin = new Thickness(0, 0, 0, 14),
+                CornerRadius = new CornerRadius(14),
+                Padding = new Thickness(14, 10, 14, 10),
+                Margin = new Thickness(0, 0, 0, 12),
                 BorderBrush = GetBrush("#E5E5EA"),
                 BorderThickness = new Thickness(1)
             };
             var topGrid = new Grid();
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var profileStack = new StackPanel();
+            var profileBadgeRow = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+            var regimePill = new Border
+            {
+                Background = GetBrush("#EBF3FF"),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 2, 10, 2),
+                VerticalAlignment = VerticalAlignment.Center
+            };
             ovProfileTitle = new TextBlock
             {
-                Text = "🏠 Сводка",
-                FontSize = 18,
+                Text = "ООО • УСН 6% (без НДС)",
+                FontSize = 12,
                 FontWeight = FontWeights.Bold,
-                Foreground = GetBrush("#1C1C1E"),
+                Foreground = GetBrush("#007AFF"),
                 TextWrapping = TextWrapping.Wrap
             };
+            regimePill.Child = ovProfileTitle;
+
             ovProfileMeta = new TextBlock
             {
                 Text = "",
                 FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("#636366"),
-                Margin = new Thickness(0, 3, 0, 0),
-                TextWrapping = TextWrapping.Wrap
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 2)
             };
-            profileStack.Children.Add(ovProfileTitle);
-            profileStack.Children.Add(ovProfileMeta);
+            profileBadgeRow.Children.Add(regimePill);
+            profileBadgeRow.Children.Add(ovProfileMeta);
 
             var btnManageProfiles = CreateSmallPillButton("⚙️ Профили компаний", "#EBF3FF", "#007AFF");
             btnManageProfiles.VerticalAlignment = VerticalAlignment.Center;
             btnManageProfiles.Click += delegate { OpenProfileManagerWindow(); };
 
-            Grid.SetColumn(profileStack, 0);
-            Grid.SetColumn(btnManageProfiles, 1);
-            topGrid.Children.Add(profileStack);
+            Grid.SetColumn(profileBadgeRow, 0);
+            Grid.SetColumn(btnManageProfiles, 2);
+            topGrid.Children.Add(profileBadgeRow);
             topGrid.Children.Add(btnManageProfiles);
             topCard.Child = topGrid;
             container.Children.Add(topCard);
 
-            // ONBOARDING CARD (visible in Simple mode, collapsed in Pro mode)
+            // ONBOARDING CARD (visible in Simple mode unless dismissed, collapsed in Pro mode)
             ovOnboardingCard = new Border
             {
                 Background = GetBrush("#F0F9FF"),
@@ -161,14 +177,34 @@ namespace GovPortalsApp
                 Margin = new Thickness(0, 0, 0, 14)
             };
             var onbStack = new StackPanel();
-            onbStack.Children.Add(new TextBlock
+            var onbHdrGrid = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+            onbHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            onbHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            onbHdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var onbTitle = new TextBlock
             {
                 Text = "🚀 Быстрый старт: 3 шага",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#0369A1"),
-                Margin = new Thickness(0, 0, 0, 2)
-            });
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var btnHideOnboarding = CreateSmallPillButton("✕ Скрыть", "#E0F2FE", "#0369A1");
+            btnHideOnboarding.VerticalAlignment = VerticalAlignment.Center;
+            btnHideOnboarding.ToolTip = "Скрыть блок быстрого старта, чтобы календарь сроков сразу был на первом экране";
+            btnHideOnboarding.Click += delegate
+            {
+                SaveOnboardingHiddenFlag();
+                if (ovOnboardingCard != null) ovOnboardingCard.Visibility = Visibility.Collapsed;
+                ShowToast("Блок «Быстрый старт» скрыт");
+            };
+            Grid.SetColumn(onbTitle, 0);
+            Grid.SetColumn(btnHideOnboarding, 2);
+            onbHdrGrid.Children.Add(onbTitle);
+            onbHdrGrid.Children.Add(btnHideOnboarding);
+            onbStack.Children.Add(onbHdrGrid);
+
             onbStack.Children.Add(new TextBlock
             {
                 Text = "Базовый режим для селлера: выберите организацию, проверьте налоги по отчётам и создайте ТН-2.",
@@ -346,7 +382,7 @@ namespace GovPortalsApp
             });
             calStack.Children.Add(new TextBlock
             {
-                Text = "Ближайшие сроки отчётности и платежей (при выпадении на выходной день срок переносится на следующий рабочий день).",
+                Text = "Ближайшие сроки отчётности и платежей (при выпадении на выходной или праздничный день срок переносится на ближайший рабочий день).",
                 FontSize = 11.5,
                 Foreground = GetBrush("#636366"),
                 TextWrapping = TextWrapping.Wrap,
@@ -390,6 +426,26 @@ namespace GovPortalsApp
 
             ovCalendarRowsStack = new StackPanel();
             calStack.Children.Add(ovCalendarRowsStack);
+
+            ovCalendarFutureStack = new StackPanel
+            {
+                Visibility = Visibility.Collapsed
+            };
+            calStack.Children.Add(ovCalendarFutureStack);
+
+            ovBtnToggleFutureCalendar = CreateSmallPillButton("Показать следующие месяцы и квартал ▼", "#F2F2F7", "#3A3A3C");
+            ovBtnToggleFutureCalendar.HorizontalAlignment = HorizontalAlignment.Left;
+            ovBtnToggleFutureCalendar.Margin = new Thickness(0, 4, 0, 0);
+            ovBtnToggleFutureCalendar.Click += delegate
+            {
+                _ovCalendarFutureExpanded = !_ovCalendarFutureExpanded;
+                if (ovCalendarFutureStack != null)
+                    ovCalendarFutureStack.Visibility = _ovCalendarFutureExpanded ? Visibility.Visible : Visibility.Collapsed;
+                ovBtnToggleFutureCalendar.Content = _ovCalendarFutureExpanded
+                    ? "Скрыть следующие месяцы и квартал ▲"
+                    : "Показать следующие месяцы и квартал ▼";
+            };
+            calStack.Children.Add(ovBtnToggleFutureCalendar);
 
             calCard.Child = calStack;
             container.Children.Add(calCard);
@@ -445,11 +501,35 @@ namespace GovPortalsApp
             return rowCard;
         }
 
+        private static string GetOnboardingHiddenFlagPath()
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Buhly");
+            return Path.Combine(dir, "overview_onboarding_hidden.flag");
+        }
+
+        private static bool IsOnboardingHidden()
+        {
+            try { return File.Exists(GetOnboardingHiddenFlagPath()); }
+            catch { return false; }
+        }
+
+        private static void SaveOnboardingHiddenFlag()
+        {
+            try
+            {
+                var path = GetOnboardingHiddenFlagPath();
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllText(path, "hidden", System.Text.Encoding.UTF8);
+            }
+            catch { }
+        }
+
         private void RefreshOverviewUiMode(bool isPro)
         {
             if (ovOnboardingCard != null)
             {
-                ovOnboardingCard.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
+                ovOnboardingCard.Visibility = (isPro || IsOnboardingHidden()) ? Visibility.Collapsed : Visibility.Visible;
             }
         }
 
@@ -542,13 +622,12 @@ namespace GovPortalsApp
             var prof = ActiveCompanyProfile;
             if (prof == null)
             {
-                ovProfileTitle.Text = "🏠 Сводка";
-                ovProfileMeta.Text = "Профиль не выбран";
+                ovProfileTitle.Text = "Профиль не выбран";
+                ovProfileMeta.Text = "";
                 return;
             }
-            ovProfileTitle.Text = "🏠 " + prof.DisplayName;
-            string unpPart = string.IsNullOrWhiteSpace(prof.Unp) ? "УНП не задан" : ("УНП " + prof.Unp);
-            ovProfileMeta.Text = unpPart + "  •  " + prof.GetTaxRegimeTitle();
+            ovProfileTitle.Text = prof.GetTaxRegimeTitle();
+            ovProfileMeta.Text = string.IsNullOrWhiteSpace(prof.Unp) ? "УНП не задан" : ("УНП " + prof.Unp.Trim());
         }
 
         private void UpdateOverviewTokenStatus(List<CertInfo> certs, bool avestInstalled)
@@ -650,6 +729,7 @@ namespace GovPortalsApp
         {
             if (ovCalendarRowsStack == null) return;
             ovCalendarRowsStack.Children.Clear();
+            if (ovCalendarFutureStack != null) ovCalendarFutureStack.Children.Clear();
 
             var today = DateTime.Today;
             var curMonth = new DateTime(today.Year, today.Month, 1);
@@ -657,16 +737,34 @@ namespace GovPortalsApp
             var prof = ActiveCompanyProfile;
             string regime = prof != null ? prof.TaxRegime : CompanyProfilesManager.RegimeUsn6;
 
-            var items = BuildRbCalendarItems(today, curMonth, nextMonth, regime);
-            foreach (var item in items)
+            var futureItems = new List<UIElement>();
+            var primaryItems = BuildRbCalendarItems(today, curMonth, nextMonth, regime, futureItems);
+            foreach (var item in primaryItems)
             {
                 ovCalendarRowsStack.Children.Add(item);
             }
+            if (ovCalendarFutureStack != null)
+            {
+                foreach (var fItem in futureItems)
+                {
+                    ovCalendarFutureStack.Children.Add(fItem);
+                }
+                ovCalendarFutureStack.Visibility = (_ovCalendarFutureExpanded && futureItems.Count > 0)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+            if (ovBtnToggleFutureCalendar != null)
+            {
+                ovBtnToggleFutureCalendar.Visibility = futureItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                ovBtnToggleFutureCalendar.Content = _ovCalendarFutureExpanded
+                    ? "Скрыть следующие месяцы и квартал ▲"
+                    : "Показать следующие месяцы и квартал ▼";
+            }
         }
 
-        private List<UIElement> BuildRbCalendarItems(DateTime today, DateTime curMonth, DateTime nextMonth, string regime)
+        private List<UIElement> BuildRbCalendarItems(DateTime today, DateTime curMonth, DateTime nextMonth, string regime, List<UIElement> futureList)
         {
-            var list = new List<UIElement>();
+            var primaryList = new List<UIElement>();
             var months = new DateTime[] { curMonth, nextMonth };
 
             // Determine nearest quarterly reporting month (Jan, Apr, Jul, Oct)
@@ -674,36 +772,44 @@ namespace GovPortalsApp
 
             foreach (var m in months)
             {
+                bool isCurrent = (m.Year == curMonth.Year && m.Month == curMonth.Month);
+                var target = isCurrent ? primaryList : futureList;
+
                 string monthTitle = m.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("ru-RU"));
                 if (monthTitle.Length > 0)
                     monthTitle = char.ToUpper(monthTitle[0]) + monthTitle.Substring(1);
 
-                list.Add(new TextBlock
+                target.Add(new TextBlock
                 {
-                    Text = m.Month == curMonth.Month ? (monthTitle + " (текущий месяц)") : (monthTitle + " (следующий месяц)"),
+                    Text = isCurrent ? (monthTitle + " (текущий месяц)") : (monthTitle + " (следующий месяц)"),
                     FontSize = 12,
                     FontWeight = FontWeights.Bold,
                     Foreground = GetBrush("#007AFF"),
-                    Margin = new Thickness(0, list.Count == 0 ? 2 : 10, 0, 6)
+                    Margin = new Thickness(0, target.Count == 0 ? 2 : 10, 0, 6)
                 });
 
-                // 15th: Payroll + FSZN
+                // 15th: Payroll + FSZN + Income tax 13%
                 var d15 = new DateTime(m.Year, m.Month, 15);
-                list.Add(CreateCalendarRow(d15, today,
+                string payrollTag = regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме (день ЗП)" : "День выплаты ЗП";
+                target.Add(CreateCalendarRow(d15, today,
                     "Выплата ЗП и уплата взносов ФСЗН",
                     "Уплата обязательных страховых взносов в ФСЗН (35%) — не позднее установленного дня выплаты зарплаты.",
-                    regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме (день ЗП)" : "День выплаты ЗП"));
+                    payrollTag));
+                target.Add(CreateCalendarRow(d15, today,
+                    "Подоходный налог 13% с ЗП",
+                    "Перечисление удержанного подоходного налога (13%) в бюджет — не позднее дня фактической выплаты зарплаты.",
+                    payrollTag));
 
                 // 20th: Import VAT 20% (EAEU / RF) + regular VAT
                 var d20 = new DateTime(m.Year, m.Month, 20);
-                list.Add(CreateCalendarRow(d20, today,
+                target.Add(CreateCalendarRow(d20, today,
                     "Ввозной НДС 20% (закупки РФ / ЕАЭС)",
                     "Заявление о ввозе товаров и уплата ввозного НДС 20% — обязательно даже для УСН без НДС и ИП.",
                     "При импорте из ЕАЭС"));
 
                 if (regime == CompanyProfilesManager.RegimeOsn20)
                 {
-                    list.Add(CreateCalendarRow(d20, today,
+                    target.Add(CreateCalendarRow(d20, today,
                         "Декларация и уплата НДС (20%)",
                         "Ежемесячная/квартальная подача декларации по НДС и уплата налога.",
                         "ОСН"));
@@ -721,7 +827,7 @@ namespace GovPortalsApp
                     string declDesc = regime == CompanyProfilesManager.RegimeIpPn20
                         ? "Сдача декларации по подоходному налогу ИП в МНС. Отчёт 4-Фонд в ФСЗН сдаётся только при наличии наёмных работников."
                         : "Сдача налоговой декларации в МНС и отчёта 4-Фонд в ФСЗН.";
-                    list.Add(CreateCalendarRow(d20, today,
+                    target.Add(CreateCalendarRow(d20, today,
                         declTitle + " за " + qLabel,
                         declDesc,
                         "Квартально"));
@@ -732,26 +838,28 @@ namespace GovPortalsApp
                         : (regime == CompanyProfilesManager.RegimeOsn20
                             ? "Уплата налога на прибыль"
                             : "Уплата налога при УСН 6%");
-                    list.Add(CreateCalendarRow(d22, today,
+                    target.Add(CreateCalendarRow(d22, today,
                         payTitle + " за " + qLabel,
                         "Перечисление рассчитанного квартального налога в бюджет.",
                         "Квартально"));
 
                     var d25 = new DateTime(m.Year, m.Month, 25);
-                    list.Add(CreateCalendarRow(d25, today,
+                    target.Add(CreateCalendarRow(d25, today,
                         "Уплата взносов в Белгосстрах за " + qLabel,
                         "Ежеквартальная уплата страховых взносов по обязательному страхованию от несчастных случаев.",
                         regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме" : "Квартально"));
+
+                    var dLast = new DateTime(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month));
+                    target.Add(CreateCalendarRow(dLast, today,
+                        "Квартальная форма ПУ-3 за " + qLabel,
+                        "Подача индивидуальных сведений ПУ-3 в ФСЗН по наёмным работникам (только при наличии работников по трудовым договорам/ГПД).",
+                        "При найме"));
                 }
 
                 // Annual IP FSZN self-employed deadline: March 31
                 if (regime == CompanyProfilesManager.RegimeIpPn20 && m.Month == 3)
                 {
-                    var d31 = new DateTime(m.Year, 3, 31);
-                    list.Add(CreateCalendarRow(d31, today,
-                        "Взносы ФСЗН ИП «за себя» за прошлый год",
-                        "Годовая уплата 35% от чистого дохода (потолок 12 МЗП = 3 603.60 BYN для 2026 г.). Форма ПУ-3 «за себя» отменена — ФСЗН считает взнос по данным МНС.",
-                        "Годовой (ИП)"));
+                    target.Add(CreateIpAnnualFsznRow(m.Year, today));
                 }
             }
 
@@ -762,7 +870,7 @@ namespace GovPortalsApp
                 while (qMonth.Month % 3 != 1) qMonth = qMonth.AddMonths(1);
                 string qLabel = GetPreviousQuarterLabel(qMonth);
 
-                list.Add(new TextBlock
+                futureList.Add(new TextBlock
                 {
                     Text = "Ближайшие квартальные сроки (" + qLabel + ")",
                     FontSize = 12,
@@ -774,6 +882,7 @@ namespace GovPortalsApp
                 var q20 = new DateTime(qMonth.Year, qMonth.Month, 20);
                 var q22 = new DateTime(qMonth.Year, qMonth.Month, 22);
                 var q25 = new DateTime(qMonth.Year, qMonth.Month, 25);
+                var qLast = new DateTime(qMonth.Year, qMonth.Month, DateTime.DaysInMonth(qMonth.Year, qMonth.Month));
                 string qDeclTitle = regime == CompanyProfilesManager.RegimeIpPn20
                     ? "Декларация ИП (подоходный 20%) (4-Фонд — только при найме работников)"
                     : (regime == CompanyProfilesManager.RegimeOsn20
@@ -782,25 +891,28 @@ namespace GovPortalsApp
                 string qDeclDesc = regime == CompanyProfilesManager.RegimeIpPn20
                     ? "Подача квартальной декларации ИП в МНС за " + qLabel + ". Отчёт 4-Фонд — только при найме работников."
                     : "Подача квартальной отчётности за " + qLabel + ".";
-                list.Add(CreateCalendarRow(q20, today,
+                futureList.Add(CreateCalendarRow(q20, today,
                     qDeclTitle,
                     qDeclDesc,
                     "Квартально"));
-                list.Add(CreateCalendarRow(q22, today,
+                futureList.Add(CreateCalendarRow(q22, today,
                     "Уплата налога за " + qLabel,
                     "Уплата налога по итогам квартала (УСН 6%, подоходный ИП 20% или налог на прибыль).",
                     "Квартально"));
-                list.Add(CreateCalendarRow(q25, today,
+                futureList.Add(CreateCalendarRow(q25, today,
                     "Уплата взносов в Белгосстрах за " + qLabel,
                     "Ежеквартальная уплата страховых взносов от несчастных случаев на производстве.",
                     regime == CompanyProfilesManager.RegimeIpPn20 ? "При найме" : "Квартально"));
+                futureList.Add(CreateCalendarRow(qLast, today,
+                    "Квартальная форма ПУ-3 за " + qLabel,
+                    "Подача индивидуальных сведений ПУ-3 в ФСЗН по наёмным работникам (только при наличии работников по трудовым договорам/ГПД).",
+                    "При найме"));
             }
 
             if (regime == CompanyProfilesManager.RegimeIpPn20 && curMonth.Month != 3 && nextMonth.Month != 3)
             {
                 int fsznDueYear = curMonth.Month < 3 ? curMonth.Year : curMonth.Year + 1;
-                var d31 = new DateTime(fsznDueYear, 3, 31);
-                list.Add(new TextBlock
+                futureList.Add(new TextBlock
                 {
                     Text = "Ближайший годовой срок ИП (ФСЗН «за себя» за " + (fsznDueYear - 1) + " г.)",
                     FontSize = 12,
@@ -808,13 +920,38 @@ namespace GovPortalsApp
                     Foreground = GetBrush("#B45309"),
                     Margin = new Thickness(0, 10, 0, 6)
                 });
-                list.Add(CreateCalendarRow(d31, today,
-                    "Взносы ФСЗН ИП «за себя» за прошлый год",
-                    "Годовая уплата 35% от чистого дохода (потолок 12 МЗП = 3 603.60 BYN для 2026 г.). Форма ПУ-3 «за себя» отменена — ФСЗН считает взнос по данным МНС.",
-                    "Годовой (ИП)"));
+                futureList.Add(CreateIpAnnualFsznRow(fsznDueYear, today));
             }
 
-            return list;
+            return primaryList;
+        }
+
+        private Border CreateIpAnnualFsznRow(int fsznDueYear, DateTime today)
+        {
+            int reportYear = fsznDueYear - 1;
+            var d31 = new DateTime(fsznDueYear, 3, 31);
+            string limitDesc;
+            if (reportYear == 2025)
+            {
+                limitDesc = "за 2025 г.: МЗП 726 BYN, база 12 МЗП = 8 712 BYN, макс. 3 049.20 BYN";
+            }
+            else if (reportYear == 2026)
+            {
+                limitDesc = "за 2026 г.: МЗП 858 BYN, база 12 МЗП = 10 296 BYN, макс. 3 603.60 BYN";
+            }
+            else if (reportYear == 2024)
+            {
+                limitDesc = "за 2024 г.: МЗП 626 BYN, база 12 МЗП = 7 512 BYN, макс. 2 629.20 BYN";
+            }
+            else
+            {
+                limitDesc = string.Format("за {0} г.: потолок 12 МЗП на {0} г. (для ориентира: за 2026 г. — база 12 МЗП = 10 296 BYN, макс. 3 603.60 BYN)", reportYear);
+            }
+
+            return CreateCalendarRow(d31, today,
+                string.Format("Взносы ФСЗН ИП «за себя» за {0} г.", reportYear),
+                string.Format("Годовая уплата 35% от чистого дохода ({0}, Закон № 90-З). Форма ПУ-3 «за себя» отменена — ФСЗН считает взнос по данным МНС.", limitDesc),
+                "Годовой (ИП)");
         }
 
         private static string GetPreviousQuarterLabel(DateTime reportMonth)
@@ -825,20 +962,30 @@ namespace GovPortalsApp
             return "III кв. " + reportMonth.Year;
         }
 
+        private static bool IsRbOfficialHolidayOrWeekend(DateTime d)
+        {
+            if (d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday)
+                return true;
+            int m = d.Month;
+            int day = d.Day;
+            if (m == 1 && (day == 1 || day == 2 || day == 7)) return true;
+            if (m == 3 && day == 8) return true;
+            if (m == 5 && (day == 1 || day == 9)) return true;
+            if (m == 7 && day == 3) return true;
+            if (m == 11 && day == 7) return true;
+            if (m == 12 && day == 25) return true;
+            return false;
+        }
+
         private static DateTime AdjustWeekendToMonday(DateTime date, out bool shiftedFromWeekend)
         {
-            if (date.DayOfWeek == DayOfWeek.Saturday)
+            DateTime cur = date;
+            while (IsRbOfficialHolidayOrWeekend(cur))
             {
-                shiftedFromWeekend = true;
-                return date.AddDays(2);
+                cur = cur.AddDays(1);
             }
-            if (date.DayOfWeek == DayOfWeek.Sunday)
-            {
-                shiftedFromWeekend = true;
-                return date.AddDays(1);
-            }
-            shiftedFromWeekend = false;
-            return date;
+            shiftedFromWeekend = (cur.Date != date.Date);
+            return cur;
         }
 
         private Border CreateCalendarRow(DateTime dueDate, DateTime today, string title, string desc, string tag)
@@ -858,7 +1005,7 @@ namespace GovPortalsApp
             }
             else if (diff == 0)
             {
-                badgeText = shifted ? "СЕГОДНЯ (перенос с вых.)" : "СЕГОДНЯ";
+                badgeText = shifted ? "СЕГОДНЯ (перенос с вых./праздн.)" : "СЕГОДНЯ";
                 badgeBg = "#FEE2E2";
                 badgeFg = "#DC2626";
             }
@@ -886,7 +1033,7 @@ namespace GovPortalsApp
             };
 
             var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });

@@ -21,6 +21,9 @@ namespace GovPortalsApp
         private List<string> wbLoadedFiles = new List<string>();
         private WaybillBuildResult wbCurrentResult;
         private bool _suppressWaybillEvents = false;
+        private int _wbLoadSeq = 0;
+        private bool _wbIsGenerating = false;
+        private bool _wbIsDemoLoaded = false;
 
         // UI controls for Waybills tab
         private ComboBox wbDocTypeCombo;
@@ -36,17 +39,24 @@ namespace GovPortalsApp
         private TextBox wbDriverBox;
         private TextBox wbLoadingPointBox;
         private TextBox wbUnloadingPointBox;
+        private TextBox wbTransportCustomerBox;
 
         private Border wbDropZone;
         private TextBlock wbDropTitle;
         private TextBlock wbDropSubtitle;
+        private Border wbLoadingBanner;
+        private TextBlock wbLoadingText;
         private Border wbPreviewCard;
         private TextBlock wbSummaryText;
         private DataGrid wbPreviewGrid;
+        private DataGridTextColumn wbColCargoPlaces;
+        private DataGridTextColumn wbColCargoMass;
         private Border wbPreviewAlertBanner;
         private TextBlock wbPreviewAlertText;
         private DatePicker wbDatePicker;
         private CheckBox wbPickingListCheck;
+        private Button wbBtnSaveOpen;
+        private Button wbBtnPrintNow;
         private StackPanel wbSettingsBody;
         private TextBlock wbSettingsChevron;
         private StackPanel wbMemoBody;
@@ -150,7 +160,7 @@ namespace GovPortalsApp
 
             wbProModeHint = new TextBlock
             {
-                Text = "ℹ️ Расширенные поля (ТТН-1, БСО в мм, правила) доступны в режиме «Бухгалтер PRO» (переключатель в меню слева).",
+                Text = "ℹ️ Расширенные правила группировки названий доступны в режиме «Бухгалтер PRO» (переключатель в меню слева).",
                 FontSize = 10.5,
                 Foreground = GetBrush("#8E8E93"),
                 TextWrapping = TextWrapping.Wrap,
@@ -319,7 +329,7 @@ namespace GovPortalsApp
             ttnRow1.Children.Add(drvCol);
             ttnStack.Children.Add(ttnRow1);
 
-            var ttnRow2 = new Grid();
+            var ttnRow2 = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             ttnRow2.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             ttnRow2.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             ttnRow2.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -342,6 +352,14 @@ namespace GovPortalsApp
             Grid.SetColumn(unloadCol, 2);
             ttnRow2.Children.Add(unloadCol);
             ttnStack.Children.Add(ttnRow2);
+
+            var custCol = new StackPanel();
+            custCol.Children.Add(CreateFieldLabel("Заказчик автомобильной перевозки (плательщик)"));
+            wbTransportCustomerBox = CreateStyledInput(wbProfile.TransportCustomer, "Напр.: ООО «ИМВБРБ», УНП 193630204 (если отличается от отправителя/получателя)");
+            wbTransportCustomerBox.Background = Brushes.White;
+            wbTransportCustomerBox.Margin = new Thickness(0, 2, 0, 0);
+            custCol.Children.Add(wbTransportCustomerBox);
+            ttnStack.Children.Add(custCol);
 
             wbTtn1FieldsPanel.Child = ttnStack;
             stack.Children.Add(wbTtn1FieldsPanel);
@@ -435,6 +453,39 @@ namespace GovPortalsApp
             fileBtnRow.Children.Add(btnClearFiles);
             stack.Children.Add(fileBtnRow);
 
+            // Background loading / generation indicator
+            wbLoadingBanner = new Border
+            {
+                Background = GetBrush("#EFF6FF"),
+                BorderBrush = GetBrush("#BFDBFE"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12, 9, 12, 9),
+                Margin = new Thickness(0, 10, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            var wbLoadStack = new StackPanel();
+            wbLoadingText = new TextBlock
+            {
+                Text = "⏳ Обработка файлов...",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#1D4ED8"),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var wbLoadProg = new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 5,
+                Foreground = GetBrush("#0284C7"),
+                Background = GetBrush("#DBEAFE"),
+                BorderThickness = new Thickness(0)
+            };
+            wbLoadStack.Children.Add(wbLoadingText);
+            wbLoadStack.Children.Add(wbLoadProg);
+            wbLoadingBanner.Child = wbLoadStack;
+            stack.Children.Add(wbLoadingBanner);
+
             // Editable Preview card (hidden until files loaded)
             wbPreviewCard = new Border
             {
@@ -448,9 +499,7 @@ namespace GovPortalsApp
             };
             var prevStack = new StackPanel();
 
-            var prevHeaderGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            prevHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            prevHeaderGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var prevHeaderStack = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
 
             wbSummaryText = new TextBlock
             {
@@ -458,31 +507,31 @@ namespace GovPortalsApp
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E"),
                 TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            prevHeaderGrid.Children.Add(wbSummaryText);
+            prevHeaderStack.Children.Add(wbSummaryText);
 
-            var prevActions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var prevActions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
             var btnApplyCat = CreateSmallPillButton("📖 Подставить цены", "#EBF3FF", "#007AFF");
-            btnApplyCat.Margin = new Thickness(0, 0, 6, 0);
+            btnApplyCat.Margin = new Thickness(0, 0, 6, 4);
             btnApplyCat.ToolTip = "Заполнить нулевые цены из локального справочника цен по артикулу/названию";
             btnApplyCat.Click += delegate { ApplyCatalogToCurrentPreview(); };
             prevActions.Children.Add(btnApplyCat);
 
             var btnSaveCat = CreateSmallPillButton("💾 Запомнить цены", "#ECFDF5", "#15803D");
-            btnSaveCat.Margin = new Thickness(0, 0, 6, 0);
+            btnSaveCat.Margin = new Thickness(0, 0, 6, 4);
             btnSaveCat.ToolTip = "Сохранить текущие цены из таблицы в справочник цен (для будущих отгрузок FBO)";
             btnSaveCat.Click += delegate { RememberCurrentPrices(); };
             prevActions.Children.Add(btnSaveCat);
 
             var btnResetEdits = CreateSmallPillButton("↻ Сброс", "#F2F2F7", "#3A3A3C");
+            btnResetEdits.Margin = new Thickness(0, 0, 0, 4);
             btnResetEdits.ToolTip = "Перечитать исходные файлы и отменить ручные правки в предпросмотре";
-            btnResetEdits.Click += delegate { RecomputePreviewIfLoaded(); ShowToast("↻ Предпросмотр обновлён из файлов"); };
+            btnResetEdits.Click += delegate { RecomputePreviewIfLoaded(); ShowToast("↻ Предпросмотр обновляется из файлов..."); };
             prevActions.Children.Add(btnResetEdits);
 
-            Grid.SetColumn(prevActions, 1);
-            prevHeaderGrid.Children.Add(prevActions);
-            prevStack.Children.Add(prevHeaderGrid);
+            prevHeaderStack.Children.Add(prevActions);
+            prevStack.Children.Add(prevHeaderStack);
 
             wbPreviewGrid = CreateEditablePreviewGrid();
             prevStack.Children.Add(wbPreviewGrid);
@@ -579,15 +628,15 @@ namespace GovPortalsApp
             actGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             actGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var btnSaveOpen = CreateSolidActionButton("💾  Создать и открыть", "#34C759", Brushes.White);
-            btnSaveOpen.Click += delegate { RunWaybillExport(false); };
-            Grid.SetColumn(btnSaveOpen, 0);
-            actGrid.Children.Add(btnSaveOpen);
+            wbBtnSaveOpen = CreateSolidActionButton("💾  Создать и открыть", "#34C759", Brushes.White);
+            wbBtnSaveOpen.Click += delegate { RunWaybillExport(false); };
+            Grid.SetColumn(wbBtnSaveOpen, 0);
+            actGrid.Children.Add(wbBtnSaveOpen);
 
-            var btnPrintNow = CreateSolidActionButton("🖨  Сразу на печать", "#007AFF", Brushes.White);
-            btnPrintNow.Click += delegate { RunWaybillExport(true); };
-            Grid.SetColumn(btnPrintNow, 2);
-            actGrid.Children.Add(btnPrintNow);
+            wbBtnPrintNow = CreateSolidActionButton("🖨  Сразу на печать", "#007AFF", Brushes.White);
+            wbBtnPrintNow.Click += delegate { RunWaybillExport(true); };
+            Grid.SetColumn(wbBtnPrintNow, 2);
+            actGrid.Children.Add(wbBtnPrintNow);
             stack.Children.Add(actGrid);
 
             mainCard.Child = stack;
@@ -688,7 +737,7 @@ namespace GovPortalsApp
                 Header = "Наименование (редактир.)",
                 Binding = new Binding("Name") { UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
                 Width = new DataGridLength(1, DataGridLengthUnitType.Star),
-                MinWidth = 170
+                MinWidth = 220
             };
             grid.Columns.Add(colName);
 
@@ -696,7 +745,7 @@ namespace GovPortalsApp
             {
                 Header = "Ед.",
                 Binding = new Binding("Unit") { UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
-                Width = 40
+                Width = 34
             };
             grid.Columns.Add(colUnit);
 
@@ -704,7 +753,7 @@ namespace GovPortalsApp
             {
                 Header = "Кол-во",
                 Binding = new Binding("Qty") { Converter = new FlexibleIntConverter(), UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
-                Width = 52
+                Width = 46
             };
             grid.Columns.Add(colQty);
 
@@ -712,7 +761,7 @@ namespace GovPortalsApp
             {
                 Header = "Цена исх.",
                 Binding = new Binding("InputUnitPrice") { Converter = new FlexibleDecimalConverter(), UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
-                Width = 70
+                Width = 62
             };
             grid.Columns.Add(colInPrice);
 
@@ -720,7 +769,7 @@ namespace GovPortalsApp
             {
                 Header = "Цена б/НДС",
                 Binding = new Binding("UnitPrice") { StringFormat = "0.00", ConverterCulture = CultureInfo.InvariantCulture },
-                Width = 72,
+                Width = 64,
                 IsReadOnly = true
             };
             grid.Columns.Add(colNetPrice);
@@ -729,7 +778,7 @@ namespace GovPortalsApp
             {
                 Header = "Без НДС",
                 Binding = new Binding("TotalNoVat") { StringFormat = "0.00", ConverterCulture = CultureInfo.InvariantCulture },
-                Width = 72,
+                Width = 64,
                 IsReadOnly = true
             };
             grid.Columns.Add(colNoVat);
@@ -738,7 +787,7 @@ namespace GovPortalsApp
             {
                 Header = "НДС",
                 Binding = new Binding("VatAmount") { StringFormat = "0.00", ConverterCulture = CultureInfo.InvariantCulture },
-                Width = 58,
+                Width = 50,
                 IsReadOnly = true
             };
             grid.Columns.Add(colVat);
@@ -747,19 +796,37 @@ namespace GovPortalsApp
             {
                 Header = "Итого с НДС",
                 Binding = new Binding("TotalWithVat") { StringFormat = "0.00", ConverterCulture = CultureInfo.InvariantCulture },
-                Width = 78,
+                Width = 68,
                 IsReadOnly = true
             };
             grid.Columns.Add(colWithVat);
+
+            wbColCargoPlaces = new DataGridTextColumn
+            {
+                Header = "Мест",
+                Binding = new Binding("CargoPlaces") { Converter = new FlexibleNonNegIntConverter(), UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
+                Width = 44
+            };
+            grid.Columns.Add(wbColCargoPlaces);
+
+            wbColCargoMass = new DataGridTextColumn
+            {
+                Header = "Масса (кг)",
+                Binding = new Binding("CargoMassKg") { Converter = new FlexibleDecimalConverter(), UpdateSourceTrigger = UpdateSourceTrigger.LostFocus },
+                Width = 66
+            };
+            grid.Columns.Add(wbColCargoMass);
 
             var colWarn = new DataGridTextColumn
             {
                 Header = "!",
                 Binding = new Binding("StatusIcon"),
-                Width = 28,
+                Width = 24,
                 IsReadOnly = true
             };
             grid.Columns.Add(colWarn);
+
+            UpdatePreviewColumnsVisibility();
 
             grid.LoadingRow += delegate(object sender, DataGridRowEventArgs e)
             {
@@ -830,13 +897,37 @@ namespace GovPortalsApp
             var hdrGrid = new Grid();
             hdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             hdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            hdrGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             hdrGrid.Children.Add(new TextBlock
             {
-                Text = "ℹ️  Памятка РБ: бланки строгой отчётности (БСО), Приложение и ЭТН",
+                Text = "ℹ️  Памятка РБ: БСО, Приложение и ЭТН",
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
-                Foreground = GetBrush("#1C1C1E")
+                Foreground = GetBrush("#1C1C1E"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
             });
+
+            var etnBadge = new Border
+            {
+                Background = GetBrush("#FEF3C7"),
+                BorderBrush = GetBrush("#F59E0B"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(7, 2, 7, 2),
+                Margin = new Thickness(8, 0, 10, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            etnBadge.Child = new TextBlock
+            {
+                Text = "ЭТН с 01.03.2026",
+                FontSize = 10.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#92400E")
+            };
+            Grid.SetColumn(etnBadge, 1);
+            hdrGrid.Children.Add(etnBadge);
+
             wbMemoChevron = new TextBlock
             {
                 Text = "▼ Открыть",
@@ -845,29 +936,10 @@ namespace GovPortalsApp
                 Foreground = GetBrush("#007AFF"),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(wbMemoChevron, 1);
+            Grid.SetColumn(wbMemoChevron, 2);
             hdrGrid.Children.Add(wbMemoChevron);
             hdrBtn.Content = hdrGrid;
             memoRoot.Children.Add(hdrBtn);
-
-            var etnAlertBanner = new Border
-            {
-                Background = GetBrush("#FEF3C7"),
-                BorderBrush = GetBrush("#F59E0B"),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(11, 8, 11, 8),
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-            etnAlertBanner.Child = new TextBlock
-            {
-                Text = "⚠️ Внимание (с 01.03.2026, Постановление Совмина № 250): обязательные электронные накладные ЭТН (бумажные ТН-2 / БСО запрещены!) действуют НЕ ТОЛЬКО на маркируемые товары (одежда/обувь УКЗ/СИ), но и на прослеживаемую бытовую технику и электронику (чайники, утюги, фены, пылесосы, мультиварки, дрели, шины, велосипеды и др.).",
-                FontSize = 11.5,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = GetBrush("#92400E"),
-                TextWrapping = TextWrapping.Wrap
-            };
-            memoRoot.Children.Add(etnAlertBanner);
 
             wbMemoBody = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0) };
             hdrBtn.Click += delegate
@@ -877,11 +949,29 @@ namespace GovPortalsApp
                 wbMemoChevron.Text = isVis ? "▼ Открыть" : "▲ Скрыть";
             };
 
+            var etnAlertBanner = new Border
+            {
+                Background = GetBrush("#FEF3C7"),
+                BorderBrush = GetBrush("#F59E0B"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(11, 8, 11, 8),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            etnAlertBanner.Child = new TextBlock
+            {
+                Text = "⚠️ Обязательные ЭТН с 01.03.2026 (Постановления Совмина № 250 и № 528): электронная накладная через аттестованного EDI-провайдера обязательна (бумажные ТН-2 / ТТН-1 / БСО запрещены!) для прослеживаемых товаров по кодам ТН ВЭД ЕАЭС (бытовая техника и электроника: чайники, утюги, фены, пылесосы, мультиварки, дрели, холодильники, шины, велосипеды и др.) и товаров, подлежащих маркировке УКЗ и СИ (одежда, обувь, парфюмерия, часы и др.).",
+                FontSize = 11.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#92400E"),
+                TextWrapping = TextWrapping.Wrap
+            };
+            wbMemoBody.Children.Add(etnAlertBanner);
+
             string[] bullets =
             {
                 "• БСО («Белбланкавыд»): в РБ оригиналы ТН-2 и ТТН-1 оформляются на типографских бланках строгой отчётности. Режим «Полный бланк А4» предназначен для черновика и согласования; для печати на сам бланк выбирайте режим «Печать данных на бланк БСО».",
-                "• Приложение к накладной: если строк больше 178 или нужно приложить расшифровку на обычной бумаге А4, выберите режим «Приложение к накладной (реестр А4)» и укажите серию/номер основного БСО.",
-                "• Обязательные ЭТН с 01.03.2026 (Постановление Совмина № 250): электронная накладная (ЭТН) через аттестованного EDI-провайдера обязательна (бумажная ТН-2/БСО запрещена!) НЕ ТОЛЬКО для маркируемых товаров (одежда/обувь с УКЗ/СИ), но и для прослеживаемой бытовой техники и электроники: чайники, утюги, фены, пылесосы, мультиварки, дрели, шины, велосипеды и др.",
+                "• Приложение к накладной: если строк больше, чем помещается на одном бланке (для БСО обычно до 20–30 строк, максимум шаблона — 178), выберите режим «Приложение к накладной (реестр А4)» и укажите серию/номер основного БСО.",
                 "• Точность НДС в строках: в ТН-2/ТТН-1 и ЭСЧФ произведение «Цена без НДС × Кол-во» обязано строго равняться «Стоимости без НДС». При выделении НДС из розничной цены возможны копеечные отклонения итоговой суммы — такие строки программа подсвечивает жёлтым."
             };
             foreach (var b in bullets)
@@ -983,22 +1073,16 @@ namespace GovPortalsApp
             wbBasisBox.Margin = new Thickness(0, 3, 0, 10);
             body.Children.Add(wbBasisBox);
 
-            // VAT + PRICE INPUT MODE + SORT
-            var vatGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(105) });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(195) });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
-            vatGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            // VAT + PRICE INPUT MODE + SORT (adaptive WrapPanel so "Имена Я → А" never clips at 860 px)
+            var vatGrid = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
 
+            var vatPair = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 14, 6) };
             var vatLbl = CreateFieldLabel("Ставка НДС:");
             vatLbl.VerticalAlignment = VerticalAlignment.Center;
             vatLbl.Margin = new Thickness(0, 0, 6, 0);
-            vatGrid.Children.Add(vatLbl);
+            vatPair.Children.Add(vatLbl);
 
-            wbVatCombo = new ComboBox { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            wbVatCombo = new ComboBox { Width = 96, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
             wbVatCombo.Items.Add("Без НДС");
             wbVatCombo.Items.Add("20%");
             wbVatCombo.Items.Add("10%");
@@ -1009,16 +1093,16 @@ namespace GovPortalsApp
                 if (_suppressWaybillEvents) return;
                 RecalculateExistingPreviewPreserveEdits();
             };
-            Grid.SetColumn(wbVatCombo, 1);
-            vatGrid.Children.Add(wbVatCombo);
+            vatPair.Children.Add(wbVatCombo);
+            vatGrid.Children.Add(vatPair);
 
+            var modePair = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 14, 6) };
             var modeLbl = CreateFieldLabel("Цена в файле:");
             modeLbl.VerticalAlignment = VerticalAlignment.Center;
             modeLbl.Margin = new Thickness(0, 0, 6, 0);
-            Grid.SetColumn(modeLbl, 3);
-            vatGrid.Children.Add(modeLbl);
+            modePair.Children.Add(modeLbl);
 
-            wbPriceInputModeCombo = new ComboBox { FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
+            wbPriceInputModeCombo = new ComboBox { Width = 175, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
             wbPriceInputModeCombo.Items.Add(new ComboBoxItem { Content = "С НДС (выделить)", Tag = WaybillEngine.PriceModeExtractVat });
             wbPriceInputModeCombo.Items.Add(new ComboBoxItem { Content = "Без НДС (начислить)", Tag = WaybillEngine.PriceModeAddVat });
             SelectComboByTag(wbPriceInputModeCombo, wbProfile.PriceInputMode, 0);
@@ -1027,8 +1111,8 @@ namespace GovPortalsApp
                 if (_suppressWaybillEvents) return;
                 RecalculateExistingPreviewPreserveEdits();
             };
-            Grid.SetColumn(wbPriceInputModeCombo, 4);
-            vatGrid.Children.Add(wbPriceInputModeCombo);
+            modePair.Children.Add(wbPriceInputModeCombo);
+            vatGrid.Children.Add(modePair);
 
             wbSortDescCheck = new CheckBox
             {
@@ -1037,10 +1121,10 @@ namespace GovPortalsApp
                 FontSize = 11.5,
                 Foreground = GetBrush("#3A3A3C"),
                 VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 6),
                 ToolTip = "Сортировка Я -> А, затем по возрастанию цены"
             };
             wbSortDescCheck.Click += delegate { RecomputePreviewIfLoaded(); };
-            Grid.SetColumn(wbSortDescCheck, 6);
             vatGrid.Children.Add(wbSortDescCheck);
             body.Children.Add(vatGrid);
 
@@ -1101,11 +1185,17 @@ namespace GovPortalsApp
             var btnOpenDir = CreateSmallPillButton("📂 Открыть", "#F2F2F7", "#1C1C1E");
             btnOpenDir.Click += delegate
             {
-                string dir = wbOutputFolderBox.Text.Trim();
-                if (!string.IsNullOrEmpty(dir))
+                try
                 {
+                    string dir = (wbOutputFolderBox.Text ?? "").Trim();
+                    if (string.IsNullOrEmpty(dir))
+                        dir = new WaybillProfile().OutputFolder;
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
                     WaybillEngine.OpenFileWithShell(dir);
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("⚠️ Не удалось открыть папку: " + ex.Message);
                 }
             };
             Grid.SetColumn(btnOpenDir, 2);
@@ -1136,7 +1226,7 @@ namespace GovPortalsApp
             bool isPro = IsProUiMode();
             if (wbBsoMarginsPanel != null)
             {
-                wbBsoMarginsPanel.Visibility = (isPro && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase))
+                wbBsoMarginsPanel.Visibility = string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
             }
             if (wbAppendixMetaPanel != null)
@@ -1146,7 +1236,7 @@ namespace GovPortalsApp
             }
             if (wbTtn1FieldsPanel != null)
             {
-                wbTtn1FieldsPanel.Visibility = (isPro && string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase))
+                wbTtn1FieldsPanel.Visibility = string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
             }
             if (wbRulesProSection != null)
@@ -1157,6 +1247,20 @@ namespace GovPortalsApp
             {
                 wbProModeHint.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
             }
+            UpdatePreviewColumnsVisibility();
+            UpdateWaybillNamesStatusBadge();
+            if (wbCurrentResult != null)
+            {
+                RefreshPreviewVisualsOnly();
+            }
+        }
+
+        private void UpdatePreviewColumnsVisibility()
+        {
+            bool isTtn1 = wbProfile != null && string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase);
+            var vis = isTtn1 ? Visibility.Visible : Visibility.Collapsed;
+            if (wbColCargoPlaces != null) wbColCargoPlaces.Visibility = vis;
+            if (wbColCargoMass != null) wbColCargoMass.Visibility = vis;
         }
 
         private static void SelectComboByTag(ComboBox combo, string tagValue, int fallbackIndex)
@@ -1185,9 +1289,17 @@ namespace GovPortalsApp
         private void UpdateWaybillNamesStatusBadge()
         {
             if (wbNamesStatusBorder == null || wbNamesStatusText == null || wbUseRulesCheck == null || wbRulesBox == null) return;
+            bool isPro = IsProUiMode();
             bool useRules = wbUseRulesCheck.IsChecked == true;
             int activeCount = WaybillEngine.ParseRules(wbRulesBox.Text ?? "").Count;
 
+            if (!isPro && !useRules)
+            {
+                wbNamesStatusBorder.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            wbNamesStatusBorder.Visibility = Visibility.Visible;
             if (useRules)
             {
                 wbNamesStatusText.Text = string.Format("Названия: По правилам группировки (активно {0})", activeCount);
@@ -1251,6 +1363,7 @@ namespace GovPortalsApp
                 wbDriverBox.Text = wbProfile.DriverInfo ?? "";
                 wbLoadingPointBox.Text = wbProfile.LoadingPoint ?? "";
                 wbUnloadingPointBox.Text = wbProfile.UnloadingPoint ?? "";
+                if (wbTransportCustomerBox != null) wbTransportCustomerBox.Text = wbProfile.TransportCustomer ?? "";
 
                 wbSortDescCheck.IsChecked = wbProfile.SortDescendingByName;
                 wbUseRulesCheck.IsChecked = wbProfile.UseNormalizationRules;
@@ -1292,6 +1405,7 @@ namespace GovPortalsApp
             wbProfile.DriverInfo = wbDriverBox != null ? (wbDriverBox.Text ?? "").Trim() : "";
             wbProfile.LoadingPoint = wbLoadingPointBox != null ? (wbLoadingPointBox.Text ?? "").Trim() : "";
             wbProfile.UnloadingPoint = wbUnloadingPointBox != null ? (wbUnloadingPointBox.Text ?? "").Trim() : "";
+            wbProfile.TransportCustomer = wbTransportCustomerBox != null ? (wbTransportCustomerBox.Text ?? "").Trim() : "";
 
             wbProfile.SenderUnp = (wbSenderUnpBox.Text ?? "").Trim();
             wbProfile.SenderInfo = (wbSenderInfoBox.Text ?? "").Trim();
@@ -1402,7 +1516,8 @@ namespace GovPortalsApp
                 ShowToast("⚠️ Нужен файл формата .xlsx (выгрузка поставки WB FBS/FBO)");
                 return;
             }
-            LoadSupplyFiles(valid);
+            _wbIsDemoLoaded = false;
+            LoadSupplyFiles(valid, null);
         }
 
         private void SelectSupplyFilesDialog()
@@ -1415,7 +1530,8 @@ namespace GovPortalsApp
             };
             if (dlg.ShowDialog() == true && dlg.FileNames.Length > 0)
             {
-                LoadSupplyFiles(dlg.FileNames);
+                _wbIsDemoLoaded = false;
+                LoadSupplyFiles(dlg.FileNames, null);
             }
         }
 
@@ -1426,8 +1542,8 @@ namespace GovPortalsApp
                 string demoDir = Path.Combine(Path.GetTempPath(), "Buhly_Demo");
                 string demoPath = Path.Combine(demoDir, "wb-gi-demo-9900123.xlsx");
                 WaybillEngine.GenerateDemoSupplyFile(demoPath);
-                LoadSupplyFiles(new string[] { demoPath });
-                ShowToast("⚡ Загружена демо-поставка (5 позиций) — можно редактировать таблицу и создать ТН-2");
+                _wbIsDemoLoaded = true;
+                LoadSupplyFiles(new string[] { demoPath }, "⚡ Загружена демо-поставка (5 позиций) — можно редактировать таблицу и создать ТН-2");
             }
             catch (Exception ex)
             {
@@ -1437,48 +1553,103 @@ namespace GovPortalsApp
 
         private void ClearSupplyFiles()
         {
+            _wbLoadSeq++;
+            _wbIsDemoLoaded = false;
             wbLoadedFiles.Clear();
             wbCurrentResult = null;
             wbPreviewGrid.ItemsSource = null;
             wbPreviewCard.Visibility = Visibility.Collapsed;
+            if (wbLoadingBanner != null && !_wbIsGenerating)
+                wbLoadingBanner.Visibility = Visibility.Collapsed;
             wbDropTitle.Text = "📥  Перетащите файлы wb-gi-*.xlsx или отгрузку WB FBO сюда";
             wbDropTitle.Foreground = GetBrush("#007AFF");
             wbDropSubtitle.Text = "или нажмите здесь, чтобы выбрать файлы .xlsx на компьютере";
             ResetDropZoneVisual(false);
+            UpdateExportButtonsState();
         }
 
-        private void LoadSupplyFiles(IEnumerable<string> paths)
+        private void LoadSupplyFiles(IEnumerable<string> paths, string completionToast)
         {
             wbLoadedFiles = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            RecomputePreviewIfLoaded();
+            RecomputePreviewIfLoaded(completionToast);
         }
 
         private void RecomputePreviewIfLoaded()
         {
+            RecomputePreviewIfLoaded(null);
+        }
+
+        private void RecomputePreviewIfLoaded(string completionToast)
+        {
             if (wbLoadedFiles.Count == 0) return;
-            try
-            {
-                SyncFieldsToProfile();
-                wbCurrentResult = WaybillEngine.ParseSupplyExcelFiles(wbLoadedFiles, wbProfile);
+            SyncFieldsToProfile();
 
-                ResetDropZoneVisual(true);
-                string supplies = wbCurrentResult.SupplyIds.Count > 0 ? string.Join(", ", wbCurrentResult.SupplyIds) : "из файла";
-                string fboTag = wbCurrentResult.IsFboDetected ? "  [WB FBO]" : "";
-                wbDropTitle.Text = "✓  Загружено файлов: " + wbLoadedFiles.Count + "  (" + supplies + ")" + fboTag;
-                wbDropTitle.Foreground = GetBrush("#16A34A");
-                wbDropSubtitle.Text = string.Join(", ", wbLoadedFiles.Select(f => Path.GetFileName(f)));
+            int seq = ++_wbLoadSeq;
+            var filesCopy = new List<string>(wbLoadedFiles);
+            var profileCopy = CloneWaybillProfile(wbProfile);
+            bool isDemoRun = _wbIsDemoLoaded;
 
-                wbPreviewGrid.ItemsSource = wbCurrentResult.GroupedItems;
-                RefreshPreviewVisualsOnly();
-                wbPreviewCard.Visibility = Visibility.Visible;
-            }
-            catch (Exception ex)
+            if (wbLoadingBanner != null)
             {
-                wbCurrentResult = null;
-                wbPreviewGrid.ItemsSource = null;
-                wbPreviewCard.Visibility = Visibility.Collapsed;
-                ShowToast("⚠️ " + ex.Message);
+                wbLoadingText.Text = string.Format("⏳ Чтение и группировка файлов поставки ({0} шт.)...", filesCopy.Count);
+                wbLoadingBanner.Visibility = Visibility.Visible;
             }
+            UpdateExportButtonsState();
+
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                WaybillBuildResult parsed = null;
+                Exception error = null;
+                try
+                {
+                    parsed = WaybillEngine.ParseSupplyExcelFiles(filesCopy, profileCopy);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+
+                Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (seq != _wbLoadSeq) return;
+                    if (wbLoadingBanner != null && !_wbIsGenerating)
+                        wbLoadingBanner.Visibility = Visibility.Collapsed;
+                    UpdateExportButtonsState();
+
+                    if (error != null)
+                    {
+                        wbCurrentResult = null;
+                        wbPreviewGrid.ItemsSource = null;
+                        wbPreviewCard.Visibility = Visibility.Collapsed;
+                        ShowToast("⚠️ " + error.Message);
+                        return;
+                    }
+
+                    wbCurrentResult = parsed;
+                    ResetDropZoneVisual(true);
+                    string supplies = wbCurrentResult.SupplyIds.Count > 0 ? string.Join(", ", wbCurrentResult.SupplyIds) : "из файла";
+                    string fboTag = wbCurrentResult.IsFboDetected ? "  [WB FBO]" : "";
+                    string demoPrefix = isDemoRun ? "[ДЕМО] " : "";
+                    wbDropTitle.Text = "✓  " + demoPrefix + "Загружено файлов: " + filesCopy.Count + "  (" + supplies + ")" + fboTag;
+                    wbDropTitle.Foreground = GetBrush("#16A34A");
+                    wbDropSubtitle.Text = string.Join(", ", filesCopy.Select(f => Path.GetFileName(f)));
+
+                    wbPreviewGrid.ItemsSource = wbCurrentResult.GroupedItems;
+                    RefreshPreviewVisualsOnly();
+                    wbPreviewCard.Visibility = Visibility.Visible;
+                    UpdateExportButtonsState();
+
+                    if (!string.IsNullOrEmpty(completionToast))
+                        ShowToast(completionToast);
+                }));
+            });
+        }
+
+        private void UpdateExportButtonsState()
+        {
+            bool busy = _wbIsGenerating || (wbLoadingBanner != null && wbLoadingBanner.Visibility == Visibility.Visible);
+            if (wbBtnSaveOpen != null) wbBtnSaveOpen.IsEnabled = !busy;
+            if (wbBtnPrintNow != null) wbBtnPrintNow.IsEnabled = !busy;
         }
 
         private void RecalculateExistingPreviewPreserveEdits()
@@ -1493,14 +1664,23 @@ namespace GovPortalsApp
         {
             if (wbCurrentResult == null) return;
 
+            bool isTtn1 = wbProfile != null && string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase);
+            bool isBso = wbProfile != null && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase);
+            bool isAppendix = wbProfile != null && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeAppendix, StringComparison.OrdinalIgnoreCase);
+
+            string cargoSummary = isTtn1
+                ? string.Format(CultureInfo.InvariantCulture, "  •  Мест: {0}  •  Масса: {1:0.00} кг", wbCurrentResult.TotalCargoPlaces, wbCurrentResult.TotalCargoMassKg)
+                : "";
+
             wbSummaryText.Text = string.Format(
                 CultureInfo.InvariantCulture,
-                "Строк: {0}  •  Товаров: {1} шт  •  Без НДС: {2:0.00}  •  НДС: {3:0.00}  •  Итого: {4:0.00} BYN",
+                "Строк: {0}  •  Товаров: {1} шт  •  Без НДС: {2:0.00}  •  НДС: {3:0.00}  •  Итого: {4:0.00} BYN{5}",
                 wbCurrentResult.GroupedItems.Count,
                 wbCurrentResult.TotalQty,
                 wbCurrentResult.TotalNoVat,
                 wbCurrentResult.TotalVat,
-                wbCurrentResult.TotalWithVat);
+                wbCurrentResult.TotalWithVat,
+                cargoSummary);
 
             wbPreviewGrid.Items.Refresh();
             for (int i = 0; i < wbPreviewGrid.Items.Count; i++)
@@ -1523,7 +1703,26 @@ namespace GovPortalsApp
             {
                 notes.Add(string.Format("⚠️ В {0} строках возникла копеечная разница округления НДС (жёлтый фон). Равенство «Цена б/НДС × Кол-во = Без НДС» сохранено строго.", wbCurrentResult.RoundingWarningCount));
             }
-            if (wbCurrentResult.GroupedItems.Count > 178 && !string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeAppendix, StringComparison.OrdinalIgnoreCase))
+            if (wbCurrentResult.Warnings != null && wbCurrentResult.Warnings.Count > 0)
+            {
+                foreach (var w in wbCurrentResult.Warnings)
+                {
+                    if (!string.IsNullOrWhiteSpace(w))
+                        notes.Add("⚠️ " + w.Trim());
+                }
+            }
+            var traceableHits = WaybillEngine.DetectTraceableKeywords(wbCurrentResult.GroupedItems);
+            if (traceableHits.Count > 0)
+            {
+                string sample = string.Join(", ", traceableHits.Take(3));
+                string tail = traceableHits.Count > 3 ? string.Format(" и ещё {0}", traceableHits.Count - 3) : "";
+                notes.Add(string.Format("🔔 Возможен обязательный ЭТН (Пост. № 250 / № 528): {0}{1}. Проверьте необходимость электронной накладной через EDI-провайдера.", sample, tail));
+            }
+            if (isBso && wbCurrentResult.GroupedItems.Count > 30 && wbCurrentResult.GroupedItems.Count <= 178)
+            {
+                notes.Add(string.Format("📄 В режиме БСО строк ({0}) больше 30 — проверьте, помещаются ли все позиции на ваш типографский бланк БСО (иначе используйте «Приложение к накладной»).", wbCurrentResult.GroupedItems.Count));
+            }
+            if (wbCurrentResult.GroupedItems.Count > 178 && !isAppendix)
             {
                 notes.Add(string.Format("📄 Строк ({0}) больше 178 — переключите режим печати на «Приложение к накладной (реестр А4)».", wbCurrentResult.GroupedItems.Count));
             }
@@ -1541,7 +1740,7 @@ namespace GovPortalsApp
 
         private void ApplyCatalogToCurrentPreview()
         {
-            if (wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0) return;
+            if (wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0 || _wbIsGenerating) return;
             wbPreviewGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             wbPreviewGrid.CommitEdit(DataGridEditingUnit.Row, true);
             int filled = WaybillEngine.ApplyCatalogPrices(wbCurrentResult);
@@ -1556,7 +1755,7 @@ namespace GovPortalsApp
 
         private void RememberCurrentPrices()
         {
-            if (wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0) return;
+            if (wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0 || _wbIsGenerating) return;
             wbPreviewGrid.CommitEdit(DataGridEditingUnit.Cell, true);
             wbPreviewGrid.CommitEdit(DataGridEditingUnit.Row, true);
             int saved = WaybillEngine.RememberPricesInCatalog(wbCurrentResult.GroupedItems);
@@ -1567,6 +1766,7 @@ namespace GovPortalsApp
 
         private void RunWaybillExport(bool sendToPrinter)
         {
+            if (_wbIsGenerating) return;
             if (wbLoadedFiles.Count == 0 || wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0)
             {
                 ShowToast("⚠️ Сначала перетащите или выберите файл поставки .xlsx");
@@ -1583,7 +1783,21 @@ namespace GovPortalsApp
                 WaybillEngine.RecalculateBuildResult(wbCurrentResult, wbProfile);
                 RefreshPreviewVisualsOnly();
 
-                if (string.IsNullOrWhiteSpace(wbProfile.SenderUnp) || string.IsNullOrWhiteSpace(wbProfile.SenderInfo))
+                var exportProfile = CloneWaybillProfile(wbProfile);
+                bool isDemo = _wbIsDemoLoaded || (wbLoadedFiles.Count == 1 &&
+                    string.Equals(Path.GetFileName(wbLoadedFiles[0]), "wb-gi-demo-9900123.xlsx", StringComparison.OrdinalIgnoreCase));
+
+                if (isDemo && (string.IsNullOrWhiteSpace(exportProfile.SenderUnp) || string.IsNullOrWhiteSpace(exportProfile.SenderInfo)))
+                {
+                    if (string.IsNullOrWhiteSpace(exportProfile.SenderUnp))
+                        exportProfile.SenderUnp = "190000000";
+                    if (string.IsNullOrWhiteSpace(exportProfile.SenderInfo))
+                        exportProfile.SenderInfo = "ООО «БелДемоМаркет» (ДЕМО), г. Минск, ул. Демонстрационная, 1";
+                    if (string.IsNullOrWhiteSpace(exportProfile.Signer))
+                        exportProfile.Signer = "Директор Демо И.И.";
+                }
+
+                if (string.IsNullOrWhiteSpace(exportProfile.SenderUnp) || string.IsNullOrWhiteSpace(exportProfile.SenderInfo))
                 {
                     wbSettingsBody.Visibility = Visibility.Visible;
                     wbSettingsChevron.Text = "▲ Свернуть";
@@ -1591,20 +1805,48 @@ namespace GovPortalsApp
                     return;
                 }
 
+                bool isTtn1 = string.Equals(exportProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase);
+                bool isAppendix = string.Equals(exportProfile.PrintMode, WaybillEngine.PrintModeAppendix, StringComparison.OrdinalIgnoreCase);
+                bool isBso = string.Equals(exportProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase);
+
+                var traceableHits = WaybillEngine.DetectTraceableKeywords(wbCurrentResult.GroupedItems);
+                if (traceableHits.Count > 0)
+                {
+                    int showCount = Math.Min(6, traceableHits.Count);
+                    string listText = "• " + string.Join("\n• ", traceableHits.Take(showCount));
+                    if (traceableHits.Count > showCount)
+                        listText += string.Format("\n• ... и ещё {0} поз.", traceableHits.Count - showCount);
+
+                    string warnMsg =
+                        "Обнаружены позиции, похожие на прослеживаемые или подлежащие маркировке товары (Постановления Совмина РБ № 250 / № 528):\n\n" +
+                        listText + "\n\n" +
+                        "Для таких товаров с 01.03.2026 в РБ может быть обязательна электронная накладная (ЭТН) через EDI-провайдера, а бумажные ТН-2/ТТН-1/БСО не допускаются.\n\n" +
+                        "Создать бумажный документ в Excel всё равно?";
+
+                    if (!ConfirmWaybillWarningDialog("Внимание: возможен обязательный ЭТН", warnMsg, "Всё равно создать", "Отмена"))
+                        return;
+                }
+
+                if (isBso && wbCurrentResult.GroupedItems.Count > 30)
+                {
+                    string bsoMsg = string.Format(
+                        "В накладной {0} поз., а на одном типографском бланке БСО обычно помещается до 20–30 строк.\n\n" +
+                        "Чтобы не испортить бланк БСО, рекомендуется переключить режим печати на «Приложение к накладной (реестр А4)».\n\n" +
+                        "Всё равно сформировать файл для печати на БСО?",
+                        wbCurrentResult.GroupedItems.Count);
+                    if (!ConfirmWaybillWarningDialog("Больше 30 строк для БСО", bsoMsg, "Всё равно создать", "Отмена"))
+                        return;
+                }
+
                 DateTime docDate = wbDatePicker.SelectedDate ?? DateTime.Today;
-                string folder = wbProfile.OutputFolder;
+                string folder = exportProfile.OutputFolder;
                 if (string.IsNullOrWhiteSpace(folder))
                     folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Buhly_ТН");
-                if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
                 string dateStr = docDate.ToString("dd.MM.yyyy");
                 string safeSupply = wbCurrentResult.SupplyIds.Count > 0
                     ? string.Join("_", wbCurrentResult.SupplyIds.Take(2)).Replace(":", "").Replace("/", "_").Replace("\\", "_")
                     : "";
-
-                bool isTtn1 = string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase);
-                bool isAppendix = string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeAppendix, StringComparison.OrdinalIgnoreCase);
-                bool isBso = string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase);
 
                 string basePrefix = isAppendix
                     ? ("Приложение_" + (isTtn1 ? "ТТН1_" : "ТН2_"))
@@ -1616,42 +1858,231 @@ namespace GovPortalsApp
                     outFile = Path.Combine(folder, basePrefix + dateStr + "_" + safeSupply + ".xlsx");
                 }
 
-                WaybillEngine.GenerateWaybillXlsx(wbCurrentResult, wbProfile, docDate, outFile);
-
-                if (wbProfile.CreatePickingList)
+                string pickFile = null;
+                if (exportProfile.CreatePickingList)
                 {
-                    string pickFile = Path.Combine(folder, "Лист_сборки_" + dateStr + ".xlsx");
+                    pickFile = Path.Combine(folder, "Лист_сборки_" + dateStr + ".xlsx");
                     if (File.Exists(pickFile) && !string.IsNullOrEmpty(safeSupply))
                     {
                         pickFile = Path.Combine(folder, "Лист_сборки_" + dateStr + "_" + safeSupply + ".xlsx");
                     }
-                    WaybillEngine.GeneratePickingListXlsx(wbCurrentResult, docDate, pickFile);
                 }
 
+                var resultSnapshot = CloneBuildResultForExport(wbCurrentResult);
                 string docLabel = isAppendix ? "Приложение" : (isTtn1 ? "ТТН-1" : "ТН-2");
-                if (sendToPrinter)
+
+                _wbIsGenerating = true;
+                UpdateExportButtonsState();
+                if (wbBtnSaveOpen != null && !sendToPrinter) wbBtnSaveOpen.Content = "⏳ Формирование...";
+                if (wbBtnPrintNow != null && sendToPrinter) wbBtnPrintNow.Content = "⏳ Подготовка печати...";
+                if (wbLoadingBanner != null)
                 {
+                    wbLoadingText.Text = string.Format("⏳ Формирование документа ({0})...", docLabel);
+                    wbLoadingBanner.Visibility = Visibility.Visible;
+                }
+
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    Exception error = null;
                     try
                     {
-                        WaybillEngine.PrintFileWithShell(outFile);
-                        ShowToast("🖨 Отправлено на печать (" + docLabel + "): " + Path.GetFileName(outFile));
+                        if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+                        WaybillEngine.GenerateWaybillXlsx(resultSnapshot, exportProfile, docDate, outFile);
+                        if (exportProfile.CreatePickingList && !string.IsNullOrEmpty(pickFile))
+                        {
+                            WaybillEngine.GeneratePickingListXlsx(resultSnapshot, docDate, pickFile);
+                        }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        WaybillEngine.OpenFileWithShell(outFile);
-                        ShowToast("⚠️ Прямая печать недоступна — файл открыт в Excel для печати (Ctrl+P)");
+                        error = ex;
                     }
-                }
-                else
-                {
-                    WaybillEngine.OpenFileWithShell(outFile);
-                    ShowToast("✓ " + docLabel + " создана и открыта: " + Path.GetFileName(outFile));
-                }
+
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        _wbIsGenerating = false;
+                        if (wbBtnSaveOpen != null) wbBtnSaveOpen.Content = "💾  Создать и открыть";
+                        if (wbBtnPrintNow != null) wbBtnPrintNow.Content = "🖨  Сразу на печать";
+                        if (wbLoadingBanner != null) wbLoadingBanner.Visibility = Visibility.Collapsed;
+                        UpdateExportButtonsState();
+
+                        if (error != null)
+                        {
+                            ShowToast("⚠️ Ошибка создания документа: " + error.Message);
+                            return;
+                        }
+
+                        if (sendToPrinter)
+                        {
+                            try
+                            {
+                                WaybillEngine.PrintFileWithShell(outFile);
+                                ShowToast("🖨 Отправлено на печать (" + docLabel + "): " + Path.GetFileName(outFile));
+                            }
+                            catch
+                            {
+                                WaybillEngine.OpenFileWithShell(outFile);
+                                ShowToast("⚠️ Прямая печать недоступна — файл открыт в Excel для печати (Ctrl+P)");
+                            }
+                        }
+                        else
+                        {
+                            WaybillEngine.OpenFileWithShell(outFile);
+                            ShowToast("✓ " + docLabel + " создана и открыта: " + Path.GetFileName(outFile));
+                        }
+                    }));
+                });
             }
             catch (Exception ex)
             {
+                _wbIsGenerating = false;
+                if (wbBtnSaveOpen != null) wbBtnSaveOpen.Content = "💾  Создать и открыть";
+                if (wbBtnPrintNow != null) wbBtnPrintNow.Content = "🖨  Сразу на печать";
+                if (wbLoadingBanner != null) wbLoadingBanner.Visibility = Visibility.Collapsed;
+                UpdateExportButtonsState();
                 ShowToast("⚠️ Ошибка создания документа: " + ex.Message);
             }
+        }
+
+        private bool ConfirmWaybillWarningDialog(string title, string message, string proceedText, string cancelText)
+        {
+            bool confirmed = false;
+            var dlg = new Window
+            {
+                Title = title,
+                Width = 470,
+                SizeToContent = SizeToContent.Height,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = Brushes.White
+            };
+
+            var root = new StackPanel { Margin = new Thickness(18) };
+            root.Children.Add(new TextBlock
+            {
+                Text = "⚠️  " + title,
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#92400E"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+
+            root.Children.Add(new TextBlock
+            {
+                Text = message,
+                FontSize = 12,
+                Foreground = GetBrush("#1C1C1E"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 16)
+            });
+
+            var btnRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            var btnCancel = CreateCompactActionButton(cancelText, "#F2F2F7", "#1C1C1E");
+            btnCancel.MinWidth = 100;
+            btnCancel.IsCancel = true;
+            btnCancel.Margin = new Thickness(0, 0, 8, 0);
+            btnCancel.Click += delegate { confirmed = false; dlg.Close(); };
+            btnRow.Children.Add(btnCancel);
+
+            var btnProceed = CreateCompactActionButton(proceedText, "#FEF3C7", "#92400E");
+            btnProceed.MinWidth = 150;
+            btnProceed.Click += delegate { confirmed = true; dlg.Close(); };
+            btnRow.Children.Add(btnProceed);
+
+            root.Children.Add(btnRow);
+            dlg.Content = root;
+            dlg.ShowDialog();
+            return confirmed;
+        }
+
+        private static WaybillProfile CloneWaybillProfile(WaybillProfile src)
+        {
+            if (src == null) return new WaybillProfile();
+            return new WaybillProfile
+            {
+                SenderUnp = src.SenderUnp,
+                SenderInfo = src.SenderInfo,
+                Signer = src.Signer,
+                ReceiverPreset = src.ReceiverPreset,
+                ReceiverUnp = src.ReceiverUnp,
+                ReceiverInfo = src.ReceiverInfo,
+                BasisPrefix = src.BasisPrefix,
+                UnitName = src.UnitName,
+                VatMode = src.VatMode,
+                PriceInputMode = src.PriceInputMode,
+                DocType = src.DocType,
+                PrintMode = src.PrintMode,
+                TopMarginMm = src.TopMarginMm,
+                LeftMarginMm = src.LeftMarginMm,
+                BsoSeries = src.BsoSeries,
+                BsoNumber = src.BsoNumber,
+                VehicleInfo = src.VehicleInfo,
+                DriverInfo = src.DriverInfo,
+                LoadingPoint = src.LoadingPoint,
+                UnloadingPoint = src.UnloadingPoint,
+                TransportCustomer = src.TransportCustomer,
+                UseNormalizationRules = src.UseNormalizationRules,
+                SortDescendingByName = src.SortDescendingByName,
+                RulesText = src.RulesText,
+                OutputFolder = src.OutputFolder,
+                CreatePickingList = src.CreatePickingList
+            };
+        }
+
+        private static WaybillBuildResult CloneBuildResultForExport(WaybillBuildResult src)
+        {
+            var copy = new WaybillBuildResult
+            {
+                TotalQty = src.TotalQty,
+                TotalNoVat = src.TotalNoVat,
+                TotalVat = src.TotalVat,
+                TotalWithVat = src.TotalWithVat,
+                TotalCargoPlaces = src.TotalCargoPlaces,
+                TotalCargoMassKg = src.TotalCargoMassKg,
+                IsFboDetected = src.IsFboDetected,
+                MissingPriceCount = src.MissingPriceCount,
+                RoundingWarningCount = src.RoundingWarningCount,
+                CatalogFilledCount = src.CatalogFilledCount
+            };
+            if (src.InputFiles != null) copy.InputFiles.AddRange(src.InputFiles);
+            if (src.SupplyIds != null) copy.SupplyIds.AddRange(src.SupplyIds);
+            if (src.Warnings != null) copy.Warnings.AddRange(src.Warnings);
+            if (src.SourceItems != null) copy.SourceItems.AddRange(src.SourceItems);
+            if (src.GroupedItems != null)
+            {
+                foreach (var g in src.GroupedItems)
+                {
+                    if (g == null) continue;
+                    copy.GroupedItems.Add(new GroupedWaybillItem
+                    {
+                        Name = g.Name,
+                        Unit = g.Unit,
+                        Qty = g.Qty,
+                        InputUnitPrice = g.InputUnitPrice,
+                        UnitPrice = g.UnitPrice,
+                        TotalNoVat = g.TotalNoVat,
+                        VatRateLabel = g.VatRateLabel,
+                        VatAmount = g.VatAmount,
+                        TotalWithVat = g.TotalWithVat,
+                        CargoPlaces = g.CargoPlaces,
+                        CargoMassKg = g.CargoMassKg,
+                        Article = g.Article,
+                        Note = g.Note,
+                        HasRoundingDiff = g.HasRoundingDiff,
+                        RoundingDiff = g.RoundingDiff,
+                        RoundingNote = g.RoundingNote,
+                        PriceFromCatalog = g.PriceFromCatalog
+                    });
+                }
+            }
+            return copy;
         }
 
         private TextBlock CreateFieldLabel(string text)
@@ -1679,6 +2110,35 @@ namespace GovPortalsApp
             };
         }
 
+        private void ApplyButtonTemplateWithTriggers(Button btn, double cornerRadius)
+        {
+            var template = new ControlTemplate(typeof(Button));
+            var bf = new FrameworkElementFactory(typeof(Border));
+            bf.Name = "btnBorder";
+            bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(cornerRadius));
+            bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            bf.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
+            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            bf.AppendChild(cp);
+            template.VisualTree = bf;
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.85, "btnBorder"));
+            template.Triggers.Add(hoverTrigger);
+
+            var pressTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.70, "btnBorder"));
+            template.Triggers.Add(pressTrigger);
+
+            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+            disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.45, "btnBorder"));
+            template.Triggers.Add(disabledTrigger);
+
+            btn.Template = template;
+        }
+
         private Button CreateSmallPillButton(string text, string bgHex, string fgHex)
         {
             var btn = new Button
@@ -1692,17 +2152,7 @@ namespace GovPortalsApp
                 Padding = new Thickness(10, 4, 10, 4),
                 Cursor = Cursors.Hand
             };
-            var template = new ControlTemplate(typeof(Button));
-            var bf = new FrameworkElementFactory(typeof(Border));
-            bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
-            bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
-            bf.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
-            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
-            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            bf.AppendChild(cp);
-            template.VisualTree = bf;
-            btn.Template = template;
+            ApplyButtonTemplateWithTriggers(btn, 7);
             return btn;
         }
 
@@ -1720,17 +2170,7 @@ namespace GovPortalsApp
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand
             };
-            var template = new ControlTemplate(typeof(Button));
-            var bf = new FrameworkElementFactory(typeof(Border));
-            bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(9));
-            bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
-            bf.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
-            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
-            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            bf.AppendChild(cp);
-            template.VisualTree = bf;
-            btn.Template = template;
+            ApplyButtonTemplateWithTriggers(btn, 9);
             return btn;
         }
 
@@ -1747,16 +2187,7 @@ namespace GovPortalsApp
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand
             };
-            var template = new ControlTemplate(typeof(Button));
-            var bf = new FrameworkElementFactory(typeof(Border));
-            bf.SetValue(Border.CornerRadiusProperty, new CornerRadius(10));
-            bf.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
-            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
-            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            bf.AppendChild(cp);
-            template.VisualTree = bf;
-            btn.Template = template;
+            ApplyButtonTemplateWithTriggers(btn, 10);
             return btn;
         }
     }
@@ -1798,6 +2229,27 @@ namespace GovPortalsApp
             string cleaned = s.Trim().Replace("\u00A0", "").Replace(" ", "");
             int n;
             if (int.TryParse(cleaned, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) && n > 0)
+                return n;
+            return Binding.DoNothing;
+        }
+    }
+
+    public class FlexibleNonNegIntConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int)
+                return ((int)value).ToString(CultureInfo.InvariantCulture);
+            return "0";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string s = value as string;
+            if (string.IsNullOrWhiteSpace(s)) return 0;
+            string cleaned = s.Trim().Replace("\u00A0", "").Replace(" ", "");
+            int n;
+            if (int.TryParse(cleaned, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) && n >= 0)
                 return n;
             return Binding.DoNothing;
         }

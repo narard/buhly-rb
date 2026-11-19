@@ -4,47 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Политика приватности и защиты данных (Закон РБ № 99-З) | Buhly</title>
-  <meta name="description" content="Политика конфиденциальности и обработки персональных данных сайта buhly.by и локальной программы Buhly в соответствии с Законом Республики Беларусь № 99-З.">
+  <meta name="description" content="Политика конфиденциальности и обработки персональных данных сайта buhly.by и локальной программы Buhly в соответствии со ст. 9 и ст. 17 Закона Республики Беларусь № 99-З.">
   <meta name="keywords" content="политика приватности buhly, закон 99-з персональные данные, 0 телеметрии buhly, локальная бухгалтерия беларусь">
   <link rel="canonical" href="https://buhly.by/privacy.html">
+  <link rel="icon" href="favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Политика приватности и защиты данных (Закон РБ № 99-З) | Buhly">
-  <meta property="og:description" content="Buhly Desktop работает 100% локально (0% телеметрии), а сайт buhly.by не использует tracking-cookies и профилирование пользователей.">
+  <meta property="og:description" content="Buhly Desktop работает 100% локально (0% ПДн-телеметрии), а сайт buhly.by не использует tracking-cookies, профилирование и сторонние CDN.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://buhly.by/privacy.html">
   <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Политика приватности и защиты данных (Закон РБ № 99-З) | Buhly">
-  <meta name="twitter:description" content="Buhly Desktop работает 100% локально (0% телеметрии), а сайт buhly.by не использует tracking-cookies и профилирование пользователей.">
+  <meta name="twitter:description" content="Buhly Desktop работает 100% локально (0% ПДн-телеметрии), а сайт buhly.by не использует tracking-cookies, профилирование и сторонние CDN.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
-
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    code { background: #e5e5ea; color: #1f2937; padding: 0.1rem 0.35rem; border-radius: 0.35rem; font-size: 0.875em; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
 
   <!-- Navigation -->
-  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
-    <a href="https://buhly.by/" class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <a href="https://buhly.by/" class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
         B
       </div>
-      <div>
+      <div class="min-w-0">
         <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
-        <span class="text-xs text-neutral-500 block font-medium">Помощник бизнеса РБ</span>
+        <span class="text-xs text-neutral-600 block font-medium">Помощник бизнеса РБ</span>
       </div>
     </a>
-    <div class="flex items-center space-x-3">
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
       <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
         Главная
       </a>
@@ -56,57 +47,82 @@
 
   <!-- Main Content -->
   <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
-    <div class="inline-flex items-center space-x-2 bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
-      <span>🔒 Закон РБ № 99-З • Политика «0% телеметрии»</span>
+    <div class="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+      <span>🔒 Закон РБ № 99-З (ст. 9, ст. 17) • Локальная обработка</span>
     </div>
 
-    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight">
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight break-words">
       Политика приватности и защиты данных (<span class="text-blue-600">buhly.by</span>)
     </h1>
 
     <p class="text-base md:text-lg text-neutral-600 mt-4 leading-relaxed">
-      Подробное описание принципов приватности десктопной программы <strong>Buhly</strong> и веб-сайта <code>buhly.by</code> в соответствии с Законом Республики Беларусь от 7 мая 2021 г. № 99-З «О защите персональных данных».
+      Политика в отношении обработки персональных данных при использовании веб-сайта <code>buhly.by</code> и локальной десктопной программы <strong>Buhly</strong> в соответствии со статьями 9 и 17 Закона Республики Беларусь от 7 мая 2021 г. № 99-З «О защите персональных данных».
     </p>
 
     <section class="mt-8 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
-      <h2 class="text-xl font-extrabold text-neutral-900">1. Десктопная программа Buhly (.exe) — 100% локально</h2>
+      <h2 class="text-xl font-extrabold text-neutral-900">1. Сведения об операторе / владельце проекта</h2>
       <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
-        Программа <strong>Buhly Desktop (<code>Buhly.exe</code>)</strong> работает исключительно на вашем персональном компьютере с политикой <strong>0% телеметрии</strong>. Разработчики не имеют доступа к вашим коммерческим и персональным данным.
+        Владелец сайта <code>buhly.by</code> и автор открытого некоммерческого проекта <strong>Buhly</strong> (лицензия <strong>MIT</strong>) — <strong>физическое лицо</strong> (Республика Беларусь), разработчик открытого ПО.
       </p>
-      <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
-        <li>✓ <strong>Никакой отправки учётных данных:</strong> ваши отчёты Wildberries и Ozon, банковские выписки, накладные ТН-2/ТТН-1, справочники себестоимости, профили организаций (УНП, расчётные счета) и реестр сроков ЭЦП никогда не передаются на серверы разработчика или третьим лицам.</li>
-        <li>✓ <strong>Локальное хранение:</strong> настройки и рабочие реестры сохраняются только в вашей пользовательской папке Windows (<code>%LOCALAPPDATA%\Buhly</code>).</li>
-        <li>✓ <strong>Нет доступа к закрытым ключам ЭЦП:</strong> программа не запрашивает PIN-код от USB-токена Авест и не извлекает закрытые ключи.</li>
-        <li>✓ <strong>Прямые запросы только к госсервисам РБ и проверка обновлений:</strong> рабочие запросы выполняются только по вашей инициативе и строго напрямую к официальным доменам Республики Беларусь (<code>nbrb.by</code> для курсов валют, <code>portal.nalog.gov.by</code> для проверки УНП по ГРП МНС и официальные госпорталы) со строгой проверкой TLS 1.2. Кроме того, 1 раз за календарные сутки при запуске программа может проверять наличие новой версии на <code>buhly-stats.repinm911.workers.dev/api/version</code> (или GitHub Releases): на сервере учитывается только общий обезличенный счётчик проверок за день без сохранения IP-адресов, идентификаторов ПК или каких-либо данных пользователя.</li>
+      <ul class="space-y-2 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>• <strong>Контакты для обращений по вопросам защиты персональных данных:</strong> GitHub <code>@narard</code>, Telegram <code>@max_repin</code> (или чат поддержки <code>@buhly_by_chat</code>), электронная почта: <code>support@buhly.by</code>.</li>
+        <li>• <strong>Цель политики:</strong> обеспечить прозрачность работы локальной программы и сайта без скрытого сбора данных, профилирования и навязанных подписок.</li>
       </ul>
     </section>
 
     <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
-      <h2 class="text-xl font-extrabold text-neutral-900">2. Сайт buhly.by — аналитика без cookie и профилирования</h2>
+      <h2 class="text-xl font-extrabold text-neutral-900">2. Десктопная программа Buhly (.exe) — локальное хранение и сеть</h2>
       <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
-        Сайт <code>buhly.by</code> является информационным ресурсом с открытым исходным кодом и спроектирован так, чтобы минимизировать сбор любых сведений о посетителях:
+        Программа <strong>Buhly Desktop (<code>Buhly.exe</code>)</strong> обрабатывает ваши коммерческие и учётные файлы исключительно локально на вашем персональном компьютере. Владелец проекта не собирает, не хранит и не имеет доступа к вашим отчётам, выпискам и реквизитам.
       </p>
       <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
-        <li>✓ <strong>Без cookie-файлов и скрытого трекинга:</strong> на сайте не устанавливаются рекламные или отслеживающие cookie, не используется <code>localStorage</code> для идентификаторов пользователей, не ведётся поведенческое профилирование и не подключаются системы записи экрана вроде Вебвизора.</li>
-        <li>✓ <strong>Обезличенная cookie-free статистика:</strong> для оценки востребованности инструкций и релизов может применяться только агрегированная cookie-free веб-аналитика (например, Cloudflare Web Analytics) и передача обезличенных UTM-меток в пределах текущей сессии без сохранения персональных идентификаторов.</li>
-        <li>✓ <strong>Добровольные внешние переходы:</strong> ссылки на скачивание релиза с <strong>GitHub</strong> (<code>github.com/narard/buhly-rb</code>), а также на канал и чат в <strong>Telegram</strong> (<code>t.me/buhly_by</code>, <code>t.me/buhly_by_chat</code>) являются необязательными. При переходе на эти внешние площадки действуют политики конфиденциальности соответствующих сервисов (GitHub / Telegram).</li>
+        <li>✓ <strong>Никакой отправки учётных данных:</strong> ваши отчёты Wildberries и Ozon, банковские выписки, накладные ТН-2/ТТН-1, справочники себестоимости, профили организаций (УНП, расчётные счета) и реестр сроков ЭЦП не передаются на серверы разработчика или третьим лицам.</li>
+        <li>✓ <strong>Точный перечень локальных путей хранения на ПК пользователя:</strong>
+          <ul class="pl-5 mt-1.5 space-y-1 text-sm">
+            <li>— <code>%LOCALAPPDATA%\Buhly\</code> (профили компаний <code>profiles.xml</code>, реестр ЭЦП <code>cert_registry.tsv</code>, справочник себестоимости, кеш ежедневной проверки версии <code>update_check.txt</code>);</li>
+            <li>— <code>%TEMP%\Buhly_error.log</code> (локальный журнал ошибок запуска/работы) и временные демо-файлы в <code>%TEMP%\Buhly_Demo\</code>;</li>
+            <li>— <code>Documents\Buhly_*</code> (папки <code>Документы\Buhly_ТН</code> и <code>Документы\Buhly_Аналитика</code> для сформированных накладных и таблиц КУДиР/1С);</li>
+            <li>— <code>Desktop\Buhly_Diag_*.txt</code> (обезличенный файл диагностики структуры отчёта/выписки без сумм и ФИО/УНП — создаётся только при нажатии пользователем кнопки «Диагностика файла», резервный путь <code>%TEMP%\Buhly_Diag_*.txt</code>).</li>
+          </ul>
+        </li>
+        <li>✓ <strong>Нет доступа к закрытым ключам ЭЦП:</strong> программа не запрашивает PIN-код от USB-токена Авест и не извлекает закрытые ключи.</li>
+        <li>✓ <strong>Сетевые обращения программы:</strong> по инициативе пользователя выполняются запросы к официальным сервисам РБ (<code>nbrb.by</code> — курсы валют, <code>portal.nalog.gov.by</code> — проверка УНП по ГРП МНС, проверка доступности 4 госпорталов: <code>nalog.gov.by</code>, <code>portal2.ssf.gov.by</code>, <code>vat.gov.by</code>, <code>e-pasluga.by</code>) со строгой проверкой TLS 1.2. Кроме того, <strong>1 раз в календарные сутки</strong> при запуске программа выполняет анонимную проверку новой версии на <code>buhly-stats.repinm911.workers.dev/api/version</code> (с резервным обращением к <code>api.github.com</code>) — без передачи ПДн, файлов или идентификаторов ПК (на стороне Worker увеличивается только общий обезличенный суточный счётчик без сохранения IP-адресов).</li>
+      </ul>
+    </section>
+
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900">3. Сайт buhly.by, удаление сторонних CDN и трансграничный доступ</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        Сайт <code>buhly.by</code> является открытым информационным ресурсом без регистрации, форм ввода ПДн и рекламного трекинга:
+      </p>
+      <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>✓ <strong>Полное удаление сторонних CDN:</strong> внешние CDN-библиотеки и сторонние шрифты (Tailwind CDN, Google Fonts) с сайта <strong>полностью удалены</strong>. Таблица стилей (<code>styles.css</code>) и иконка (<code>favicon.ico</code>) загружаются локально с того же домена.</li>
+        <li>✓ <strong>Без cookie-файлов и профилирования:</strong> на сайте не устанавливаются отслеживающие cookie, не используется <code>localStorage</code> для идентификации посетителей и не ведутся профили поведения.</li>
+        <li>✓ <strong>Обезличенная статистика и клики скачивания:</strong> для подсчёта посещаемости и скачиваний применяются cookie-free сервис <strong>Cloudflare Web Analytics</strong> и неблокирующий ping-запрос при клике скачивания на Cloudflare Worker (<code>buhly-stats.repinm911.workers.dev/api/download/*?ping=1</code>), а также передача UTM-меток в ссылках текущей сессии без сохранения ПДн.</li>
+        <li>✓ <strong>Трансграничная передача / доступ (ст. 9 Закона № 99-З):</strong> поскольку сайт размещён на инфраструктуре <strong>GitHub Pages</strong> (GitHub, Inc., США), дистрибутивы загружаются с <strong>GitHub Releases</strong>, а аналитика и проверка обновлений обслуживаются через сеть <strong>Cloudflare</strong> (Cloudflare, Inc., США/ЕС), при открытии сайта или скачивании релиза технические сетевые данные (HTTP-заголовки, IP-адрес на уровне транспортного соединения хостинга/CDN) обрабатываются за пределами Республики Беларусь в соответствии с политиками GitHub и Cloudflare. При добровольном переходе по ссылкам в Telegram (<code>t.me/buhly_by</code>, <code>t.me/buhly_by_chat</code>) действуют правила Telegram.</li>
+      </ul>
+    </section>
+
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900">4. Сроки хранения и права субъекта персональных данных</h2>
+      <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>• <strong>Сроки хранения:</strong> все локальные файлы программы (<code>%LOCALAPPDATA%\Buhly</code>, <code>%TEMP%\Buhly_error.log</code>, <code>Documents\Buhly_*</code>, <code>Desktop\Buhly_Diag_*.txt</code>) хранятся исключительно на устройстве пользователя и могут быть удалены им в любой момент. Агрегированные суточные счётчики Cloudflare Worker (без IP и идентификаторов устройств) имеют автоматический срок хранения <strong>90 дней</strong> (TTL KV), суммарные обезличенные счётчики и агрегированная статистика Cloudflare Web Analytics хранятся в обезличенном виде без привязки к субъектам ПДн.</li>
+        <li>• <strong>Ваши права по Закону РБ № 99-З (ст. 10–14, ст. 17):</strong> вы вправе отозвать согласие (если обработка осуществляется на его основании), получить информацию об обработке своих персональных данных, требовать их изменения, прекращения обработки или удаления, получать сведения о предоставлении ПДн третьим лицам, а также обжаловать действия/бездействие оператора в уполномоченный орган по защите прав субъектов персональных данных — <strong>Национальный центр защиты персональных данных Республики Беларусь (НЦЗПД)</strong>.</li>
+        <li>• <strong>Порядок реализации прав:</strong> направьте обращение владельцу проекта по контактам из раздела 1 (<code>support@buhly.by</code>, <code>@narard</code>, <code>@max_repin</code> или <code>@buhly_by_chat</code>). Поскольку программа работает локально и не передаёт ваши ПДн разработчику, удаление учётных данных на ПК выполняется вами самостоятельно удалением соответствующих папок.</li>
       </ul>
     </section>
 
     <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80 space-y-4">
-      <h2 class="text-xl font-extrabold text-neutral-900">3. Проверка открытого кода и обратная связь</h2>
+      <h2 class="text-xl font-extrabold text-neutral-900">5. Проверка открытого кода и обратная связь</h2>
       <p class="text-sm md:text-base text-neutral-800 leading-relaxed">
         Исходный код Buhly полностью открыт по лицензии <strong>MIT</strong> — любой специалист по информационной безопасности может проверить отсутствие скрытой телеметрии и собрать <code>Buhly.exe</code> самостоятельно штатным компилятором Windows (<code>build.bat</code>).
-      </p>
-      <p class="text-sm md:text-base text-neutral-800 leading-relaxed">
-        По вопросам приватности, защиты данных по Закону РБ № 99-З или помощи с программой обращайтесь напрямую в наш Telegram-чат поддержки: <strong>@buhly_by_chat</strong>.
       </p>
       <div class="pt-2 flex flex-wrap gap-3">
         <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
           Написать в @buhly_by_chat
         </a>
         <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
-          Скачать Buhly v3.1 (ZIP)
+          Скачать Buhly v3.1.1 (ZIP)
         </a>
         <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
           Исходный код на GitHub
@@ -119,7 +135,7 @@
   <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
     <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly v3.1</a> • Локальный помощник бизнеса РБ (MIT)
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly v3.1.1</a> • Локальный помощник бизнеса РБ (MIT)
       </div>
       <div class="flex items-center flex-wrap gap-5">
         <a href="privacy.html" class="text-white font-medium hover:underline transition">Политика приватности</a>
@@ -149,6 +165,17 @@
         try {
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
       };
 
       var links = document.querySelectorAll('a[href]');
@@ -159,6 +186,8 @@
           if (!goal) {
             if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
               goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
             } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
               goal = 'tg_chat';
             } else if (href.indexOf('t.me/buhly_by') !== -1) {
@@ -171,7 +200,7 @@
 
           if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
             var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
-            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
             if (isInternal || isGithubPage) {
               try {
                 var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';

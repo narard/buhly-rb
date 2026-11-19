@@ -25,11 +25,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Restore and save portal state cache
-        uses: actions/cache@v4
+      - name: Restore portal state cache
+        uses: actions/cache/restore@v4
         with:
           path: portal_state.json
-          key: portal-state-v1-${{ github.run_id }}
+          key: portal-state-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             portal-state-v1-
 
@@ -39,3 +39,10 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHANNEL_ID: ${{ secrets.TG_CHANNEL_ID }}
         run: python3 scripts/check_portals.py --state-file portal_state.json
+
+      - name: Save portal state cache
+        if: always() && hashFiles('portal_state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: portal_state.json
+          key: portal-state-v1-${{ github.run_id }}-${{ github.run_attempt }}

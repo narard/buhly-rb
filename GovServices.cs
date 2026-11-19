@@ -292,6 +292,10 @@ namespace GovPortalsApp
         private static string CsvEscape(string s)
         {
             string val = s ?? "";
+            if (val.Length > 0 && (val[0] == '=' || val[0] == '+' || val[0] == '-' || val[0] == '@' || val[0] == '\t' || val[0] == '\r'))
+            {
+                val = "'" + val;
+            }
             if (val.Contains(";") || val.Contains("\"") || val.Contains("\n") || val.Contains("\r"))
             {
                 val = "\"" + val.Replace("\"", "\"\"") + "\"";
@@ -529,6 +533,10 @@ namespace GovPortalsApp
                 {
                     res.ErrorMessage = "Сервер ГРП МНС временно недоступен: " + wex.Message;
                 }
+                if (wex.Response != null)
+                {
+                    try { ((IDisposable)wex.Response).Dispose(); } catch { }
+                }
                 return res;
             }
             catch (Exception ex)
@@ -554,21 +562,43 @@ namespace GovPortalsApp
             return m.Success ? m.Groups[1].Value : null;
         }
 
+        private static string HttpGetNbrb(string url)
+        {
+            Program.ConfigureSafeTls();
+            var req = (HttpWebRequest)WebRequest.Create(url);
+            req.Method = "GET";
+            req.Timeout = 4000;
+            req.ReadWriteTimeout = 4000;
+            req.UserAgent = "Buhly-Desktop";
+            try
+            {
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    return sr.ReadToEnd();
+                }
+            }
+            catch (WebException wex)
+            {
+                if (wex.Response != null)
+                {
+                    try { ((IDisposable)wex.Response).Dispose(); } catch { }
+                }
+                throw;
+            }
+        }
+
         public static void FetchAllRatesAsync(Action<NbrbRatesSnapshot> onLoaded)
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try
                 {
-                    Program.ConfigureSafeTls();
                     var snap = new NbrbRatesSnapshot();
-                    using (var wc = new WebClient())
-                    {
-                        wc.Encoding = Encoding.UTF8;
-                        snap.Usd = ExtractRate(wc.DownloadString("https://www.nbrb.by/api/exrates/rates/431"));
-                        snap.Rub100 = ExtractRate(wc.DownloadString("https://www.nbrb.by/api/exrates/rates/456"));
-                        snap.Eur = ExtractRate(wc.DownloadString("https://www.nbrb.by/api/exrates/rates/451"));
-                    }
+                    try { snap.Usd = ExtractRate(HttpGetNbrb("https://www.nbrb.by/api/exrates/rates/431")); } catch { }
+                    try { snap.Rub100 = ExtractRate(HttpGetNbrb("https://www.nbrb.by/api/exrates/rates/456")); } catch { }
+                    try { snap.Eur = ExtractRate(HttpGetNbrb("https://www.nbrb.by/api/exrates/rates/451")); } catch { }
+
                     if (!string.IsNullOrEmpty(snap.Usd) || !string.IsNullOrEmpty(snap.Rub100) || !string.IsNullOrEmpty(snap.Eur))
                     {
                         if (onLoaded != null) onLoaded(snap);
@@ -584,25 +614,20 @@ namespace GovPortalsApp
             {
                 try
                 {
-                    Program.ConfigureSafeTls();
                     string url = string.Format(
                         CultureInfo.InvariantCulture,
                         "https://www.nbrb.by/api/exrates/rates/{0}?ondate={1:yyyy-MM-dd}",
                         curId,
                         date);
-                    using (var wc = new WebClient())
+                    string json = HttpGetNbrb(url);
+                    string raw = ExtractRate(json);
+                    decimal val;
+                    if (!string.IsNullOrEmpty(raw) &&
+                        decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out val) &&
+                        val > 0m)
                     {
-                        wc.Encoding = Encoding.UTF8;
-                        string json = wc.DownloadString(url);
-                        string raw = ExtractRate(json);
-                        decimal val;
-                        if (!string.IsNullOrEmpty(raw) &&
-                            decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out val) &&
-                            val > 0m)
-                        {
-                            if (onLoaded != null) onLoaded(val, null);
-                            return;
-                        }
+                        if (onLoaded != null) onLoaded(val, null);
+                        return;
                     }
                     if (onLoaded != null) onLoaded(null, "Курс на выбранную дату не найден в ответе НБРБ.");
                 }
@@ -630,6 +655,7 @@ namespace GovPortalsApp
     public static class UpdateChecker
     {
         private const string WorkerVersionApiUrl = "https://buhly-stats.repinm911.workers.dev/api/version";
+        private const string FallbackVersionApiUrl = "https://buhly.by/version.json";
         private const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
 
         public static string GetCacheFilePath()
@@ -689,7 +715,8 @@ namespace GovPortalsApp
         public static bool IsValidReleaseUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
-            return url.StartsWith("https://github.com/narard/buhly-rb/", StringComparison.OrdinalIgnoreCase);
+            return url.StartsWith("https://github.com/narard/buhly-rb/", StringComparison.OrdinalIgnoreCase) ||
+                   url.StartsWith("https://buhly.by/", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsSameMinskCalendarDay(DateTime lastUtc, DateTime nowUtc)
@@ -707,10 +734,21 @@ namespace GovPortalsApp
             req.UserAgent = "Buhly-Desktop";
             req.Accept = "application/vnd.github+json";
 
-            using (var resp = (HttpWebResponse)req.GetResponse())
-            using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+            try
             {
-                return sr.ReadToEnd();
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                {
+                    return sr.ReadToEnd();
+                }
+            }
+            catch (WebException wex)
+            {
+                if (wex.Response != null)
+                {
+                    try { ((IDisposable)wex.Response).Dispose(); } catch { }
+                }
+                throw;
             }
         }
 
@@ -772,21 +810,26 @@ namespace GovPortalsApp
                     string tagName = "";
                     string htmlUrl = "";
 
-                    try
+                    string[] candidateUrls = new string[] { WorkerVersionApiUrl, FallbackVersionApiUrl, LatestReleaseApiUrl };
+                    int[] timeouts = new int[] { 4000, 4000, 5000 };
+                    for (int u = 0; u < candidateUrls.Length; u++)
                     {
-                        string workerJson = HttpGetJson(WorkerVersionApiUrl, 4000);
-                        tagName = ExtractJsonField(workerJson, "tag_name");
-                        htmlUrl = ExtractJsonField(workerJson, "html_url");
+                        try
+                        {
+                            string json = HttpGetJson(candidateUrls[u], timeouts[u]);
+                            string t = ExtractJsonField(json, "tag_name");
+                            string h = ExtractJsonField(json, "html_url");
+                            if (!string.IsNullOrEmpty(t) && IsValidReleaseUrl(h))
+                            {
+                                tagName = t;
+                                htmlUrl = h;
+                                break;
+                            }
+                        }
+                        catch { }
                     }
-                    catch { }
 
-                    if (string.IsNullOrEmpty(tagName) || !IsValidReleaseUrl(htmlUrl))
-                    {
-                        string ghJson = HttpGetJson(LatestReleaseApiUrl, 5000);
-                        tagName = ExtractJsonField(ghJson, "tag_name");
-                        htmlUrl = ExtractJsonField(ghJson, "html_url");
-                    }
-
+                    // Always update timestamp in update_check.txt (even when offline) so we don't retry every startup
                     SaveCache(cachePath, tagName, htmlUrl);
 
                     if (IsRemoteNewer(tagName, currentVer) && IsValidReleaseUrl(htmlUrl))
@@ -796,12 +839,10 @@ namespace GovPortalsApp
                 }
                 catch
                 {
-                    // Offline or GitHub API unreachable: cache timestamp silently so we don't retry excessively
+                    // Offline or endpoints unreachable: always refresh timestamp so we don't retry on every startup
                     try
                     {
-                        string cachePath = GetCacheFilePath();
-                        if (!File.Exists(cachePath))
-                            SaveCache(cachePath, "", "");
+                        SaveCache(GetCacheFilePath(), "", "");
                     }
                     catch { }
                 }

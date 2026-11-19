@@ -7,6 +7,7 @@
   <meta name="description" content="Почему не заходит на корпоративный портал ФСЗН 2.0 (portal2.ssf.gov.by): ошибка 8084, зависший NTClientSoftware, AvTunProxy и проверка USB-ключа ЭЦП Авест.">
   <meta name="keywords" content="portal2.ssf.gov.by не работает, фсзн 2.0 не открывается, ошибка 8084 фсзн, ntclientsoftware 8084, avtunproxy фсзн, вход на портал фсзн эцп">
   <link rel="canonical" href="https://buhly.by/fszn-8084.html">
+  <link rel="icon" href="favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Не работает портал ФСЗН 2.0 (portal2.ssf.gov.by) — ошибка порта 8084 и AvTunProxy | Buhly">
@@ -19,17 +20,7 @@
   <meta name="twitter:title" content="Не работает портал ФСЗН 2.0 (portal2.ssf.gov.by) — ошибка порта 8084 и AvTunProxy | Buhly">
   <meta name="twitter:description" content="Почему не заходит на корпоративный портал ФСЗН 2.0 (portal2.ssf.gov.by): ошибка 8084, зависший NTClientSoftware, AvTunProxy и проверка USB-ключа ЭЦП Авест.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
-
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    code { background: #e5e5ea; color: #1f2937; padding: 0.1rem 0.35rem; border-radius: 0.35rem; font-size: 0.875em; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 
   <script type="application/ld+json">
 {
@@ -67,17 +58,17 @@
 <body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
 
   <!-- Navigation -->
-  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between">
-    <a href="https://buhly.by/" class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <a href="https://buhly.by/" class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
         B
       </div>
-      <div>
+      <div class="min-w-0">
         <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
-        <span class="text-xs text-neutral-500 block font-medium">ГосПорталы Беларуси</span>
+        <span class="text-xs text-neutral-600 block font-medium">ГосПорталы Беларуси</span>
       </div>
     </a>
-    <div class="flex items-center space-x-3">
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
       <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
         Главная
       </a>
@@ -89,11 +80,11 @@
 
   <!-- Article Main -->
   <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
-    <div class="inline-flex items-center space-x-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
       <span>Инструкция ФСЗН 2.0 • portal2.ssf.gov.by</span>
     </div>
 
-    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight">
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight break-words">
       Не открывается ФСЗН 2.0 (<span class="text-blue-600">portal2.ssf.gov.by</span>): ошибка порта 8084 и AvTunProxy
     </h1>
 
@@ -105,7 +96,7 @@
     <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
         <div class="font-bold text-neutral-900 text-base">Исправить автоматически через Buhly v3.1</div>
-        <div class="text-xs text-neutral-500 mt-1">Бесплатно, ~602 КБ (ZIP 229 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
+        <div class="text-xs text-neutral-600 mt-1">Бесплатно, ~725 КБ (ZIP ~266 КБ), без установки. Работает с вашими родными Edge и Chrome.</div>
       </div>
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
         Скачать Buhly v3.1 (ZIP)
@@ -135,7 +126,7 @@
       <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Автодиагностика и вход на ФСЗН 2.0 в Buhly v3.1</h2>
       <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
         <li>✓ В реальном времени проверяет доступность сервера <code>portal2.ssf.gov.by</code>, локального порта <code>8084</code> и PAC-туннеля <code>10224</code>.</li>
-        <li>✓ При сбое в 1 клик освобождает зависший порт <code>8084</code>, снимает аппаратную блокировку с USB-токена и при необходимости очищает файл <code>hosts</code>.</li>
+        <li>✓ При сбое в 1 клик перезапускает службу <code>NTClientSoftware</code> (порт <code>8084</code>), предупредит о конфликтующем процессе <code>EDeclaration</code> / <code>MngCert</code>, не завершая его принудительно, и при необходимости очищает файл <code>hosts</code> (с <code>.bak</code>-копией).</li>
         <li>✓ Если компьютер «голый» и не хватает ГосСУОК или <code>AvTunProxy</code>, мастер настройки помогает скачать официальные установщики.</li>
       </ul>
       <div class="mt-6 flex flex-wrap gap-3">
@@ -169,7 +160,7 @@
 
     <!-- Other Guides -->
     <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
-      <h3 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h3>
+      <h2 class="font-bold text-base text-neutral-900 mb-3">Другие инструкции для порталов РБ</h2>
       <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
         <a href="vat-err-ssl.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🧾 Ошибка ERR_SSL_PROTOCOL_ERROR на ЭСЧФ (vat.gov.by) →</a>
         <a href="mns-nalog-avest.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏛️ Не заходит в МНС (nalog.gov.by / account.gov.by) с ЭЦП →</a>
@@ -213,6 +204,17 @@
         try {
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
       };
 
       var links = document.querySelectorAll('a[href]');
@@ -223,6 +225,8 @@
           if (!goal) {
             if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
               goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
             } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
               goal = 'tg_chat';
             } else if (href.indexOf('t.me/buhly_by') !== -1) {
@@ -235,7 +239,7 @@
 
           if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
             var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
-            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
             if (isInternal || isGithubPage) {
               try {
                 var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';

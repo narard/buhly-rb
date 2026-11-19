@@ -88,6 +88,20 @@ async function readInt(kv, key) {
   }
 }
 
+function timingSafeEqual(a, b) {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(String(a || ""));
+  const bufB = enc.encode(String(b || ""));
+  const len = Math.max(bufA.length, bufB.length);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < len; i++) {
+    const byteA = i < bufA.length ? bufA[i] : 0;
+    const byteB = i < bufB.length ? bufB[i] : 0;
+    diff |= byteA ^ byteB;
+  }
+  return diff === 0 && bufA.length > 0;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") {
@@ -98,11 +112,12 @@ export default {
     const path = url.pathname.replace(/\/+$/, "") || "/";
     const kv = env && env.STATS_KV ? env.STATS_KV : null;
     const today = getMinskDateKey(0);
+    const isGet = request.method === "GET";
 
     // 1. Daily version check + anonymous launch counter (0% PII, no IP/device stored)
     if (path === "/api/version" || path === "/version" || path === "/") {
       const ninetyDays = 90 * 86400;
-      if (kv && ctx && typeof ctx.waitUntil === "function") {
+      if (isGet && kv && ctx && typeof ctx.waitUntil === "function") {
         ctx.waitUntil(
           Promise.all([
             incrementCounter(kv, "opens:" + today, ninetyDays),
@@ -119,16 +134,19 @@ export default {
       });
     }
 
-    // 2. Optional counted download redirects
+    // 2. Counted download tracking (?ping=1 returns 204 No Content with CORS) or 302 redirect
     if (path === "/api/download/zip" || path === "/api/download/exe") {
       const ninetyDays = 90 * 86400;
-      if (kv && ctx && typeof ctx.waitUntil === "function") {
+      if (isGet && kv && ctx && typeof ctx.waitUntil === "function") {
         ctx.waitUntil(
           Promise.all([
             incrementCounter(kv, "dl:" + today, ninetyDays),
             incrementCounter(kv, "dl:total", null)
           ])
         );
+      }
+      if (url.searchParams.get("ping") === "1") {
+        return new Response(null, { status: 204, headers: corsHeaders() });
       }
       const file = path.endsWith("/exe") ? "Buhly.exe" : "Buhly.zip";
       return Response.redirect(
@@ -140,9 +158,8 @@ export default {
     // 3. Aggregated statistics for local Buhly_Dashboard.html
     if (path === "/api/stats" || path === "/stats") {
       if (env && env.STATS_TOKEN) {
-        const provided =
-          request.headers.get("X-Stats-Token") || url.searchParams.get("token") || "";
-        if (provided !== env.STATS_TOKEN) {
+        const provided = request.headers.get("X-Stats-Token") || "";
+        if (!timingSafeEqual(provided, env.STATS_TOKEN)) {
           return jsonResponse({ ok: false, error: "Unauthorized" }, 401);
         }
       }
