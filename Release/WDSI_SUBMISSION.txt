@@ -9,8 +9,8 @@
    Software developer
 
 3. Прикрепите файл:
-   GitHub\Buhly\Buhly.exe  (размер: 742 400 байт / ~725 КБ; архив Buhly.zip: ~266 КБ)
-   SHA-256: 3492CE31334AE18B2E2DC30DD80EF787D53BB97905BBBB7E71F90B6918D44BB0
+   GitHub\Buhly\Buhly.exe  (размер: 742 400 байт / ~725 КБ; архив Buhly.zip: ~268 КБ)
+   SHA-256: D657E1703B80B5E8ACC5B366167A6E7CF3343045B400FCC6CBC975FA50A585BA
    Версия:  3.1.1.0
 
 4. Выберите тип обращения:
@@ -25,7 +25,7 @@ Official Website: https://buhly.by
 Public Source Repository: https://github.com/narard/buhly-rb
 Build Script: https://github.com/narard/buhly-rb/blob/main/build.bat
 GitHub Actions CI/CD: https://github.com/narard/buhly-rb/blob/main/.github/workflows/release.yml
-File SHA-256 (Buhly.exe): 3492CE31334AE18B2E2DC30DD80EF787D53BB97905BBBB7E71F90B6918D44BB0
+File SHA-256 (Buhly.exe): D657E1703B80B5E8ACC5B366167A6E7CF3343045B400FCC6CBC975FA50A585BA
 
 Description:
 Buhly is a free, open-source (MIT) Windows WPF utility (.NET Framework 4.8, compiled reproducibly from public C# source files using standard csc.exe with zero third-party binaries) designed for small businesses and accountants in the Republic of Belarus.
