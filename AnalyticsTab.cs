@@ -59,17 +59,22 @@ namespace GovPortalsApp
         private DataGrid anSkuGrid;
         private ICollectionView anSkuView;
 
-        // Import VAT 20% calculator controls
+        // Import VAT 20%/10% multi-currency calculator controls
         private bool _anImpExpanded = false;
         private Button anImpAccordionBtn;
         private StackPanel anImpCalcBody;
+        private ComboBox anImpCurrencyCombo;
+        private ComboBox anImpVatRateCombo;
         private DatePicker anImpDatePicker;
+        private TextBlock anImpAmountLabel;
         private TextBox anImpRubBox;
+        private TextBlock anImpRateLabel;
         private TextBox anImpRateBox;
         private TextBlock anImpRateStatus;
         private TextBlock anImpBaseText;
         private TextBlock anImpVatText;
         private TextBlock anImpDueText;
+        private TextBlock anImpAccountingHint;
 
         private void BuildAnalyticsTab(StackPanel container)
         {
@@ -518,7 +523,7 @@ namespace GovPortalsApp
 
             anImpAccordionBtn = new Button
             {
-                Content = "🛃 Калькулятор ввозного НДС 20% (закупки РФ / ЕАЭС) ▼ Открыть",
+                Content = "🛃 Калькулятор ввозного НДС 20% / 10% (импорт РФ / ЕАЭС: RUB / USD / EUR) ▼ Открыть",
                 FontSize = 13.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E"),
@@ -543,8 +548,8 @@ namespace GovPortalsApp
                 if (anImpCalcBody != null)
                     anImpCalcBody.Visibility = _anImpExpanded ? Visibility.Visible : Visibility.Collapsed;
                 anImpAccordionBtn.Content = _anImpExpanded
-                    ? "🛃 Калькулятор ввозного НДС 20% (закупки РФ / ЕАЭС) ▲ Свернуть"
-                    : "🛃 Калькулятор ввозного НДС 20% (закупки РФ / ЕАЭС) ▼ Открыть";
+                    ? "🛃 Калькулятор ввозного НДС 20% / 10% (импорт РФ / ЕАЭС: RUB / USD / EUR) ▲ Свернуть"
+                    : "🛃 Калькулятор ввозного НДС 20% / 10% (импорт РФ / ЕАЭС: RUB / USD / EUR) ▼ Открыть";
             };
             stack.Children.Add(anImpAccordionBtn);
 
@@ -555,12 +560,47 @@ namespace GovPortalsApp
             };
             anImpCalcBody.Children.Add(new TextBlock
             {
-                Text = "При импорте товара из РФ / ЕАЭС подача заявления о ввозе и уплата ввозного НДС 20% по курсу НБРБ на дату принятия товара к учёту обязательны до 20-го числа следующего месяца даже для УСН без НДС и ИП.",
+                Text = "При импорте товара из РФ / ЕАЭС подача заявления о ввозе и уплата ввозного НДС (20% или 10%) по курсу НБРБ на дату принятия товара к учёту обязательны до 20-го числа следующего месяца даже для УСН без НДС и ИП.",
                 FontSize = 11.5,
                 Foreground = GetBrush("#636366"),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10)
             });
+
+            // Currency & VAT rate selectors row
+            var selGrid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+            selGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            selGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
+            selGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var curCol = new StackPanel();
+            curCol.Children.Add(CreateFieldLabel("Валюта накладной / контракта (НБРБ)"));
+            anImpCurrencyCombo = new ComboBox { FontSize = 12, Margin = new Thickness(0, 3, 0, 0) };
+            anImpCurrencyCombo.Items.Add("RUB (100 RUB • 456)");
+            anImpCurrencyCombo.Items.Add("USD (1 USD • 431)");
+            anImpCurrencyCombo.Items.Add("EUR (1 EUR • 451)");
+            anImpCurrencyCombo.SelectedIndex = 0;
+            anImpCurrencyCombo.SelectionChanged += delegate
+            {
+                UpdateImportVatCurrencyLabels();
+                FetchImportVatRubRate();
+            };
+            curCol.Children.Add(anImpCurrencyCombo);
+            Grid.SetColumn(curCol, 0);
+            selGrid.Children.Add(curCol);
+
+            var vatCol = new StackPanel();
+            vatCol.Children.Add(CreateFieldLabel("Ставка ввозного НДС"));
+            anImpVatRateCombo = new ComboBox { FontSize = 12, Margin = new Thickness(0, 3, 0, 0) };
+            anImpVatRateCombo.Items.Add("20% (стандарт)");
+            anImpVatRateCombo.Items.Add("10% (детские / продтовары)");
+            anImpVatRateCombo.SelectedIndex = 0;
+            anImpVatRateCombo.SelectionChanged += delegate { RecalculateImportVat(); };
+            vatCol.Children.Add(anImpVatRateCombo);
+            Grid.SetColumn(vatCol, 2);
+            selGrid.Children.Add(vatCol);
+
+            anImpCalcBody.Children.Add(selGrid);
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(145) });
@@ -585,8 +625,9 @@ namespace GovPortalsApp
             grid.Children.Add(dateCol);
 
             var rubCol = new StackPanel();
-            rubCol.Children.Add(CreateFieldLabel("Сумма по накладной / УПД, RUB"));
-            anImpRubBox = CreateStyledInput("100000", "Сумма закупки в российских рублях");
+            anImpAmountLabel = CreateFieldLabel("Сумма по накладной / УПД, RUB");
+            rubCol.Children.Add(anImpAmountLabel);
+            anImpRubBox = CreateStyledInput("100000", "Сумма закупки в валюте контракта / УПД");
             anImpRubBox.Margin = new Thickness(0, 3, 0, 0);
             anImpRubBox.TextChanged += delegate { RecalculateImportVat(); };
             rubCol.Children.Add(anImpRubBox);
@@ -594,8 +635,9 @@ namespace GovPortalsApp
             grid.Children.Add(rubCol);
 
             var rateCol = new StackPanel();
-            rateCol.Children.Add(CreateFieldLabel("Курс 100 RUB (НБРБ)"));
-            anImpRateBox = CreateStyledInput("", "Официальный курс НБРБ за 100 российских рублей");
+            anImpRateLabel = CreateFieldLabel("Курс 100 RUB (НБРБ)");
+            rateCol.Children.Add(anImpRateLabel);
+            anImpRateBox = CreateStyledInput("", "Официальный курс НБРБ на дату прихода товара");
             anImpRateBox.Margin = new Thickness(0, 3, 0, 0);
             anImpRateBox.TextChanged += delegate { RecalculateImportVat(); };
             rateCol.Children.Add(anImpRateBox);
@@ -667,13 +709,32 @@ namespace GovPortalsApp
             resBox.Child = resGrid;
             anImpCalcBody.Children.Add(resBox);
 
+            anImpAccountingHint = new TextBlock
+            {
+                Text = "💡 Учёт ввозного НДС: при УСН / ИП включается в стоимость товара; при ОСН — принимается к вычету после уплаты в бюджет и выставления ЭСЧФ.",
+                FontSize = 11,
+                Foreground = GetBrush("#075985"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            anImpCalcBody.Children.Add(anImpAccountingHint);
+
+            anImpCalcBody.Children.Add(new TextBlock
+            {
+                Text = "⚠️ При работе по договору с РФ-площадкой (напр. ООО «Интернет Решения» / Ozon РФ) дополнительно возникает НДС 20% налогового агента с услуг нерезидента (даже для УСН без НДС и ИП).",
+                FontSize = 11,
+                Foreground = GetBrush("#7C2D12"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 5, 0, 0)
+            });
+
             anImpCalcBody.Children.Add(new TextBlock
             {
                 Text = "📌 При импорте из РФ / ЕАЭС от 3 000 EUR по контракту/месяцу дополнительно подаётся статистическая декларация (статдекларация) — в течение 7 рабочих дней с даты поступления товара.",
                 FontSize = 11,
                 Foreground = GetBrush("#B45309"),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 8, 0, 0)
+                Margin = new Thickness(0, 5, 0, 0)
             });
 
             stack.Children.Add(anImpCalcBody);
@@ -685,33 +746,82 @@ namespace GovPortalsApp
             return card;
         }
 
+        private void GetSelectedImportVatCurrency(out int curId, out int curScale, out string curCode)
+        {
+            int idx = anImpCurrencyCombo != null ? anImpCurrencyCombo.SelectedIndex : 0;
+            if (idx == 1)
+            {
+                curId = NbrbRatesHelper.CurIdUsd;
+                curScale = 1;
+                curCode = "USD";
+            }
+            else if (idx == 2)
+            {
+                curId = NbrbRatesHelper.CurIdEur;
+                curScale = 1;
+                curCode = "EUR";
+            }
+            else
+            {
+                curId = NbrbRatesHelper.CurIdRub100;
+                curScale = 100;
+                curCode = "RUB";
+            }
+        }
+
+        private decimal GetSelectedImportVatRatePercent()
+        {
+            return (anImpVatRateCombo != null && anImpVatRateCombo.SelectedIndex == 1) ? 10m : 20m;
+        }
+
+        private void UpdateImportVatCurrencyLabels()
+        {
+            int curId, curScale;
+            string curCode;
+            GetSelectedImportVatCurrency(out curId, out curScale, out curCode);
+            if (anImpAmountLabel != null)
+                anImpAmountLabel.Text = "Сумма по накладной / УПД, " + curCode;
+            if (anImpRateLabel != null)
+                anImpRateLabel.Text = string.Format(CultureInfo.InvariantCulture, "Курс {0} {1} (НБРБ)", curScale, curCode);
+        }
+
         private void FetchImportVatRubRate()
         {
             if (anImpDatePicker == null || anImpRateStatus == null) return;
             DateTime dt = anImpDatePicker.SelectedDate ?? DateTime.Today;
+            int curId, curScale;
+            string curCode;
+            GetSelectedImportVatCurrency(out curId, out curScale, out curCode);
+
             int seq = ++_importVatSeq;
-            anImpRateStatus.Text = string.Format("Запрос курса 100 RUB НБРБ на {0:dd.MM.yyyy}...", dt);
+            anImpRateStatus.Text = string.Format(CultureInfo.InvariantCulture, "Запрос курса {0} {1} НБРБ на {2:dd.MM.yyyy}...", curScale, curCode, dt);
             anImpRateStatus.Foreground = GetBrush("#8E8E93");
 
-            NbrbRatesHelper.FetchRateOnDateAsync(456, dt, delegate(decimal? rate, string err)
+            NbrbRatesHelper.FetchRateOnDateAsync(curId, dt, delegate(NbrbRateOnDateResult res)
             {
                 Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (seq != _importVatSeq) return;
-                    if (rate.HasValue && rate.Value > 0m)
+                    if (res != null && res.Success && res.Rate > 0m)
                     {
-                        anImpRateBox.Text = rate.Value.ToString("0.0000", CultureInfo.InvariantCulture);
+                        anImpRateBox.Text = res.Rate.ToString("0.0000", CultureInfo.InvariantCulture);
                         anImpRateStatus.Text = string.Format(
                             CultureInfo.InvariantCulture,
-                            "✓ Курс НБРБ (ID 456) на {0:dd.MM.yyyy}: 100 RUB = {1:0.0000} BYN",
+                            "✓ Курс НБРБ (ID {0}) на {1:dd.MM.yyyy}: {2} {3} = {4:0.0000} BYN",
+                            res.CurId,
                             dt,
-                            rate.Value);
+                            res.CurScale,
+                            string.IsNullOrEmpty(res.CurAbbreviation) ? curCode : res.CurAbbreviation,
+                            res.Rate);
                         anImpRateStatus.Foreground = GetBrush("#16A34A");
                         RecalculateImportVat();
                     }
                     else
                     {
-                        anImpRateStatus.Text = "⚠️ " + (err ?? "Не удалось получить курс НБРБ — можно ввести вручную");
+                        string errMsg = (res != null && !string.IsNullOrEmpty(res.ErrorMessage))
+                            ? res.ErrorMessage
+                            : "Не удалось получить курс НБРБ — можно ввести вручную";
+                        anImpRateStatus.Text = "⚠️ " + errMsg;
                         anImpRateStatus.Foreground = GetBrush("#D97706");
                         RecalculateImportVat();
                     }
@@ -728,22 +838,36 @@ namespace GovPortalsApp
             DateTime nextM = new DateTime(dt.Year, dt.Month, 1).AddMonths(1);
             DateTime due = new DateTime(nextM.Year, nextM.Month, 20);
 
-            decimal rubAmt = 0m, rate100 = 0m;
-            bool okRub = TryParseFlexibleDecimal(anImpRubBox.Text, out rubAmt) && rubAmt >= 0m;
-            bool okRate = TryParseFlexibleDecimal(anImpRateBox.Text, out rate100) && rate100 > 0m;
+            int curId, curScale;
+            string curCode;
+            GetSelectedImportVatCurrency(out curId, out curScale, out curCode);
+            decimal vatRate = GetSelectedImportVatRatePercent();
 
-            if (okRub && okRate)
+            decimal foreignAmt = 0m, rateVal = 0m;
+            bool okAmt = TryParseFlexibleDecimal(anImpRubBox.Text, out foreignAmt) && foreignAmt >= 0m;
+            bool okRate = TryParseFlexibleDecimal(anImpRateBox.Text, out rateVal) && rateVal > 0m;
+
+            if (okAmt && okRate)
             {
-                decimal baseByn = Math.Round(rubAmt * rate100 / 100m, 2, MidpointRounding.AwayFromZero);
-                decimal vatByn = Math.Round(baseByn * 0.20m, 2, MidpointRounding.AwayFromZero);
-                anImpBaseText.Text = "Налоговая база: " + FmtByn(baseByn) + " BYN";
-                anImpVatText.Text = "НДС 20%: " + FmtByn(vatByn) + " BYN";
+                var calc = new NbrbRateOnDateResult
+                {
+                    Success = true,
+                    CurId = curId,
+                    CurAbbreviation = curCode,
+                    CurScale = curScale,
+                    Date = dt,
+                    Rate = rateVal
+                };
+                decimal baseByn = calc.ConvertToByn(foreignAmt);
+                decimal vatByn = calc.CalculateImportVat(foreignAmt, vatRate);
+                anImpBaseText.Text = string.Format("Налоговая база ({0} {1}): {2} BYN", FmtByn(foreignAmt), curCode, FmtByn(baseByn));
+                anImpVatText.Text = string.Format(CultureInfo.InvariantCulture, "НДС {0:0}%: {1} BYN", vatRate, FmtByn(vatByn));
                 anImpDueText.Text = string.Format("Срок заявления о ввозе (ЕАЭС) и уплаты: до {0:dd.MM.yyyy}", due);
             }
             else
             {
-                anImpBaseText.Text = "Налоговая база: введите сумму в RUB и курс 100 RUB";
-                anImpVatText.Text = "НДС 20%: —";
+                anImpBaseText.Text = string.Format(CultureInfo.InvariantCulture, "Налоговая база: введите сумму в {0} и курс {1} {0}", curCode, curScale);
+                anImpVatText.Text = string.Format(CultureInfo.InvariantCulture, "НДС {0:0}%: —", vatRate);
                 anImpDueText.Text = string.Format("Срок заявления о ввозе (ЕАЭС) и уплаты: до {0:dd.MM.yyyy}", due);
             }
         }
@@ -928,10 +1052,13 @@ namespace GovPortalsApp
             }
             else
             {
+                bool isRealMethod = prof != null && string.Equals(prof.UsnMethod, CompanyProfilesManager.UsnMethodRealization, StringComparison.OrdinalIgnoreCase);
                 anRegimeBanner.Background = GetBrush("#F0F9FF");
                 anRegimeBanner.BorderBrush = GetBrush("#BAE6FD");
                 anRegimeBannerText.Foreground = GetBrush("#075985");
-                anRegimeBannerText.Text = "📘 Активный режим: ООО • УСН 6% (без НДС). Налоговая база = реализация на маркетплейсах (Пр) + облагаемые прочие поступления на р/с.";
+                anRegimeBannerText.Text = isRealMethod
+                    ? "📘 Активный режим: ООО • УСН 6% (без НДС) • По реализации отчётов МП (переключить на кассовый метод по ст. 328 НК РБ можно в «Профилях компаний»)."
+                    : "📘 Активный режим: ООО • УСН 6% (без НДС) • Кассовый метод (ст. 328 НК РБ: зачисления на р/с + взаимозачёт удержаний МП; без выписки — авторасчёт по реализации).";
             }
         }
 
@@ -1153,6 +1280,9 @@ namespace GovPortalsApp
             string regime = prof != null ? prof.TaxRegime : CompanyProfilesManager.RegimeUsn6;
             decimal taxRate = ParseTaxRate();
             decimal ipNorm = prof != null ? prof.IpExpenseNormPercent : 30m;
+            string usnMethod = (prof != null && !string.IsNullOrWhiteSpace(prof.UsnMethod))
+                ? prof.UsnMethod
+                : CompanyProfilesManager.UsnMethodCashBasis;
             var costsToUse = anDemoSkuCostsOverride != null
                 ? new Dictionary<string, decimal>(anDemoSkuCostsOverride, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, decimal>(anSkuCosts, StringComparer.OrdinalIgnoreCase);
@@ -1165,7 +1295,7 @@ namespace GovPortalsApp
                 Exception error = null;
                 try
                 {
-                    resultSnap = AnalyticsEngine.AnalyzeFiles(filesCopy, regime, taxRate, costsToUse, ipNorm);
+                    resultSnap = AnalyticsEngine.AnalyzeFiles(filesCopy, regime, taxRate, costsToUse, ipNorm, usnMethod);
                 }
                 catch (Exception ex)
                 {
@@ -1355,7 +1485,9 @@ namespace GovPortalsApp
             if (s.Reports.Count > 0)
             {
                 string revLabel = s.TaxRegime == CompanyProfilesManager.RegimeUsn6
-                    ? "Реализация МП (база УСН)"
+                    ? (s.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis
+                        ? "Реализация МП (справочно; УСН по кассовому методу)"
+                        : "Реализация МП (база УСН)")
                     : "Выручка реализации на маркетплейсах (Пр)";
                 string compNote = s.TotalCompensations != 0m
                     ? string.Format("  |  Компенс./корр.: {0} BYN", FmtByn(s.TotalCompensations))
@@ -1515,13 +1647,54 @@ namespace GovPortalsApp
                     FmtByn(s.OsnProfitTax20), "#DC2626",
                     string.Format("База прибыли: {0} BYN (выручка без НДС минус комиссии МП, закупка и р/с)", FmtByn(s.OsnProfitTaxBase)));
             }
+            else if (s.TaxRegime == CompanyProfilesManager.RegimeUsn6)
+            {
+                decimal baseDelta = s.UsnCashBasisIncome - s.UsnRealizationBase;
+                decimal taxDelta = s.UsnCashBasisTax - s.UsnRealizationTax;
+                string signBase = baseDelta > 0m ? "+" : "";
+                string signTax = taxDelta > 0m ? "+" : "";
+
+                if (s.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis)
+                {
+                    AddKpiPairRow(anKpiContent,
+                        string.Format(CultureInfo.InvariantCulture, "Налог УСН ({0:0.##}%) — кассовый метод (ст. 328 НК РБ)", s.EffectiveTaxRateApplied),
+                        FmtByn(s.UsnCashBasisTax), "#DC2626",
+                        string.Format("Кассовая база: {0} BYN = р/с от МП ({1}) + взаимозачёт МП ({2}) + облаг. р/с ({3})",
+                            FmtByn(s.UsnCashBasisIncome), FmtByn(s.UsnCashMpBankCredits), FmtByn(s.UsnCashMpOffset), FmtByn(s.BankOtherCredits)));
+
+                    AddKpiPairRow(anKpiContent,
+                        "Сравнение: Кассовый метод (ст. 328 НК РБ: р/с + взаимозачёт) vs По реализации отчётов МП",
+                        FmtByn(s.UsnRealizationTax), "#636366",
+                        string.Format("По реализации отчётов МП: база {0} BYN → налог {1} BYN  |  Дельта переходящих выплат: база {2}{3} BYN (налог {4}{5} BYN)",
+                            FmtByn(s.UsnRealizationBase), FmtByn(s.UsnRealizationTax), signBase, FmtByn(baseDelta), signTax, FmtByn(taxDelta)));
+                }
+                else
+                {
+                    string noBankHint = s.UsnCashBasisIncome <= 0m
+                        ? " • для кассового метода (ст. 328 НК РБ) загрузите выписку банка"
+                        : "";
+                    AddKpiPairRow(anKpiContent,
+                        string.Format(CultureInfo.InvariantCulture, "Налог УСН ({0:0.##}%) — по реализации отчётов МП", s.EffectiveTaxRateApplied),
+                        FmtByn(s.UsnRealizationTax), "#DC2626",
+                        string.Format("База: {0} BYN (реализация МП {1} + комп. {2} + облаг. р/с {3}){4}",
+                            FmtByn(s.UsnRealizationBase), FmtByn(s.TotalRealizedP), FmtByn(s.TotalCompensations), FmtByn(s.BankOtherCredits), noBankHint));
+
+                    if (s.UsnCashBasisIncome > 0m)
+                    {
+                        AddKpiPairRow(anKpiContent,
+                            "Сравнение: Кассовый метод (ст. 328 НК РБ: р/с + взаимозачёт) vs По реализации отчётов МП",
+                            FmtByn(s.UsnCashBasisTax), "#0F766E",
+                            string.Format("Кассовый метод (р/с {0} + взаимозачёт {1} + облаг. {2} = {3} BYN → налог {4} BYN)  |  Дельта переходящих выплат: база {5}{6} BYN (налог {7}{8} BYN)",
+                                FmtByn(s.UsnCashMpBankCredits), FmtByn(s.UsnCashMpOffset), FmtByn(s.BankOtherCredits),
+                                FmtByn(s.UsnCashBasisIncome), FmtByn(s.UsnCashBasisTax),
+                                signBase, FmtByn(baseDelta), signTax, FmtByn(taxDelta)));
+                    }
+                }
+            }
             else
             {
-                string taxLabel = s.TaxRegime == CompanyProfilesManager.RegimeCustom
-                    ? string.Format("Ориентир налога ({0:0.##}%)", s.EffectiveTaxRateApplied)
-                    : string.Format("Ориентир налога УСН ({0:0.##}%)", s.EffectiveTaxRateApplied);
                 AddKpiPairRow(anKpiContent,
-                    taxLabel,
+                    string.Format(CultureInfo.InvariantCulture, "Ориентир налога ({0:0.##}%)", s.EffectiveTaxRateApplied),
                     FmtByn(s.EstimatedTaxByRealization), "#DC2626",
                     string.Format("База: {0} BYN (реализация МП {1} + комп. {2} + облаг. р/с {3})",
                         FmtByn(s.TaxBaseAmount), FmtByn(s.TotalRealizedP), FmtByn(s.TotalCompensations), FmtByn(s.BankOtherCredits)));

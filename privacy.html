@@ -76,7 +76,7 @@
         Программа <strong>Buhly Desktop (<code>Buhly.exe</code>)</strong> обрабатывает ваши коммерческие и учётные файлы исключительно локально на вашем персональном компьютере. Владелец проекта не собирает, не хранит и не имеет доступа к вашим отчётам, выпискам и реквизитам.
       </p>
       <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
-        <li>✓ <strong>Никакой отправки учётных данных:</strong> ваши отчёты Wildberries и Ozon, банковские выписки, накладные ТН-2/ТТН-1, справочники себестоимости, профили организаций (УНП, расчётные счета) и реестр сроков ЭЦП не передаются на серверы разработчика или третьим лицам.</li>
+        <li>✓ <strong>Никакой отправки учётных данных:</strong> ваши отчёты Wildberries и Ozon, банковские выписки, накладные ТН-2 и 11-графная ТТН-1 (из поставок WB и Ozon), расчёты налогов (кассовый метод УСН 6%, вычет ИП 30%/20%, ввозной НДС), справочники себестоимости, профили организаций (УНП, расчётные счета) и реестр сроков ЭЦП не передаются на серверы разработчика или третьим лицам.</li>
         <li>✓ <strong>Точный перечень локальных путей хранения на ПК пользователя:</strong>
           <ul class="pl-5 mt-1.5 space-y-1 text-sm">
             <li>— <code>%LOCALAPPDATA%\Buhly\</code> (профили компаний <code>profiles.xml</code>, реестр ЭЦП <code>cert_registry.tsv</code>, справочник себестоимости, кеш ежедневной проверки версии <code>update_check.txt</code>);</li>
@@ -86,7 +86,7 @@
           </ul>
         </li>
         <li>✓ <strong>Нет доступа к закрытым ключам ЭЦП:</strong> программа не запрашивает PIN-код от USB-токена Авест и не извлекает закрытые ключи.</li>
-        <li>✓ <strong>Сетевые обращения программы:</strong> по инициативе пользователя выполняются запросы к официальным сервисам РБ (<code>nbrb.by</code> — курсы валют, <code>portal.nalog.gov.by</code> — проверка УНП по ГРП МНС, проверка доступности 4 госпорталов: <code>nalog.gov.by</code>, <code>portal2.ssf.gov.by</code>, <code>vat.gov.by</code>, <code>e-pasluga.by</code>) со строгой проверкой TLS 1.2. Кроме того, <strong>1 раз в календарные сутки</strong> при запуске программа выполняет анонимную проверку новой версии на <code>buhly-stats.repinm911.workers.dev/api/version</code> (с резервным обращением к <code>api.github.com</code>) — без передачи ПДн, файлов или идентификаторов ПК (на стороне Worker увеличивается только общий обезличенный суточный счётчик без сохранения IP-адресов).</li>
+        <li>✓ <strong>Сетевые обращения программы и режим «Полный офлайн»:</strong> по инициативе пользователя выполняются запросы к официальным сервисам РБ (<code>nbrb.by</code> — курсы валют, <code>portal.nalog.gov.by</code> — проверка УНП по ГРП МНС, проверка доступности 4 госпорталов: <code>nalog.gov.by</code>, <code>portal2.ssf.gov.by</code>, <code>vat.gov.by</code>, <code>e-pasluga.by</code>) со строгой проверкой TLS 1.2. Кроме того, <strong>1 раз в календарные сутки</strong> при запуске программа выполняет анонимную проверку новой версии на <code>https://api.buhly.by/api/version</code> (с резервными узлами <code>buhly-stats.repinm911.workers.dev</code>, <code>buhly.by/version.json</code> и <code>api.github.com</code>) — без передачи ПДн, файлов или идентификаторов ПК (на сервере увеличивается только общий обезличенный суточный счётчик без сохранения IP-адресов). В настройках Buhly v3.2 предусмотрен <strong>тумблер отключения проверки обновлений («Полный офлайн»)</strong>, полностью выключающий фоновые проверки версии.</li>
       </ul>
     </section>
 
@@ -98,7 +98,7 @@
       <ul class="space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
         <li>✓ <strong>Полное удаление сторонних CDN:</strong> внешние CDN-библиотеки и сторонние шрифты (Tailwind CDN, Google Fonts) с сайта <strong>полностью удалены</strong>. Таблица стилей (<code>styles.css</code>) и иконка (<code>favicon.ico</code>) загружаются локально с того же домена.</li>
         <li>✓ <strong>Без cookie-файлов и профилирования:</strong> на сайте не устанавливаются отслеживающие cookie, не используется <code>localStorage</code> для идентификации посетителей и не ведутся профили поведения.</li>
-        <li>✓ <strong>Обезличенная статистика и клики скачивания:</strong> для подсчёта посещаемости и скачиваний применяются cookie-free сервис <strong>Cloudflare Web Analytics</strong> и неблокирующий ping-запрос при клике скачивания на Cloudflare Worker (<code>buhly-stats.repinm911.workers.dev/api/download/*?ping=1</code>), а также передача UTM-меток в ссылках текущей сессии без сохранения ПДн.</li>
+        <li>✓ <strong>Обезличенная статистика и клики скачивания:</strong> для подсчёта посещаемости и скачиваний применяются cookie-free сервис <strong>Cloudflare Web Analytics</strong> и неблокирующий ping-запрос при клике скачивания на <code>https://api.buhly.by/api/download/*?ping=1</code> (резервно <code>buhly-stats.repinm911.workers.dev</code>), а также передача UTM-меток в ссылках текущей сессии без сохранения ПДн.</li>
         <li>✓ <strong>Трансграничная передача / доступ (ст. 9 Закона № 99-З):</strong> поскольку сайт размещён на инфраструктуре <strong>GitHub Pages</strong> (GitHub, Inc., США), дистрибутивы загружаются с <strong>GitHub Releases</strong>, а аналитика и проверка обновлений обслуживаются через сеть <strong>Cloudflare</strong> (Cloudflare, Inc., США/ЕС), при открытии сайта или скачивании релиза технические сетевые данные (HTTP-заголовки, IP-адрес на уровне транспортного соединения хостинга/CDN) обрабатываются за пределами Республики Беларусь в соответствии с политиками GitHub и Cloudflare. При добровольном переходе по ссылкам в Telegram (<code>t.me/buhly_by</code>, <code>t.me/buhly_by_chat</code>) действуют правила Telegram.</li>
       </ul>
     </section>
@@ -122,7 +122,7 @@
           Написать в @buhly_by_chat
         </a>
         <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
-          Скачать Buhly v3.1.1 (ZIP)
+          Скачать Buhly v3.2 (ZIP)
         </a>
         <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
           Исходный код на GitHub
@@ -135,7 +135,7 @@
   <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
     <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div>
-        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly v3.1.1</a> • Локальный помощник бизнеса РБ (MIT)
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly v3.2</a> • Локальный помощник бизнеса РБ (MIT)
       </div>
       <div class="flex items-center flex-wrap gap-5">
         <a href="privacy.html" class="text-white font-medium hover:underline transition">Политика приватности</a>
@@ -166,7 +166,7 @@
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
         if (goal === 'download_zip' || goal === 'download_exe') {
-          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          var pingUrl = 'https://api.buhly.by/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
           try {
             if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
               return;

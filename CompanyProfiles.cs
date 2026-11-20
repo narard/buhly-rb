@@ -19,6 +19,7 @@ namespace GovPortalsApp
         public string OrgInfo { get; set; }
         public string Signer { get; set; }
         public string TaxRegime { get; set; }
+        public string UsnMethod { get; set; }
         public decimal CustomTaxRate { get; set; }
         public decimal IpExpenseNormPercent { get; set; }
         public WaybillProfile WaybillProfile { get; set; }
@@ -31,6 +32,7 @@ namespace GovPortalsApp
             OrgInfo = "";
             Signer = "";
             TaxRegime = CompanyProfilesManager.RegimeUsn6;
+            UsnMethod = CompanyProfilesManager.UsnMethodCashBasis;
             CustomTaxRate = 6m;
             IpExpenseNormPercent = 30m;
             WaybillProfile = new WaybillProfile();
@@ -81,12 +83,14 @@ namespace GovPortalsApp
     {
         public string ActiveProfileId { get; set; }
         public string UiMode { get; set; }
+        public bool DisableUpdateChecks { get; set; }
         public List<CompanyProfile> Profiles { get; set; }
 
         public CompanyProfileStore()
         {
             ActiveProfileId = "";
             UiMode = "Simple";
+            DisableUpdateChecks = false;
             Profiles = new List<CompanyProfile>();
         }
 
@@ -102,6 +106,9 @@ namespace GovPortalsApp
         public const string RegimeIpPn20 = "IP_PN_20";
         public const string RegimeOsn20 = "OSN_20";
         public const string RegimeCustom = "CUSTOM";
+
+        public const string UsnMethodCashBasis = "CashBasis";
+        public const string UsnMethodRealization = "Realization";
 
         public static bool LastLoadHadCorruptFile { get; private set; }
         public static string LastCorruptBackupPath { get; private set; }
@@ -221,6 +228,10 @@ namespace GovPortalsApp
                 if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("N");
                 if (string.IsNullOrWhiteSpace(p.DisplayName)) p.DisplayName = GuessDisplayName(p.OrgInfo, "Компания");
                 if (string.IsNullOrWhiteSpace(p.TaxRegime)) p.TaxRegime = RegimeUsn6;
+                if (string.Equals(p.UsnMethod, UsnMethodRealization, StringComparison.OrdinalIgnoreCase))
+                    p.UsnMethod = UsnMethodRealization;
+                else
+                    p.UsnMethod = UsnMethodCashBasis;
                 if (p.IpExpenseNormPercent != 20m && p.IpExpenseNormPercent != 30m)
                     p.IpExpenseNormPercent = 30m;
                 if (p.WaybillProfile == null) p.WaybillProfile = new WaybillProfile();
@@ -457,6 +468,14 @@ namespace GovPortalsApp
             regimeGrid.Children.Add(tbCustomRate);
             form.Children.Add(regimeGrid);
 
+            var usnMethodPanel = new StackPanel { Margin = new Thickness(0, 2, 0, 8), Visibility = Visibility.Collapsed };
+            usnMethodPanel.Children.Add(CreateFieldLabel("Метод определения выручки УСН (ст. 328 НК РБ)"));
+            var cbUsnMethod = new ComboBox { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
+            cbUsnMethod.Items.Add("Кассовый метод — по оплате на р/с + взаимозачёт МП (по умолчанию)");
+            cbUsnMethod.Items.Add("По реализации отчётов МП (быстрый ориентир без выписки)");
+            usnMethodPanel.Children.Add(cbUsnMethod);
+            form.Children.Add(usnMethodPanel);
+
             var ipNormPanel = new StackPanel { Margin = new Thickness(0, 2, 0, 8), Visibility = Visibility.Collapsed };
             ipNormPanel.Children.Add(CreateFieldLabel("Норматив проф. вычета ИП (п. 10 ст. 205 НК РБ, с 2026 г.)"));
             var cbIpNorm = new ComboBox { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
@@ -526,6 +545,8 @@ namespace GovPortalsApp
                 decimal rate = prof.TaxRegime == CompanyProfilesManager.RegimeCustom ? prof.CustomTaxRate : prof.GetEffectiveTaxRate();
                 tbCustomRate.Text = rate.ToString("0.##", CultureInfo.InvariantCulture);
                 tbCustomRate.IsEnabled = (cbRegime.SelectedIndex == 3);
+                usnMethodPanel.Visibility = (cbRegime.SelectedIndex == 0) ? Visibility.Visible : Visibility.Collapsed;
+                cbUsnMethod.SelectedIndex = string.Equals(prof.UsnMethod, CompanyProfilesManager.UsnMethodRealization, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                 ipNormPanel.Visibility = (cbRegime.SelectedIndex == 1) ? Visibility.Visible : Visibility.Collapsed;
                 cbIpNorm.SelectedIndex = (prof.IpExpenseNormPercent == 20m) ? 1 : 0;
                 dialogStatus.Text = "";
@@ -552,6 +573,7 @@ namespace GovPortalsApp
             {
                 int idx = cbRegime.SelectedIndex;
                 tbCustomRate.IsEnabled = (idx == 3);
+                usnMethodPanel.Visibility = (idx == 0) ? Visibility.Visible : Visibility.Collapsed;
                 ipNormPanel.Visibility = (idx == 1) ? Visibility.Visible : Visibility.Collapsed;
                 if (idx == 0) tbCustomRate.Text = "6";
                 else if (idx == 1 || idx == 2) tbCustomRate.Text = "20";
@@ -684,6 +706,9 @@ namespace GovPortalsApp
                 else if (cbRegime.SelectedIndex == 3) selectedProfile.TaxRegime = CompanyProfilesManager.RegimeCustom;
                 else selectedProfile.TaxRegime = CompanyProfilesManager.RegimeUsn6;
 
+                selectedProfile.UsnMethod = (cbUsnMethod.SelectedIndex == 1)
+                    ? CompanyProfilesManager.UsnMethodRealization
+                    : CompanyProfilesManager.UsnMethodCashBasis;
                 selectedProfile.IpExpenseNormPercent = (cbIpNorm.SelectedIndex == 1) ? 20m : 30m;
 
                 decimal parsedRate;

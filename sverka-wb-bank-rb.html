@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сверка отчётов Wildberries и Ozon с выпиской банка РБ (2026): КУДиР, 1С и частые ошибки | Buhly</title>
+  <meta name="description" content="Как сверить отчёты WB и Ozon с выпиской банка Беларуси (1CClientBankExchange и Excel Беларусбанка, Приорбанка, МТБанка, Белинвестбанка, БНБ, Сбера, Альфа-Банка): эквайринг и ПВЗ, предоплаты и личные переводы ИП, защита от дублей, выгрузка КУДиР и 1С.">
+  <meta name="keywords" content="сверка wildberries с банком беларусь, 1cclientbankexchange рб, выписка альфа банк приорбанк мтбанк кудир, эквайринг пвз в отчете wb, выгрузка wb в 1с кудир">
+  <link rel="canonical" href="https://buhly.by/sverka-wb-bank-rb.html">
+  <link rel="icon" href="favicon.ico">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Сверка отчётов Wildberries и Ozon с выпиской банка РБ (2026): КУДиР, 1С и частые ошибки | Buhly">
+  <meta property="og:description" content="Куда пропадает эквайринг и ПВЗ, почему нельзя списывать предоплаты и личные переводы ИП в расход, как не задвоить отчёты WB/Ozon и быстро собрать черновик КУДиР и 1С.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://buhly.by/sverka-wb-bank-rb.html">
+  <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_analytics.png">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Сверка отчётов WB и Ozon с выпиской банка РБ | Buhly">
+  <meta name="twitter:description" content="1CClientBankExchange и Excel 7+ банков РБ, удержания эквайринга/ПВЗ, фильтрация дублей и выгрузка черновика КУДиР и 1С.">
+  <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_analytics.png">
+  <link rel="stylesheet" href="styles.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Главная",
+            "item": "https://buhly.by/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Сверка WB/Ozon с выпиской банка РБ",
+            "item": "https://buhly.by/sverka-wb-bank-rb.html"
+          }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Какой формат банковской выписки лучше загружать — 1CClientBankExchange или Excel?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Если ваш клиент-банк умеет выгружать стандартный 1CClientBankExchange (.txt в Windows-1251 или UTF-8) — выбирайте его: там всегда чётко разделены даты, контрагенты, УНП и дебет/кредит. Если под рукой только Excel (.xlsx) или CSV (Беларусбанк, Приорбанк, МТБанк, Белинвестбанк, БНБ, Сбер, Альфа-Банк), Buhly v3.2 читает и их."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Почему сумма в кабинете WB не сходится с деньгами на расчётном счёте?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Во-первых, WB удерживает из выплаты комиссию, логистику, хранение, платную приёмку, штрафы, рекламу, а также отдельные строки возмещения за эквайринг и обработку/выдачу на ПВЗ. Во-вторых, деньги за последнюю неделю месяца часто приходят на расчётный счёт уже в первых числах следующего месяца."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Можно ли включить предоплату поставщику или перевод на личную карту ИП в расходы?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Нет. Личный доход ИП (перевод на собственную карту физлица) вообще не является расходом бизнеса. А оплата поставщику за товар учитывается в расходах ИП на подоходном налоге только по мере фактической реализации этого товара покупателям, а не в момент авансового платежа."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Что делать, если выписка моего банка не открылась в Buhly?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Нажмите в программе кнопку «Диагностика файла» — Buhly создаст на Рабочем столе обезличенный файл (только названия колонок и структура, без сумм, УНП и ФИО). Перешлите его в чат @buhly_by_chat, и поддержку вашего формата добавят."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Navigation -->
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <a href="https://buhly.by/" class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+        B
+      </div>
+      <div class="min-w-0">
+        <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
+        <span class="text-xs text-neutral-600 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
+      </div>
+    </a>
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+      <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Главная
+      </a>
+      <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+        Чат помощи
+      </a>
+    </div>
+  </nav>
+
+  <!-- Article Main -->
+  <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
+    <nav aria-label="Хлебные крошки" class="text-xs text-neutral-600 mb-4 flex flex-wrap items-center gap-1.5">
+      <a href="https://buhly.by/" class="hover:text-blue-600 transition">Главная</a>
+      <span>/</span>
+      <span class="text-neutral-800 font-medium">Сверка WB/Ozon с выпиской банка РБ</span>
+    </nav>
+
+    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+      <span>Учёт и выписки • Банки РБ, КУДиР и 1С</span>
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight break-words">
+      Сверка отчётов <span class="text-blue-600">WB и Ozon</span> с выпиской банка РБ: куда уходят деньги и как сделать КУДиР
+    </h1>
+
+    <p class="text-base md:text-lg text-neutral-600 mt-4 leading-relaxed">
+      Классика конца квартала: в детализации Wildberries продано на 40 000 BYN, в банке пришло 27 800 BYN, а Excel завис на 12-й тысяче строк. Разбираем, почему цифры не бьются на первый взгляд, какие платежи из выписки нельзя тащить в расход и как свести всё за пару минут.
+    </p>
+
+    <!-- Download CTA Banner -->
+    <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <div class="font-bold text-neutral-900 text-base">Свести WB/Ozon с любым банком РБ в Buhly v3.2</div>
+        <div class="text-xs text-neutral-600 mt-1">Читает 1CClientBankExchange и Excel 7+ банков, убирает дубли отчётов и выгружает черновик КУДиР и 1С.</div>
+      </div>
+      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
+        Скачать Buhly v3.2 (ZIP)
+      </a>
+    </div>
+
+    <!-- Section 1: Where does the difference go -->
+    <section class="mt-10 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">1. Куда пропадает разница: эквайринг, ПВЗ и кассовый лаг</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        Даже если вы вычли из реализации очевидные комиссию и логистику, на несколько сотен рублей отчёт всё равно может не сойтись с банком. Причины почти всегда три:
+      </p>
+      <ul class="list-disc pl-5 space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li><b>Эквайринг и ПВЗ:</b> в детализации WB появились отдельные колонки — <b>возмещение издержек за эквайринг</b> и <b>возмещение расходов по выдаче/доставке через ПВЗ</b>. Они не сидят в базовой комиссии, но уменьшают итоговую выплату на р/с.</li>
+        <li><b>Прочие удержания в конце отчёта:</b> ВБ.Продвижение (реклама с баланса), платное хранение, приёмка, корректировки за габариты и штрафы за самовыкупы/маркировку.</li>
+        <li><b>Переходящие выплаты на стыке месяца:</b> отчёт закрылся 31-го числа, а платёжное поручение маркетплейса зашло в ваш банк 2–4-го числа следующего месяца.</li>
+      </ul>
+    </section>
+
+    <!-- Section 2: Bank statement traps -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">2. Три ошибки в выписке, за которые налоговая доначисляет</h2>
+      <div class="p-4 sm:p-5 rounded-2xl bg-rose-50 border border-rose-200/80 text-sm text-rose-900 leading-relaxed">
+        <ul class="list-disc pl-5 space-y-2">
+          <li><b>Списывать предоплаты поставщикам в расход сразу:</b> деньги ушли с р/с за партию товара — это ещё <b>не расход</b>! У ИП на подоходном налоге закупка попадает в расход только по мере фактической реализации этого товара покупателям.</li>
+          <li><b>Тащить в расходы личные переводы ИП:</b> снятие наличных или перевод на личную карту физлица («перевод личного дохода ИП») — не расход бизнеса, как и погашение тела кредита/займа, возврат ошибочных сумм и бюджетные штрафы.</li>
+          <li><b>Задваивать отчёты WB/Ozon:</b> если в одну папку свалить недельный отчёт и повторно скачанный/сводный файл с теми же номерами строк (<code>rrd_id</code>), выручка и налог удвоятся на пустом месте.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Section 3: Supported RB bank formats -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">3. Какие форматы выписок банков РБ лучше использовать</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        У белорусских банков разные Excel-шаблоны: у кого-то одна колонка «Сумма» со знаком, у кого-то «Дебет / Кредит», у кого-то «Зачисление / Списание» и шапка на 12 строк.
+      </p>
+      <div class="overflow-x-auto mt-3">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-neutral-50 border-b border-neutral-200 text-left">
+              <th class="py-2.5 px-3 font-bold text-neutral-900">Формат файла</th>
+              <th class="py-2.5 px-3 font-bold text-neutral-900">Какие банки РБ</th>
+              <th class="py-2.5 px-3 font-bold text-neutral-900">Рекомендация</th>
+            </tr>
+          </thead>
+          <tbody class="text-neutral-700">
+            <tr class="border-b border-neutral-100 align-top bg-blue-50/70">
+              <td class="py-2.5 px-3 font-bold text-blue-700 whitespace-nowrap">1CClientBankExchange (.txt)</td>
+              <td class="py-2.5 px-3">Почти все банки РБ (Windows-1251 и UTF-8)</td>
+              <td class="py-2.5 px-3"><b>Лучший выбор:</b> единый стандарт, чёткие УНП, счета и назначения платежей.</td>
+            </tr>
+            <tr class="align-top">
+              <td class="py-2.5 px-3 font-bold text-neutral-900 whitespace-nowrap">Excel (.xlsx) / CSV</td>
+              <td class="py-2.5 px-3">Беларусбанк, Приорбанк, МТБанк, Белинвестбанк, БНБ-Банк, Сбер Банк, Альфа-Банк</td>
+              <td class="py-2.5 px-3">Удобно для быстрой сверки; Buhly сам распознаёт шапку и колонки списаний/зачислений.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Auto Solution -->
+    <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Сверка, КУДиР и выгрузка в 1С в Buhly v3.2</h2>
+      <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
+        <li>✓ Закидываете сразу пачку отчётов <b>WB</b> (<code>.zip</code>/<code>.xlsx</code>/<code>.csv</code>) и <b>Ozon</b> (<code>.xlsx</code>/<code>.csv</code>) — программа сама фильтрует дубли и выделяет эквайринг, ПВЗ, логистику, возвраты и компенсации.</li>
+        <li>✓ Добавляете банковскую выписку (<code>1CClientBankExchange</code> или Excel вашего банка) — Buhly отделяет выручку маркетплейсов от закупок, налогов, предоплат и личных переводов ИП.</li>
+        <li>✓ В 1 клик сохраняете <b>черновик КУДиР</b> и структурированную таблицу для загрузки в <b>1С</b> — а если ваш банк поменял шаблон выписки, кнопка <b><code>🛟 Диагностика файла</code></b> сохранит безопасный отчёт без сумм и УНП.</li>
+      </ul>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
+          Скачать Buhly v3.2 (ZIP)
+        </a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
+          Отправить диагностику в чат
+        </a>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mt-10">
+      <h2 class="text-2xl font-extrabold text-neutral-900 mb-5">Частые вопросы</h2>
+      <div class="space-y-3">
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Какой формат банковской выписки лучше загружать — 1CClientBankExchange или Excel?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Если ваш клиент-банк умеет выгружать стандартный 1CClientBankExchange (.txt в Windows-1251 или UTF-8) — выбирайте его: там всегда чётко разделены даты, контрагенты, УНП и дебет/кредит. Если под рукой только Excel (.xlsx) или CSV (Беларусбанк, Приорбанк, МТБанк, Белинвестбанк, БНБ, Сбер, Альфа-Банк), Buhly v3.2 читает и их.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Почему сумма в кабинете WB не сходится с деньгами на расчётном счёте?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Во-первых, WB удерживает из выплаты комиссию, логистику, хранение, платную приёмку, штрафы, рекламу, а также отдельные строки возмещения за эквайринг и обработку/выдачу на ПВЗ. Во-вторых, деньги за последнюю неделю месяца часто приходят на расчётный счёт уже в первых числах следующего месяца.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Можно ли включить предоплату поставщику или перевод на личную карту ИП в расходы?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Нет. Личный доход ИП (перевод на собственную карту физлица) вообще не является расходом бизнеса. А оплата поставщику за товар учитывается в расходах ИП на подоходном налоге только по мере фактической реализации этого товара покупателям, а не в момент авансового платежа.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Что делать, если выписка моего банка не открылась в Buhly?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Нажмите в программе кнопку «Диагностика файла» — Buhly создаст на Рабочем столе обезличенный файл (только названия колонок и структура, без сумм, УНП и ФИО). Перешлите его в чат @buhly_by_chat, и поддержку вашего формата добавят.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Other Guides -->
+    <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+      <h2 class="font-bold text-base text-neutral-900 mb-3">Другие разборы для селлеров РБ</h2>
+      <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
+        <a href="usn-wb-ozon-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏢 УСН 6% для ООО на WB и Ozon: кассовый метод ст. 328 НК РБ →</a>
+        <a href="ip-nalogi-fszn-2026-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">👤 ИП на WB/Ozon 2026: подоходный 20%/30%, вычет 30% и ФСЗН →</a>
+        <a href="vvoznoi-nds-rf-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🚚 Ввозной НДС 20% при закупке в РФ/ЕАЭС и статдекларация →</a>
+        <a href="tn2-bso-etn-wb-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📦 Накладные ТН-2, 11-графная ТТН-1 (БСО) и обязательные ЭТН →</a>
+        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v3.2 →</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly</a> • Бесплатный помощник продавцов и бухгалтеров РБ
+      </div>
+      <div class="flex items-center flex-wrap gap-5">
+        <a href="privacy.html" class="hover:text-white transition">Политика приватности</a>
+        <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="hover:text-white transition">Канал @buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="hover:text-white transition">Чат помощи</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Cookie-free Click & UTM Helper (0% cookies, 0% localStorage, Закон РБ № 99-З) -->
+  <script>
+    (function () {
+      var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      var params = new URLSearchParams(window.location.search || '');
+      var activeUtm = {};
+      var hasUtm = false;
+      utmKeys.forEach(function (k) {
+        var v = params.get(k);
+        if (v) { activeUtm[k] = v; hasUtm = true; }
+      });
+
+      window.buhlyEvents = window.buhlyEvents || [];
+      window.buhlyTrack = function (goal, url) {
+        var payload = { goal: goal, url: url || '', path: window.location.pathname, utm: activeUtm, ts: Date.now() };
+        window.buhlyEvents.push(payload);
+        try {
+          window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
+        } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://api.buhly.by/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
+      };
+
+      var links = document.querySelectorAll('a[href]');
+      for (var i = 0; i < links.length; i++) {
+        (function (a) {
+          var href = a.getAttribute('href') || '';
+          var goal = a.getAttribute('data-goal');
+          if (!goal) {
+            if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
+              goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
+            } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
+              goal = 'tg_chat';
+            } else if (href.indexOf('t.me/buhly_by') !== -1) {
+              goal = 'tg_channel';
+            } else if (href.indexOf('github.com/narard/buhly-rb') !== -1) {
+              goal = 'github_click';
+            }
+            if (goal) a.setAttribute('data-goal', goal);
+          }
+
+          if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
+            var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
+            if (isInternal || isGithubPage) {
+              try {
+                var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';
+                var u = new URL(href, base);
+                utmKeys.forEach(function (k) {
+                  if (activeUtm[k] && !u.searchParams.has(k)) u.searchParams.set(k, activeUtm[k]);
+                });
+                if (href.indexOf('http') !== 0) {
+                  a.setAttribute('href', href.split('?')[0].split('#')[0] + u.search + u.hash);
+                } else {
+                  a.setAttribute('href', u.toString());
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (goal) {
+            a.addEventListener('click', function () {
+              window.buhlyTrack(goal, a.href);
+            });
+          }
+        })(links[i]);
+      }
+    })();
+  </script>
+  <!-- Cloudflare Web Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "41c6c66b6e064606a506e2577db47e59"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

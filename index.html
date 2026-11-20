@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров</title>
-  <meta name="description" content="Простой локальный помощник для малого бизнеса РБ на WB и Ozon и бухгалтеров: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход на порталы МНС/ЭСЧФ.">
-  <meta name="keywords" content="buhly, wildberries беларусь налоги, ozon отчет рб, тн-2 генератор, vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, кудир рб, ввозной ндс рф, эцп авест">
+  <title>Buhly v3.2 — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров</title>
+  <meta name="description" content="Простой локальный помощник для малого бизнеса РБ на WB и Ozon и бухгалтеров: накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon, финансовая сверка с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, ввозной НДС и вход на порталы МНС/ЭСЧФ.">
+  <meta name="keywords" content="buhly, wildberries беларусь налоги, ozon отчет рб, тн-2 ттн-1 генератор, vat.gov.by, nalog.gov.by, portal2.ssf.gov.by, кудир рб, ввозной ндс рф, эцп авест">
   <meta name="google-site-verification" content="WD-6rHtHfFlNpetvUoZ7PJtIo6KkqRYPiqFOh4MdhPQ">
   <meta name="yandex-verification" content="153895d755675f1a">
   <link rel="icon" href="favicon.ico">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
-  <meta property="og:description" content="Накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
+  <meta property="og:title" content="Buhly v3.2 — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
+  <meta property="og:description" content="Накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon, сверка с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, мультивалютный ввозной НДС и вход в МНС/ЭСЧФ в 1 клик.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://buhly.by/">
   <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Buhly — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
-  <meta name="twitter:description" content="Накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, расчёт налога и вход в МНС / ЭСЧФ в 1 клик. Без облаков и подписок.">
+  <meta name="twitter:title" content="Buhly v3.2 — Бесплатный помощник продавцов WB/Ozon в Беларуси и бухгалтеров">
+  <meta name="twitter:description" content="Накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon, сверка с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, мультивалютный ввозной НДС и вход в МНС/ЭСЧФ в 1 клик.">
   <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_overview.png">
   <link rel="canonical" href="https://buhly.by/">
   <link rel="stylesheet" href="styles.css">
@@ -32,7 +32,7 @@
       {
         "@type": "SoftwareApplication",
         "name": "Buhly",
-        "softwareVersion": "3.1.1.0",
+        "softwareVersion": "3.2.0.0",
         "operatingSystem": "Windows 10, Windows 11",
         "applicationCategory": "BusinessApplication",
         "license": "https://opensource.org/licenses/MIT",
@@ -41,7 +41,7 @@
           "price": "0",
           "priceCurrency": "BYN"
         },
-        "description": "Бесплатный локальный помощник для продавцов WB/Ozon в Беларуси и бухгалтеров: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, налоги и вход на госпорталы.",
+        "description": "Бесплатный локальный помощник для продавцов WB/Ozon в Беларуси и бухгалтеров: накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon, сверка с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, мультивалютный ввозной НДС и вход на госпорталы.",
         "downloadUrl": "https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip"
       },
       {
@@ -80,7 +80,7 @@
       <div class="min-w-0">
         <div class="flex items-center gap-2">
           <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
-          <span class="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">v3.1.1</span>
+          <span class="text-[11px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">v3.2</span>
         </div>
         <span class="text-xs text-neutral-600 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
       </div>
@@ -114,14 +114,14 @@
     </h1>
 
     <p class="text-base sm:text-lg text-neutral-600 max-w-2xl mx-auto mt-5 leading-relaxed">
-      Убирает ручную рутину: накладные ТН-2/ТТН-1 из поставок WB, финансовая сверка WB и Ozon с банком, понятный расчёт налога и вход на порталы МНС / ЭСЧФ в один клик.
+      Убирает ручную рутину: накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon, финансовая сверка с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, мультивалютный ввозной НДС и вход на порталы МНС / ЭСЧФ в один клик.
     </p>
 
     <!-- Download CTA -->
     <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
         <svg class="w-5 h-5 shrink-0" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        <span>Скачать Buhly (ZIP, ~268 КБ)</span>
+        <span>Скачать Buhly (ZIP, ~283 КБ)</span>
       </a>
       <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="w-full sm:w-auto px-6 py-4 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold rounded-2xl border border-neutral-300 transition flex items-center justify-center gap-2">
         <span>Канал в Telegram</span>
@@ -132,7 +132,7 @@
     </div>
 
     <p class="mt-3 text-xs text-neutral-600">
-      Внутри: только <b>Buhly.exe</b> (~725 КБ), <b>README</b> и <b>LICENSE (MIT)</b> •
+      Внутри: только <b>Buhly.exe</b> (~780 КБ), <b>README</b> и <b>LICENSE (MIT)</b> •
       <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.exe" data-goal="download_exe" class="text-blue-600 hover:underline">Прямой .exe</a> •
       <a href="https://buhly.by/Release/SHA256SUMS.txt" class="text-blue-600 hover:underline">SHA-256</a>
     </p>
@@ -185,16 +185,16 @@
           <h3 class="font-extrabold text-xl text-neutral-900 mb-4">Кто сам ведёт свою бухгалтерию</h3>
           <ul class="space-y-3.5 text-sm text-neutral-700 leading-relaxed">
             <li>
-              <b class="text-neutral-900">Накладные ТН-2/ТТН-1 из поставок WB:</b> загружаешь файл поставки Wildberries, подставляешь реквизиты — получаешь готовую накладную под печать (есть настройка отступов под готовые бланки БСО).
+              <b class="text-neutral-900">Накладные ТН-2 и 11-графная ТТН-1 из поставок WB и Ozon:</b> загружаешь файл поставки Wildberries или Ozon, подставляешь реквизиты — получаешь готовую накладную (Пост. № 58), приложение-реестр и лист сборки (есть настройка отступов в мм под типографские бланки БСО).
             </li>
             <li>
-              <b class="text-neutral-900">Финансовая сверка WB и Ozon с банком:</b> загружаешь отчёт маркетплейса и выписку банка — видно, сколько реально дошло до счёта и с какой суммы считается налог (УСН или ИП + ФСЗН).
+              <b class="text-neutral-900">Финансовая сверка WB и Ozon с банком:</b> загружаешь отчёт маркетплейса и выписку банка — видно, сколько реально дошло до счёта и с какой суммы считается налог: <b>кассовый метод УСН 6%</b> (ст. 328 НК РБ), <b>ИП с вычетом 30% / 20%</b> и ФСЗН 35%.
             </li>
             <li>
               <b class="text-neutral-900">Расшифровка «Как посчитано?»:</b> по каждой цифре можно открыть расчёт по строчкам, чтобы перепроверить себя, а не верить программе на слово.
             </li>
             <li>
-              <b class="text-neutral-900">Товар из России и госпорталы:</b> сам тянет курс Нацбанка для расчёта ввозного НДС 20% и в 1 клик открывает ЭСЧФ, МНС и ФСЗН (чинит слетевший режим в Edge без закрытия вкладок).
+              <b class="text-neutral-900">Мультивалютный ввозной НДС и госпорталы:</b> сам тянет курс Нацбанка (<code>RUB</code>/<code>USD</code>/<code>EUR</code>) на дату прихода для ввозного НДС 20%/10% и в 1 клик открывает ЭСЧФ, МНС и ФСЗН (чинит слетевший режим в Edge без закрытия вкладок).
             </li>
           </ul>
         </div>
@@ -233,7 +233,7 @@
           <h2 class="text-xl font-extrabold text-neutral-900 mb-3">Почему программе можно доверять</h2>
           <ul class="space-y-2.5 text-sm text-neutral-600 leading-relaxed">
             <li>• <b>Учётные данные — только на вашем ПК:</b> никаких облаков, аккаунтов и ПДн-телеметрии. Выписки, суммы, накладные и пароли от ЭЦП никуда не отправляются.</li>
-            <li>• <b>Прозрачные сетевые обращения:</b> при запуске 1 раз в сутки выполняется анонимная проверка новой версии на Cloudflare Worker / GitHub (без ПДн и файлов), а также проверка доступности 4 госпорталов (МНС, ФСЗН, ЭСЧФ, Е-Паслуга) и загрузка курсов НБРБ (плюс ручная проверка УНП по базе МНС).</li>
+            <li>• <b>Прозрачные сетевые обращения:</b> при запуске 1 раз в сутки выполняется анонимная проверка новой версии через <code>api.buhly.by</code> / GitHub (без ПДн и файлов; при желании отключается тумблером <b>«Полный офлайн»</b>), а также проверка доступности 4 госпорталов (МНС, ФСЗН, ЭСЧФ, Е-Паслуга) и загрузка курсов НБРБ (плюс ручная проверка УНП по базе МНС).</li>
             <li>• <b>Открытый код и проверки:</b> исходники выложены на GitHub (MIT), политика приватности оформлена по Закону РБ № 99-З. Чистые релизные сборки отправляются на анализ в Microsoft (WDSI); бесплатную open-source подпись кода (SignPath Foundation) планируется переподать после роста сообщества (звёзд и обзоров).</li>
           </ul>
         </div>
@@ -245,7 +245,7 @@
           <div class="mt-3 space-y-2">
             <p>0 внешних библиотек — собирается штатным компилятором Windows (<code class="bg-neutral-100 px-1 rounded">build.bat</code>). Перед правкой <code class="bg-neutral-100 px-1 rounded">hosts</code> или Edge всегда создаётся <code class="bg-neutral-100 px-1 rounded">.bak</code>-бэкап.</p>
             <div class="flex items-center gap-2 bg-[#F2F2F7] rounded-xl px-3 py-2">
-              <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all min-w-0 flex-1 p-0">D657E1703B80B5E8ACC5B366167A6E7CF3343045B400FCC6CBC975FA50A585BA</code>
+              <code id="sha-exe" class="text-[11px] font-mono text-neutral-800 break-all select-all min-w-0 flex-1 p-0">26A02B2BE194A6AE92FAF1BECD08DFEAE0BB6BE82909BE42FC3CCD434F32492F</code>
               <button type="button" onclick="copyHash()" id="copy-hash-btn" class="shrink-0 text-[11px] font-semibold bg-white text-blue-600 px-2.5 py-1 rounded-lg border border-neutral-200">Копировать</button>
             </div>
             <p class="text-[11px] text-neutral-600">
@@ -273,14 +273,32 @@
       </div>
     </div>
 
-    <!-- Compact Troubleshooting Strip -->
-    <div class="mt-6 bg-white rounded-2xl p-4 sm:p-5 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-      <span class="font-semibold text-neutral-700">Шпаргалки по частым ошибкам порталов РБ:</span>
-      <div class="flex flex-wrap gap-2">
-        <a href="vat-err-ssl.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">ЭСЧФ (ERR_SSL)</a>
-        <a href="fszn-8084.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">ФСЗН (порт 8084)</a>
-        <a href="mns-nalog-avest.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">МНС и Авест</a>
-        <a href="avest-srok-ecp.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 transition">Сроки ключей ЭЦП</a>
+    <!-- Guides & Troubleshooting Strip (All 9 RB Articles) -->
+    <div class="mt-6 bg-white rounded-3xl p-5 sm:p-6 border border-neutral-200 shadow-sm space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <h2 class="font-extrabold text-base sm:text-lg text-neutral-900">Шпаргалки и разборы РБ (2026)</h2>
+        <span class="text-xs text-neutral-600">Без воды — по нормам НК РБ 2026 и практике селлеров</span>
+      </div>
+
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2">Селлерам WB / Ozon и налоги РБ</div>
+        <div class="grid sm:grid-cols-2 gap-2.5 text-xs sm:text-sm">
+          <a href="usn-wb-ozon-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏢 УСН 6% для ООО на WB/Ozon (кассовый метод ст. 328) →</a>
+          <a href="ip-nalogi-fszn-2026-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">👤 ИП на WB/Ozon: 20%/30%, вычет 30% и ФСЗН 35% →</a>
+          <a href="vvoznoi-nds-rf-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🚚 Ввозной НДС 20%/10% из РФ/ЕАЭС и статдекларация →</a>
+          <a href="tn2-bso-etn-wb-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📦 ТН-2, 11-графная ТТН-1 (БСО) и обязательные ЭТН →</a>
+          <a href="sverka-wb-bank-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏦 Сверка WB/Ozon с банком РБ, КУДиР и 1С →</a>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-neutral-100">
+        <div class="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2">Госпорталы РБ и ЭЦП (Авест)</div>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <a href="vat-err-ssl.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 font-medium transition">ЭСЧФ (ERR_SSL и режим IE)</a>
+          <a href="fszn-8084.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 font-medium transition">ФСЗН 2.0 (порт 8084)</a>
+          <a href="mns-nalog-avest.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 font-medium transition">МНС и Авест</a>
+          <a href="avest-srok-ecp.html" class="px-3 py-1.5 rounded-lg bg-[#F2F2F7] hover:bg-blue-50 text-neutral-700 hover:text-blue-700 font-medium transition">Сроки ключей ЭЦП</a>
+        </div>
       </div>
     </div>
   </section>
@@ -310,12 +328,12 @@
       analytics: {
         src: 'screenshots/buhly_v3_analytics.png',
         alt: 'Buhly — Отчёты WB/Ozon, банк и расчёт налога',
-        caption: 'Отчёты и налоги: сверка WB/Ozon с выпиской банка, расчёт налога и расшифровка «Как посчитано?» по строчкам.'
+        caption: 'Отчёты и налоги: сверка WB/Ozon с банком, кассовый метод УСН 6%, вычет ИП 30%/20%, мультивалютный ввозной НДС и расшифровка «Как посчитано?».'
       },
       waybills: {
         src: 'screenshots/buhly_v3_waybills.png',
-        alt: 'Buhly — Генератор накладных ТН/ТТН',
-        caption: 'Накладные: загружаешь файл поставки WB, проверяешь цены — и готовая накладная под печать.'
+        alt: 'Buhly — Генератор накладных ТН-2 и 11-графной ТТН-1',
+        caption: 'Накладные: загружаешь поставку WB или Ozon, проверяешь цены — и готовая ТН-2 / 11-графная ТТН-1 под бланк БСО.'
       }
     };
 
@@ -432,7 +450,7 @@
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
         if (goal === 'download_zip' || goal === 'download_exe') {
-          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          var pingUrl = 'https://api.buhly.by/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
           try {
             if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
               return;

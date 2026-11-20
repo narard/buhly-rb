@@ -554,12 +554,103 @@ namespace GovPortalsApp
         public string Eur { get; set; }
     }
 
+    public class NbrbRateOnDateResult
+    {
+        public bool Success { get; set; }
+        public int CurId { get; set; }
+        public string CurAbbreviation { get; set; }
+        public int CurScale { get; set; }
+        public DateTime Date { get; set; }
+        public decimal Rate { get; set; }
+        public string ErrorMessage { get; set; }
+
+        public NbrbRateOnDateResult()
+        {
+            CurAbbreviation = "";
+            CurScale = 1;
+            ErrorMessage = "";
+        }
+
+        public decimal ConvertToByn(decimal foreignAmount)
+        {
+            if (Rate <= 0m || CurScale <= 0) return 0m;
+            return Math.Round(foreignAmount * Rate / CurScale, 2, MidpointRounding.AwayFromZero);
+        }
+
+        public decimal CalculateImportVat(decimal foreignAmount, decimal vatRatePercent)
+        {
+            decimal baseByn = ConvertToByn(foreignAmount);
+            return Math.Round(baseByn * (Math.Max(0m, vatRatePercent) / 100m), 2, MidpointRounding.AwayFromZero);
+        }
+    }
+
     public static class NbrbRatesHelper
     {
+        public const int CurIdUsd = 431;
+        public const int CurIdRub100 = 456;
+        public const int CurIdEur = 451;
+
+        public static int GetDefaultScaleForCurId(int curId)
+        {
+            if (curId == CurIdRub100) return 100;
+            return 1;
+        }
+
+        public static string GetDefaultAbbreviationForCurId(int curId)
+        {
+            if (curId == CurIdRub100) return "RUB";
+            if (curId == CurIdUsd) return "USD";
+            if (curId == CurIdEur) return "EUR";
+            return "";
+        }
+
         private static string ExtractRate(string json)
         {
             var m = Regex.Match(json ?? "", "\"Cur_OfficialRate\"\\s*:\\s*([0-9.]+)");
             return m.Success ? m.Groups[1].Value : null;
+        }
+
+        private static int ExtractIntField(string json, string key, int fallback)
+        {
+            var m = Regex.Match(json ?? "", "\"" + Regex.Escape(key) + "\"\\s*:\\s*([0-9]+)");
+            int parsed;
+            if (m.Success && int.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed) && parsed > 0)
+                return parsed;
+            return fallback;
+        }
+
+        private static string ExtractStringField(string json, string key, string fallback)
+        {
+            var m = Regex.Match(json ?? "", "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"([^\"]+)\"");
+            return m.Success ? m.Groups[1].Value.Trim() : fallback;
+        }
+
+        public static NbrbRateOnDateResult ParseRateOnDateJson(int curId, DateTime onDate, string json)
+        {
+            int defScale = GetDefaultScaleForCurId(curId);
+            string defAbbr = GetDefaultAbbreviationForCurId(curId);
+            var res = new NbrbRateOnDateResult
+            {
+                Success = false,
+                CurId = curId,
+                CurScale = ExtractIntField(json, "Cur_Scale", defScale),
+                CurAbbreviation = ExtractStringField(json, "Cur_Abbreviation", defAbbr),
+                Date = onDate
+            };
+
+            string raw = ExtractRate(json);
+            decimal val;
+            if (!string.IsNullOrEmpty(raw) &&
+                decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out val) &&
+                val > 0m)
+            {
+                res.Success = true;
+                res.Rate = val;
+                return res;
+            }
+
+            res.ErrorMessage = "Курс на выбранную дату не найден в ответе НБРБ.";
+            return res;
         }
 
         private static string HttpGetNbrb(string url)
@@ -608,7 +699,7 @@ namespace GovPortalsApp
             });
         }
 
-        public static void FetchRateOnDateAsync(int curId, DateTime date, Action<decimal?, string> onLoaded)
+        public static void FetchRateOnDateAsync(int curId, DateTime onDate, Action<NbrbRateOnDateResult> onDone)
         {
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -618,23 +709,41 @@ namespace GovPortalsApp
                         CultureInfo.InvariantCulture,
                         "https://www.nbrb.by/api/exrates/rates/{0}?ondate={1:yyyy-MM-dd}",
                         curId,
-                        date);
+                        onDate);
                     string json = HttpGetNbrb(url);
-                    string raw = ExtractRate(json);
-                    decimal val;
-                    if (!string.IsNullOrEmpty(raw) &&
-                        decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out val) &&
-                        val > 0m)
-                    {
-                        if (onLoaded != null) onLoaded(val, null);
-                        return;
-                    }
-                    if (onLoaded != null) onLoaded(null, "Курс на выбранную дату не найден в ответе НБРБ.");
+                    var res = ParseRateOnDateJson(curId, onDate, json);
+                    if (onDone != null) onDone(res);
                 }
                 catch (Exception ex)
                 {
-                    if (onLoaded != null) onLoaded(null, "Ошибка загрузки курса НБРБ: " + ex.Message);
+                    var fail = new NbrbRateOnDateResult
+                    {
+                        Success = false,
+                        CurId = curId,
+                        CurScale = GetDefaultScaleForCurId(curId),
+                        CurAbbreviation = GetDefaultAbbreviationForCurId(curId),
+                        Date = onDate,
+                        ErrorMessage = "Ошибка загрузки курса НБРБ: " + ex.Message
+                    };
+                    if (onDone != null) onDone(fail);
                 }
+            });
+        }
+
+        public static void FetchRub100RateOnDateAsync(DateTime onDate, Action<NbrbRateOnDateResult> onDone)
+        {
+            FetchRateOnDateAsync(CurIdRub100, onDate, onDone);
+        }
+
+        public static void FetchRateOnDateAsync(int curId, DateTime date, Action<decimal?, string> onLoaded)
+        {
+            FetchRateOnDateAsync(curId, date, delegate(NbrbRateOnDateResult res)
+            {
+                if (onLoaded == null) return;
+                if (res != null && res.Success && res.Rate > 0m)
+                    onLoaded(res.Rate, null);
+                else
+                    onLoaded(null, res != null ? res.ErrorMessage : "Ошибка загрузки курса НБРБ.");
             });
         }
 
@@ -652,11 +761,40 @@ namespace GovPortalsApp
         }
     }
 
+    public class UpdateCheckResult
+    {
+        public bool Checked { get; set; }
+        public bool UpdateAvailable { get; set; }
+        public bool SkippedOffline { get; set; }
+        public string TagName { get; set; }
+        public string ReleaseUrl { get; set; }
+        public string SourceUrl { get; set; }
+
+        public UpdateCheckResult()
+        {
+            TagName = "";
+            ReleaseUrl = "";
+            SourceUrl = "";
+        }
+    }
+
     public static class UpdateChecker
     {
-        private const string WorkerVersionApiUrl = "https://buhly-stats.repinm911.workers.dev/api/version";
-        private const string FallbackVersionApiUrl = "https://buhly.by/version.json";
-        private const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
+        public const string PrimaryVersionApiUrl = "https://api.buhly.by/api/version";
+        public const string WorkerVersionApiUrl = "https://buhly-stats.repinm911.workers.dev/api/version";
+        public const string FallbackVersionApiUrl = "https://buhly.by/version.json";
+        public const string LatestReleaseApiUrl = "https://api.github.com/repos/narard/buhly-rb/releases/latest";
+
+        public static string[] GetVersionEndpointChain()
+        {
+            return new string[]
+            {
+                PrimaryVersionApiUrl,
+                WorkerVersionApiUrl,
+                FallbackVersionApiUrl,
+                LatestReleaseApiUrl
+            };
+        }
 
         public static string GetCacheFilePath()
         {
@@ -769,11 +907,38 @@ namespace GovPortalsApp
 
         public static void CheckForUpdatesAsync(Action<string, string> onUpdateAvailable)
         {
+            Version currentVer = Assembly.GetExecutingAssembly().GetName().Version;
+            CheckForUpdatesAsync(currentVer, false, delegate(UpdateCheckResult res)
+            {
+                if (res != null && res.UpdateAvailable && onUpdateAvailable != null)
+                {
+                    onUpdateAvailable(res.TagName, res.ReleaseUrl);
+                }
+            });
+        }
+
+        public static void CheckForUpdatesAsync(Version currentVersion, bool disableChecks, Action<UpdateCheckResult> onResult)
+        {
+            if (disableChecks)
+            {
+                if (onResult != null)
+                {
+                    onResult(new UpdateCheckResult
+                    {
+                        Checked = false,
+                        UpdateAvailable = false,
+                        SkippedOffline = true
+                    });
+                }
+                return;
+            }
+
             ThreadPool.QueueUserWorkItem(delegate
             {
+                var result = new UpdateCheckResult { Checked = true };
                 try
                 {
-                    Version currentVer = Assembly.GetExecutingAssembly().GetName().Version;
+                    Version currentVer = currentVersion ?? Assembly.GetExecutingAssembly().GetName().Version;
                     string cachePath = GetCacheFilePath();
 
                     if (File.Exists(cachePath))
@@ -797,8 +962,12 @@ namespace GovPortalsApp
                                         string cachedUrl = lines.Length >= 3 ? lines[2].Trim() : "";
                                         if (IsRemoteNewer(cachedTag, currentVer) && IsValidReleaseUrl(cachedUrl))
                                         {
-                                            if (onUpdateAvailable != null) onUpdateAvailable(cachedTag, cachedUrl);
+                                            result.UpdateAvailable = true;
+                                            result.TagName = cachedTag;
+                                            result.ReleaseUrl = cachedUrl;
+                                            result.SourceUrl = "cache";
                                         }
+                                        if (onResult != null) onResult(result);
                                         return;
                                     }
                                 }
@@ -809,9 +978,10 @@ namespace GovPortalsApp
 
                     string tagName = "";
                     string htmlUrl = "";
+                    string sourceUrl = "";
 
-                    string[] candidateUrls = new string[] { WorkerVersionApiUrl, FallbackVersionApiUrl, LatestReleaseApiUrl };
-                    int[] timeouts = new int[] { 4000, 4000, 5000 };
+                    string[] candidateUrls = GetVersionEndpointChain();
+                    int[] timeouts = new int[] { 4000, 4000, 4000, 5000 };
                     for (int u = 0; u < candidateUrls.Length; u++)
                     {
                         try
@@ -823,6 +993,7 @@ namespace GovPortalsApp
                             {
                                 tagName = t;
                                 htmlUrl = h;
+                                sourceUrl = candidateUrls[u];
                                 break;
                             }
                         }
@@ -834,7 +1005,10 @@ namespace GovPortalsApp
 
                     if (IsRemoteNewer(tagName, currentVer) && IsValidReleaseUrl(htmlUrl))
                     {
-                        if (onUpdateAvailable != null) onUpdateAvailable(tagName, htmlUrl);
+                        result.UpdateAvailable = true;
+                        result.TagName = tagName;
+                        result.ReleaseUrl = htmlUrl;
+                        result.SourceUrl = sourceUrl;
                     }
                 }
                 catch
@@ -846,6 +1020,8 @@ namespace GovPortalsApp
                     }
                     catch { }
                 }
+
+                if (onResult != null) onResult(result);
             });
         }
     }

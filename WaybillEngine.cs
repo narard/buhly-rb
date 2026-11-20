@@ -92,6 +92,7 @@ namespace GovPortalsApp
         public int MissingPriceCount { get; set; }
         public int RoundingWarningCount { get; set; }
         public int CatalogFilledCount { get; set; }
+        public string SourceMarketplace { get; set; }
 
         public WaybillBuildResult()
         {
@@ -100,6 +101,7 @@ namespace GovPortalsApp
             SourceItems = new List<WbSourceItem>();
             GroupedItems = new List<GroupedWaybillItem>();
             Warnings = new List<string>();
+            SourceMarketplace = WaybillEngine.MarketplaceWildberries;
         }
     }
 
@@ -174,6 +176,15 @@ namespace GovPortalsApp
 
         public const string PriceModeExtractVat = "ExtractVat";
         public const string PriceModeAddVat = "AddVat";
+
+        public const string MarketplaceWildberries = "Wildberries";
+        public const string MarketplaceOzon = "Ozon";
+
+        public const string WbReceiverUnp = "193630204";
+        public const string OzonReceiverUnp = "193602362";
+        public const string OzonReceiverInfo = "ООО «ОЗОН Маркет Бел», 223021, Минская обл., Минский р-н, Щомыслицкий с/с, 28/1, пом. 21";
+        public const string DefaultWbBasisPrefix = "оферта, акц. 01.02.2023";
+        public const string DefaultOzonBasisPrefix = "договор оферты Ozon";
 
         private static readonly XNamespace MainNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         private static readonly XNamespace XmlNs = XNamespace.Xml;
@@ -359,10 +370,50 @@ namespace GovPortalsApp
         {
             if (p == null) return;
             p.ReceiverPreset = "WB";
-            p.ReceiverUnp = "193630204";
+            p.ReceiverUnp = WbReceiverUnp;
             p.ReceiverInfo = "Общество с ограниченной ответственностью \"ИМВБРБ\", 220036, г. Минск, ул. Грушевская 21, помещение 217";
-            if (string.IsNullOrEmpty(p.BasisPrefix))
-                p.BasisPrefix = "оферта, акц. 01.02.2023";
+            if (string.IsNullOrWhiteSpace(p.BasisPrefix) ||
+                string.Equals(p.BasisPrefix.Trim(), DefaultOzonBasisPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                p.BasisPrefix = DefaultWbBasisPrefix;
+            }
+        }
+
+        public static void ApplyOzonPreset(WaybillProfile p)
+        {
+            if (p == null) return;
+            p.ReceiverPreset = "Ozon";
+            p.ReceiverUnp = OzonReceiverUnp;
+            p.ReceiverInfo = OzonReceiverInfo;
+            if (string.IsNullOrWhiteSpace(p.BasisPrefix) ||
+                string.Equals(p.BasisPrefix.Trim(), DefaultWbBasisPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                p.BasisPrefix = DefaultOzonBasisPrefix;
+            }
+        }
+
+        public static bool IsEmptyOrStandardWbReceiver(string unp, string info)
+        {
+            string u = (unp ?? "").Trim();
+            string inf = (info ?? "").Trim();
+            if (string.IsNullOrEmpty(u) && string.IsNullOrEmpty(inf))
+                return true;
+            if (string.Equals(u, WbReceiverUnp, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (inf.IndexOf("ИМВБРБ", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
+        }
+
+        public static bool IsStandardOzonReceiver(string unp, string info)
+        {
+            string u = (unp ?? "").Trim();
+            string inf = (info ?? "").Trim();
+            if (string.Equals(u, OzonReceiverUnp, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (inf.IndexOf("ОЗОН Маркет Бел", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
         }
 
         public static bool TryExtractFromCertStore(out string unp, out string orgName, out string signerLine)
@@ -503,66 +554,272 @@ namespace GovPortalsApp
             if (paths == null) return result;
             var rules = ParseRules(profile != null ? profile.RulesText : "");
             bool applyRules = profile != null && profile.UseNormalizationRules;
+            bool preferNoVatPrice = profile != null &&
+                string.Equals(profile.PriceInputMode, PriceModeAddVat, StringComparison.OrdinalIgnoreCase);
             var supplySet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int ozonFilesCount = 0;
+            int wbFilesCount = 0;
 
             foreach (var file in paths)
             {
                 if (string.IsNullOrEmpty(file) || !File.Exists(file)) continue;
                 result.InputFiles.Add(file);
 
+                string fileName = Path.GetFileName(file) ?? "";
                 string fileNameNoExt = Path.GetFileNameWithoutExtension(file) ?? "";
-                string fallbackSupplyId = ExtractSupplyNumber(fileNameNoExt);
+                string fileNameLower = fileName.ToLowerInvariant().Replace('ё', 'е');
+                bool isCsvFile = fileNameLower.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+
+                bool hasOzonSignal = fileNameLower.Contains("ozon") || fileNameLower.Contains("озон");
+                bool hasWbSignal = fileNameLower.Contains("wb-gi") || fileNameLower.Contains("wb_") ||
+                                   fileNameLower.Contains("wildberries") || fileNameLower.Contains("вайлдберриз");
+
+                string wbSupplyFromFileName = ExtractSupplyNumber(fileNameNoExt);
+                if (!string.IsNullOrEmpty(wbSupplyFromFileName))
+                    hasWbSignal = true;
+
+                string fallbackSupplyId = wbSupplyFromFileName;
                 if (string.IsNullOrEmpty(fallbackSupplyId))
                     fallbackSupplyId = fileNameNoExt.ToUpperInvariant();
 
-                var rows = ReadFirstSheetRows(file, result.Warnings);
+                var rows = ReadSupplyFileRows(file, result.Warnings);
                 if (rows.Count == 0) continue;
 
                 int headerIdx = -1;
                 int colName = -1, colPrice = -1, colSupply = -1, colSticker = -1, colArticle = -1, colBarcode = -1, colQty = -1;
+                int colMass = -1, colCargoPlaces = -1;
+                bool massIsGrams = false;
+                bool priceColIsLineTotal = false;
 
-                int scanLimit = Math.Min(15, rows.Count);
+                int scanLimit = Math.Min(25, rows.Count);
                 for (int r = 0; r < scanLimit; r++)
                 {
                     var row = rows[r];
-                    int foundName = -1, foundPrice = -1;
-                    int fSupply = -1, fSticker = -1, fArticle = -1, fBarcode = -1, fQty = -1;
+                    int foundName = -1;
+                    int fPriceUnitWithVat = -1, fPriceUnitNoVat = -1, fPriceUnitGeneric = -1, fPriceCost = -1, fPriceTotal = -1;
+                    int fSupplyPrimary = -1, fPosting = -1, fStickerDirect = -1;
+                    int fArticlePrimary = -1, fArticleSecondary = -1;
+                    int fBarcode = -1;
+                    int fQtyPrimary = -1, fQtySecondary = -1;
+                    int fMass = -1, fCargoPlaces = -1;
+                    bool fMassIsGrams = false;
+                    bool rowHasOzonHeader = false;
+                    bool rowHasWbHeader = false;
+                    bool rowHasOzonSoftHeader = false;
+
                     foreach (var kv in row)
                     {
-                        string h = (kv.Value ?? "").Trim().ToLowerInvariant();
+                        string h = NormalizeHeaderText(kv.Value);
                         if (string.IsNullOrEmpty(h)) continue;
-                        if (foundName < 0 && (h == "наименование" || h.Contains("наименование товара") || h.Contains("наименование номенклатуры") || h == "название" || h == "товар" || h == "предмет"))
+
+                        if (h.Contains("ozon") || h.Contains("озон") ||
+                            h == "offer id" || h == "offer_id" ||
+                            h == "fbo sku" || h == "fbs sku" ||
+                            h.Contains("номер отправления") || h.Contains("№ отправления") ||
+                            h.Contains("сумма отправления") || h.Contains("принят в обработку") ||
+                            h.Contains("склад отгрузки") || h.Contains("кластер"))
+                        {
+                            rowHasOzonHeader = true;
+                        }
+                        if (h.Contains("qr-код поставки") || h.Contains("артикул wb") ||
+                            h.Contains("wildberries") || h == "стикер" || h.Contains("стикер"))
+                        {
+                            rowHasWbHeader = true;
+                        }
+                        if (h == "sku" || h == "код товара" || h == "заявлено" || h == "принято")
+                        {
+                            rowHasOzonSoftHeader = true;
+                        }
+
+                        if (foundName < 0 && (
+                            h == "наименование" ||
+                            h == "название" ||
+                            h == "товар" ||
+                            h == "предмет" ||
+                            h == "наименование позиции" ||
+                            h == "имя товара" ||
+                            h.Contains("наименование товара") ||
+                            h.Contains("название товара") ||
+                            h.Contains("наименование номенклатуры")))
+                        {
                             foundName = kv.Key;
-                        if (foundPrice < 0 && (h.Contains("стоимость") || h == "цена" || h.StartsWith("цена ") || h.StartsWith("цена,") || h.Contains("цена за ед")))
-                            foundPrice = kv.Key;
-                        if (fSupply < 0 && (h.Contains("qr-код поставки") || h.Contains("номер поставки") || h == "поставка" || h.Contains("№ поставки") || h.Contains("id поставки")))
-                            fSupply = kv.Key;
-                        if (fSticker < 0 && (h == "стикер" || h.Contains("стикер")))
-                            fSticker = kv.Key;
-                        if (fArticle < 0 && (h.Contains("артикул продавца") || h.Contains("артикул поставщика") || h == "артикул" || h.Contains("артикул wb")))
-                            fArticle = kv.Key;
-                        if (fBarcode < 0 && (h == "баркод" || h == "шк" || h.Contains("штрихкод") || h == "gtin"))
+                        }
+
+                        bool isVatTaxAmountOnly = h.Contains("сумма ндс") || h.Contains("ставка ндс") ||
+                                                  h.Contains("ндс, %") || h.Contains("ндс %");
+                        if (!isVatTaxAmountOnly)
+                        {
+                            if (fPriceUnitWithVat < 0 && (h.Contains("цена с ндс") || h.Contains("цена, с ндс")))
+                                fPriceUnitWithVat = kv.Key;
+                            else if (fPriceUnitNoVat < 0 && (h.Contains("цена без ндс") || h.Contains("цена, без ндс")))
+                                fPriceUnitNoVat = kv.Key;
+                            else if (fPriceUnitGeneric < 0 && (
+                                h == "цена" || h.StartsWith("цена ") || h.StartsWith("цена,") || h.StartsWith("цена(") ||
+                                h.Contains("цена за ед") || h.Contains("цена товара") || h == "ваша цена"))
+                                fPriceUnitGeneric = kv.Key;
+                            else if (fPriceCost < 0 && (
+                                h == "стоимость" || h == "стоимость товара" ||
+                                h.StartsWith("стоимость ") || h.StartsWith("стоимость,") || h.StartsWith("стоимость(")))
+                                fPriceCost = kv.Key;
+                            else if (fPriceTotal < 0 && (
+                                h == "итого" || h == "сумма" ||
+                                h.StartsWith("сумма ") || h.StartsWith("сумма,") || h.StartsWith("сумма(") ||
+                                h.StartsWith("итого ") || h.StartsWith("итого,") ||
+                                h.Contains("итоговая сумма") || h.Contains("итоговая стоимость")))
+                                fPriceTotal = kv.Key;
+                        }
+
+                        if (fSupplyPrimary < 0 && (
+                            h.Contains("qr-код поставки") || h.Contains("номер поставки") ||
+                            h == "поставка" || h.Contains("№ поставки") || h.Contains("id поставки") ||
+                            h.Contains("номер задания") || h.Contains("номер заявки")))
+                        {
+                            fSupplyPrimary = kv.Key;
+                        }
+                        if (fPosting < 0 && (
+                            h.Contains("номер отправления") || h.Contains("№ отправления") || h == "отправление"))
+                        {
+                            fPosting = kv.Key;
+                        }
+                        if (fStickerDirect < 0 && (h == "стикер" || h.Contains("стикер")))
+                        {
+                            fStickerDirect = kv.Key;
+                        }
+
+                        if (fArticlePrimary < 0 && (
+                            h.Contains("артикул продавца") || h.Contains("артикул поставщика") ||
+                            h == "артикул" || h == "offer id" || h == "offer_id" || h == "код товара"))
+                        {
+                            fArticlePrimary = kv.Key;
+                        }
+                        else if (fArticleSecondary < 0 && (
+                            h.Contains("артикул wb") || h == "ozon id" || h == "ozon sku" ||
+                            h == "fbo sku" || h == "fbs sku" || h == "sku" ||
+                            h.Contains("ozon product id") || h.Contains("артикул")))
+                        {
+                            fArticleSecondary = kv.Key;
+                        }
+
+                        if (fBarcode < 0 && (
+                            h == "баркод" || h == "шк" || h == "barcode" || h == "gtin" || h == "ean" ||
+                            h.Contains("штрихкод") || h.Contains("штрих-код") || h.Contains("штрих код")))
+                        {
                             fBarcode = kv.Key;
-                        if (fQty < 0 && (h == "количество" || h == "кол-во" || h == "шт" || h.Contains("к отгрузке") || h.Contains("кол-во,") || h == "план"))
-                            fQty = kv.Key;
+                        }
+
+                        bool isCargoPlacesHeader =
+                            h.Contains("грузовых мест") || h.Contains("груз. мест") ||
+                            h == "мест" || h.Contains("кол-во мест") || h.Contains("количество мест") ||
+                            h == "коробов" || h == "коробок" || h == "коробки" ||
+                            h.Contains("кол-во коробов") || h.Contains("количество коробов");
+                        if (fCargoPlaces < 0 && isCargoPlacesHeader)
+                        {
+                            fCargoPlaces = kv.Key;
+                        }
+
+                        bool isVolumetricWeight = h.Contains("объемн");
+                        if (fMass < 0 && !isVolumetricWeight && (
+                            h == "вес" || h == "масса" ||
+                            h.StartsWith("вес,") || h.StartsWith("вес ") || h.StartsWith("вес(") ||
+                            h.StartsWith("масса,") || h.StartsWith("масса ") || h.StartsWith("масса(") ||
+                            h.Contains("вес брутто") || h.Contains("масса брутто") || h.Contains("масса груза")))
+                        {
+                            fMass = kv.Key;
+                            fMassIsGrams = IsGramsUnitHeader(h);
+                        }
+
+                        if (!isCargoPlacesHeader &&
+                            !h.Contains("мест") && !h.Contains("короб") && !h.Contains("палет") &&
+                            !h.Contains("упаков") && !h.Contains("строк") && !h.Contains("позиц"))
+                        {
+                            if (fQtyPrimary < 0 && (
+                                h == "количество" || h == "кол-во" || h == "количество товара" ||
+                                h == "заявлено" || h == "шт" || h == "план" ||
+                                h.Contains("к отгрузке") ||
+                                h.StartsWith("кол-во,") || h.StartsWith("кол-во ") || h.StartsWith("кол-во(") ||
+                                h.StartsWith("количество,") || h.StartsWith("количество ") || h.StartsWith("количество(")))
+                            {
+                                fQtyPrimary = kv.Key;
+                            }
+                            else if (fQtySecondary < 0 && (
+                                h == "принято" || h.StartsWith("принято ") || h.StartsWith("принято,") || h.StartsWith("принято(")))
+                            {
+                                fQtySecondary = kv.Key;
+                            }
+                        }
                     }
-                    bool hasSupportingCol = (foundPrice >= 0 || fQty >= 0 || fArticle >= 0 || fBarcode >= 0 || fSupply >= 0);
+
+                    int chosenPrice = -1;
+                    bool chosenPriceIsTotal = false;
+                    if (preferNoVatPrice && fPriceUnitNoVat >= 0)
+                        chosenPrice = fPriceUnitNoVat;
+                    else if (fPriceUnitWithVat >= 0)
+                        chosenPrice = fPriceUnitWithVat;
+                    else if (fPriceUnitGeneric >= 0)
+                        chosenPrice = fPriceUnitGeneric;
+                    else if (fPriceUnitNoVat >= 0)
+                        chosenPrice = fPriceUnitNoVat;
+                    else if (fPriceCost >= 0)
+                        chosenPrice = fPriceCost;
+                    else if (fPriceTotal >= 0)
+                    {
+                        chosenPrice = fPriceTotal;
+                        chosenPriceIsTotal = true;
+                    }
+
+                    int chosenSupply = fSupplyPrimary >= 0 ? fSupplyPrimary : fPosting;
+                    int chosenSticker = fStickerDirect >= 0 ? fStickerDirect : fPosting;
+                    int chosenArticle = fArticlePrimary >= 0 ? fArticlePrimary : fArticleSecondary;
+                    int chosenQty = fQtyPrimary >= 0 ? fQtyPrimary : fQtySecondary;
+
+                    bool hasSupportingCol = (chosenPrice >= 0 || chosenQty >= 0 || chosenArticle >= 0 || fBarcode >= 0 || chosenSupply >= 0);
                     if (foundName >= 0 && hasSupportingCol)
                     {
                         headerIdx = r;
                         colName = foundName;
-                        colPrice = foundPrice;
-                        colSupply = fSupply;
-                        colSticker = fSticker;
-                        colArticle = fArticle;
+                        colPrice = chosenPrice;
+                        priceColIsLineTotal = chosenPriceIsTotal;
+                        colSupply = chosenSupply;
+                        colSticker = chosenSticker;
+                        colArticle = chosenArticle;
                         colBarcode = fBarcode;
-                        colQty = fQty;
+                        colQty = chosenQty;
+                        colMass = fMass;
+                        massIsGrams = fMassIsGrams;
+                        colCargoPlaces = fCargoPlaces;
+
+                        if (rowHasOzonHeader) hasOzonSignal = true;
+                        if (rowHasWbHeader) hasWbSignal = true;
+                        if (isCsvFile && !hasWbSignal && (rowHasOzonSoftHeader || fMass >= 0 || fCargoPlaces >= 0))
+                            hasOzonSignal = true;
                         break;
                     }
                 }
 
                 if (headerIdx < 0)
-                    throw new InvalidOperationException("В файле «" + Path.GetFileName(file) + "» не найдены колонки «Наименование» и «Стоимость»/«Количество»/«Артикул».");
+                    throw new InvalidOperationException("В файле «" + Path.GetFileName(file) + "» не найдены колонки «Наименование» и «Цена»/«Стоимость»/«Количество»/«Артикул».");
+
+                // Inspect metadata rows above the table header for marketplace hints & supply number
+                for (int r = 0; r < headerIdx; r++)
+                {
+                    foreach (var kv in rows[r])
+                    {
+                        string cellVal = (kv.Value ?? "").Trim();
+                        if (string.IsNullOrEmpty(cellVal)) continue;
+                        string lowerMeta = cellVal.ToLowerInvariant().Replace('ё', 'е');
+                        if (lowerMeta.Contains("ozon") || lowerMeta.Contains("озон"))
+                            hasOzonSignal = true;
+                        if (lowerMeta.Contains("wildberries") || lowerMeta.Contains("имвбрб") || lowerMeta.Contains("wb-gi-"))
+                            hasWbSignal = true;
+
+                        if (string.IsNullOrEmpty(wbSupplyFromFileName))
+                        {
+                            string extractedMetaSupply = ExtractSupplyNumberFromMetadata(cellVal);
+                            if (!string.IsNullOrEmpty(extractedMetaSupply))
+                                fallbackSupplyId = extractedMetaSupply;
+                        }
+                    }
+                }
 
                 if (colSticker < 0 || colPrice < 0)
                     result.IsFboDetected = true;
@@ -580,17 +837,13 @@ namespace GovPortalsApp
                         continue;
 
                     string trimmedName = rawName.Trim();
-                    if (trimmedName.Equals("итого", StringComparison.OrdinalIgnoreCase) ||
-                        trimmedName.Equals("всего", StringComparison.OrdinalIgnoreCase))
+                    string trimmedNameLower = trimmedName.ToLowerInvariant();
+                    if (trimmedNameLower == "итого" ||
+                        trimmedNameLower == "всего" ||
+                        trimmedNameLower.StartsWith("итого ") ||
+                        trimmedNameLower.StartsWith("итого:") ||
+                        trimmedNameLower.StartsWith("всего:"))
                         continue;
-
-                    decimal price = 0m;
-                    if (colPrice >= 0 && !string.IsNullOrWhiteSpace(rawPrice))
-                    {
-                        decimal parsedPrice;
-                        if (TryParseMoney(rawPrice, out parsedPrice) && parsedPrice >= 0m)
-                            price = Math.Round(parsedPrice, 2, MidpointRounding.AwayFromZero);
-                    }
 
                     int qty = 1;
                     if (colQty >= 0)
@@ -608,13 +861,34 @@ namespace GovPortalsApp
                         }
                     }
 
+                    decimal price = 0m;
+                    if (colPrice >= 0 && !string.IsNullOrWhiteSpace(rawPrice))
+                    {
+                        decimal parsedPrice;
+                        if (TryParseMoney(rawPrice, out parsedPrice) && parsedPrice >= 0m)
+                        {
+                            if (priceColIsLineTotal && qty > 1)
+                                price = Math.Round(parsedPrice / qty, 2, MidpointRounding.AwayFromZero);
+                            else
+                                price = Math.Round(parsedPrice, 2, MidpointRounding.AwayFromZero);
+                        }
+                    }
+
                     string rawSupply = "";
                     if (colSupply >= 0) row.TryGetValue(colSupply, out rawSupply);
                     string supplyId = ExtractSupplyNumber(rawSupply);
-                    if (string.IsNullOrEmpty(supplyId))
-                        supplyId = !string.IsNullOrWhiteSpace(rawSupply) ? rawSupply.Trim() : fallbackSupplyId;
                     if (!string.IsNullOrEmpty(supplyId))
                     {
+                        hasWbSignal = true;
+                    }
+                    else
+                    {
+                        supplyId = !string.IsNullOrWhiteSpace(rawSupply) ? rawSupply.Trim() : fallbackSupplyId;
+                    }
+                    if (!string.IsNullOrEmpty(supplyId))
+                    {
+                        if (!hasWbSignal && Regex.IsMatch(supplyId, @"^\d{5,12}-\d{3,5}-\d+$"))
+                            hasOzonSignal = true;
                         supplySet.Add(supplyId);
                         foundSupplyInFile = true;
                     }
@@ -626,9 +900,44 @@ namespace GovPortalsApp
                     string barcode = "";
                     if (colBarcode >= 0) row.TryGetValue(colBarcode, out barcode);
 
+                    int cargoPlaces = 0;
+                    if (colCargoPlaces >= 0)
+                    {
+                        string rawPlaces;
+                        if (row.TryGetValue(colCargoPlaces, out rawPlaces) && !string.IsNullOrWhiteSpace(rawPlaces))
+                        {
+                            decimal parsedPlaces;
+                            if (TryParseMoney(rawPlaces, out parsedPlaces) && parsedPlaces > 0m)
+                                cargoPlaces = (int)Math.Round(parsedPlaces, 0, MidpointRounding.AwayFromZero);
+                        }
+                    }
+
+                    decimal cargoMassKg = 0m;
+                    if (colMass >= 0)
+                    {
+                        string rawMass;
+                        if (row.TryGetValue(colMass, out rawMass) && !string.IsNullOrWhiteSpace(rawMass))
+                        {
+                            decimal parsedMass;
+                            if (TryParseMoney(rawMass, out parsedMass) && parsedMass > 0m)
+                            {
+                                bool rowInGrams = massIsGrams;
+                                string lowerMass = rawMass.ToLowerInvariant();
+                                if (lowerMass.Contains("кг") || lowerMass.Contains("kg"))
+                                    rowInGrams = false;
+                                else if (Regex.IsMatch(lowerMass, @"(?:^|[\d\s])(?:г|гр|g)\.?(?:\s|$)"))
+                                    rowInGrams = true;
+
+                                cargoMassKg = rowInGrams
+                                    ? Math.Round(parsedMass / 1000m, 3, MidpointRounding.AwayFromZero)
+                                    : Math.Round(parsedMass, 3, MidpointRounding.AwayFromZero);
+                            }
+                        }
+                    }
+
                     result.SourceItems.Add(new WbSourceItem
                     {
-                        SourceFile = Path.GetFileName(file),
+                        SourceFile = fileName,
                         SupplyId = supplyId,
                         Sticker = (sticker ?? "").Trim(),
                         Article = (article ?? "").Trim(),
@@ -636,13 +945,24 @@ namespace GovPortalsApp
                         RawName = trimmedName,
                         NormalizedName = NormalizeItemName(trimmedName, rules, applyRules),
                         Price = price,
-                        Qty = qty
+                        Qty = qty,
+                        CargoPlaces = cargoPlaces,
+                        CargoMassKg = cargoMassKg
                     });
                 }
 
                 if (!foundSupplyInFile && !string.IsNullOrEmpty(fallbackSupplyId))
                     supplySet.Add(fallbackSupplyId);
+
+                if (hasOzonSignal && !hasWbSignal)
+                    ozonFilesCount++;
+                else
+                    wbFilesCount++;
             }
+
+            result.SourceMarketplace = (ozonFilesCount > 0 && ozonFilesCount >= wbFilesCount)
+                ? MarketplaceOzon
+                : MarketplaceWildberries;
 
             result.SupplyIds = supplySet.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
 
@@ -666,7 +986,9 @@ namespace GovPortalsApp
                         UnitPrice = item.Price,
                         VatRateLabel = vatMode,
                         Article = item.Article ?? "",
-                        Note = !string.IsNullOrEmpty(item.Barcode) ? item.Barcode : (item.Article ?? "")
+                        Note = !string.IsNullOrEmpty(item.Barcode) ? item.Barcode : (item.Article ?? ""),
+                        CargoPlaces = 0,
+                        CargoMassKg = 0m
                     };
                     groupsDict[key] = grp;
                 }
@@ -678,6 +1000,8 @@ namespace GovPortalsApp
                         grp.Note = !string.IsNullOrEmpty(item.Barcode) ? item.Barcode : item.Article;
                 }
                 grp.Qty += item.Qty;
+                grp.CargoPlaces += item.CargoPlaces;
+                grp.CargoMassKg = Math.Round(grp.CargoMassKg + item.CargoMassKg, 3, MidpointRounding.AwayFromZero);
             }
 
             var groupedList = groupsDict.Values.ToList();
@@ -840,6 +1164,22 @@ namespace GovPortalsApp
             return hits;
         }
 
+        private static string NormalizeHeaderText(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            string s = raw.Trim().Trim('\uFEFF', '"', '\'').ToLowerInvariant().Replace('ё', 'е');
+            s = Regex.Replace(s, @"\s+", " ");
+            return s.Trim();
+        }
+
+        private static bool IsGramsUnitHeader(string h)
+        {
+            if (string.IsNullOrEmpty(h)) return false;
+            if (h.Contains("кг") || h.Contains("kg") || h.Contains("килограмм")) return false;
+            if (h.Contains("грамм")) return true;
+            return Regex.IsMatch(h, @"(?:^|[\s,(/])(?:г|гр|g)\.?(?:[\s,)/]|$)", RegexOptions.IgnoreCase);
+        }
+
         private static string ExtractSupplyNumber(string text)
         {
             if (string.IsNullOrEmpty(text)) return "";
@@ -850,6 +1190,212 @@ namespace GovPortalsApp
                 return val.StartsWith("WB-") ? val : "WB-" + val;
             }
             return "";
+        }
+
+        private static string ExtractSupplyNumberFromMetadata(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            string wbNum = ExtractSupplyNumber(text);
+            if (!string.IsNullOrEmpty(wbNum)) return wbNum;
+            var m = Regex.Match(text, @"(?:поставк\w*|заявк\w*|отправлен\w*)\s*(?:[№#]|n\.?)?\s*[:№#]?\s*([A-Za-z0-9][A-Za-z0-9\-/]{3,})", RegexOptions.IgnoreCase);
+            if (m.Success)
+                return m.Groups[1].Value.Trim();
+            return "";
+        }
+
+        private static string FormatSupplyIdsForBasis(List<string> supplyIds)
+        {
+            if (supplyIds == null || supplyIds.Count == 0) return "";
+            if (supplyIds.Count <= 5) return string.Join(", ", supplyIds);
+            return string.Join(", ", supplyIds.Take(5)) + " и ещё " + (supplyIds.Count - 5);
+        }
+
+        private static List<Dictionary<int, string>> ReadSupplyFileRows(string path, List<string> warnings)
+        {
+            if (!string.IsNullOrEmpty(path) && path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+                return ReadCsvRows(path, warnings);
+            return ReadFirstSheetRows(path, warnings);
+        }
+
+        private static List<Dictionary<int, string>> ReadCsvRows(string csvPath, List<string> warnings)
+        {
+            string text = ReadTextWithEncodingDetection(csvPath);
+            if (string.IsNullOrWhiteSpace(text))
+                return new List<Dictionary<int, string>>();
+            char delim = DetectCsvDelimiter(text);
+            return ParseCsvLogicalRows(text, delim, 0);
+        }
+
+        private static string ReadTextWithEncodingDetection(string path)
+        {
+            byte[] raw = File.ReadAllBytes(path);
+            if (raw == null || raw.Length == 0) return "";
+            if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF)
+                return Encoding.UTF8.GetString(raw, 3, raw.Length - 3);
+            if (raw.Length >= 2 && raw[0] == 0xFF && raw[1] == 0xFE)
+                return Encoding.Unicode.GetString(raw, 2, raw.Length - 2);
+            if (raw.Length >= 2 && raw[0] == 0xFE && raw[1] == 0xFF)
+                return Encoding.BigEndianUnicode.GetString(raw, 2, raw.Length - 2);
+            try
+            {
+                return new UTF8Encoding(false, true).GetString(raw);
+            }
+            catch (DecoderFallbackException)
+            {
+                return Encoding.GetEncoding(1251).GetString(raw);
+            }
+        }
+
+        private static char DetectCsvDelimiter(string text)
+        {
+            char[] candidates = new char[] { ';', '\t', ',' };
+            char bestDelim = ';';
+            double bestScore = -1.0;
+
+            for (int c = 0; c < candidates.Length; c++)
+            {
+                char d = candidates[c];
+                var sample = ParseCsvLogicalRows(text, d, 12);
+                int nonEmptyRows = 0;
+                int multiColRows = 0;
+                int headerKeywordHits = 0;
+                var colCounts = new Dictionary<int, int>();
+
+                for (int i = 0; i < sample.Count; i++)
+                {
+                    var row = sample[i];
+                    bool hasAny = false;
+                    foreach (var kv in row)
+                    {
+                        if (!string.IsNullOrWhiteSpace(kv.Value))
+                        {
+                            hasAny = true;
+                            string h = NormalizeHeaderText(kv.Value);
+                            if (h == "наименование" || h.Contains("наименование товара") || h.Contains("название товара") ||
+                                h == "артикул" || h == "offer id" || h == "ozon id" || h == "ozon sku" || h == "sku" ||
+                                h == "количество" || h == "кол-во" || h == "цена" || h.StartsWith("цена ") ||
+                                h == "стоимость" || h == "штрихкод" || h == "баркод" || h.Contains("номер отправления") ||
+                                h.Contains("номер поставки"))
+                            {
+                                headerKeywordHits++;
+                            }
+                        }
+                    }
+                    if (!hasAny) continue;
+                    nonEmptyRows++;
+                    int cnt = row.Count;
+                    if (cnt >= 2) multiColRows++;
+                    int existing;
+                    colCounts.TryGetValue(cnt, out existing);
+                    colCounts[cnt] = existing + 1;
+                }
+
+                if (nonEmptyRows == 0 || multiColRows == 0) continue;
+
+                int bestModeCount = 0;
+                int modeCols = 1;
+                foreach (var kv in colCounts)
+                {
+                    if (kv.Key >= 2 && (kv.Value > bestModeCount || (kv.Value == bestModeCount && kv.Key > modeCols)))
+                    {
+                        bestModeCount = kv.Value;
+                        modeCols = kv.Key;
+                    }
+                }
+
+                double consistency = (double)bestModeCount / nonEmptyRows;
+                double tieBreak = (d == ';') ? 0.5 : ((d == '\t') ? 0.25 : 0.0);
+                double score = headerKeywordHits * 25.0 + consistency * 10.0 + Math.Min(modeCols, 20) + tieBreak;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestDelim = d;
+                }
+            }
+
+            return bestDelim;
+        }
+
+        private static List<Dictionary<int, string>> ParseCsvLogicalRows(string text, char delimiter, int maxRows)
+        {
+            var rows = new List<Dictionary<int, string>>();
+            if (string.IsNullOrEmpty(text)) return rows;
+
+            var currentRow = new Dictionary<int, string>();
+            var field = new StringBuilder();
+            int colIdx = 1;
+            bool inQuotes = false;
+            bool fieldHasContent = false;
+            int len = text.Length;
+
+            for (int i = 0; i < len; i++)
+            {
+                char ch = text[i];
+                if (inQuotes)
+                {
+                    if (ch == '"')
+                    {
+                        if (i + 1 < len && text[i + 1] == '"')
+                        {
+                            field.Append('"');
+                            i++;
+                        }
+                        else
+                        {
+                            inQuotes = false;
+                        }
+                    }
+                    else
+                    {
+                        field.Append(ch);
+                    }
+                }
+                else
+                {
+                    if (ch == '"' && field.Length == 0)
+                    {
+                        inQuotes = true;
+                        fieldHasContent = true;
+                    }
+                    else if (ch == delimiter)
+                    {
+                        currentRow[colIdx] = field.ToString();
+                        field.Length = 0;
+                        colIdx++;
+                        fieldHasContent = true;
+                    }
+                    else if (ch == '\r' || ch == '\n')
+                    {
+                        if (ch == '\r' && i + 1 < len && text[i + 1] == '\n')
+                            i++;
+
+                        if (fieldHasContent || field.Length > 0 || currentRow.Count > 0)
+                        {
+                            currentRow[colIdx] = field.ToString();
+                            rows.Add(currentRow);
+                            if (maxRows > 0 && rows.Count >= maxRows)
+                                return rows;
+                        }
+                        currentRow = new Dictionary<int, string>();
+                        field.Length = 0;
+                        colIdx = 1;
+                        fieldHasContent = false;
+                    }
+                    else
+                    {
+                        field.Append(ch);
+                        fieldHasContent = true;
+                    }
+                }
+            }
+
+            if (fieldHasContent || field.Length > 0 || currentRow.Count > 0)
+            {
+                currentRow[colIdx] = field.ToString();
+                rows.Add(currentRow);
+            }
+
+            return rows;
         }
 
         private static bool TryParseMoney(string raw, out decimal val)
@@ -1173,11 +1719,13 @@ namespace GovPortalsApp
                     SetCellString(rowsByNum, 13, "R", (profile.SenderInfo ?? "").Trim());
                     SetCellString(rowsByNum, 15, "R", (profile.ReceiverInfo ?? "").Trim());
 
-                    string suppliesStr = data.SupplyIds.Count > 0 ? string.Join(", ", data.SupplyIds) : "";
+                    string suppliesStr = FormatSupplyIdsForBasis(data.SupplyIds);
                     string basisPrefix = (profile.BasisPrefix ?? "").Trim();
+                    bool isOzonBasis = string.Equals(data.SourceMarketplace, MarketplaceOzon, StringComparison.OrdinalIgnoreCase);
+                    string supplyLabel = isOzonBasis ? "поставка №: " : "сборочные задания №: ";
                     string basisText = string.IsNullOrEmpty(suppliesStr)
                         ? basisPrefix
-                        : (string.IsNullOrEmpty(basisPrefix) ? "сборочные задания №: " + suppliesStr : basisPrefix + ", сборочные задания №: " + suppliesStr);
+                        : (string.IsNullOrEmpty(basisPrefix) ? supplyLabel + suppliesStr : basisPrefix + ", " + supplyLabel + suppliesStr);
                     SetCellString(rowsByNum, 17, "T", basisText);
 
                     // 2. Item rows 22 .. 199
@@ -1488,11 +2036,13 @@ namespace GovPortalsApp
             string bsoFull = (bsoSer + " " + bsoNum).Trim();
             if (string.IsNullOrEmpty(bsoFull)) bsoFull = "____________";
 
-            string suppliesStr = data.SupplyIds.Count > 0 ? string.Join(", ", data.SupplyIds) : "";
+            string suppliesStr = FormatSupplyIdsForBasis(data.SupplyIds);
             string basisPrefix = profile != null ? (profile.BasisPrefix ?? "").Trim() : "";
+            bool isOzonBasis = string.Equals(data.SourceMarketplace, MarketplaceOzon, StringComparison.OrdinalIgnoreCase);
+            string supplyLabel = isOzonBasis ? "поставка №: " : "сборочные задания №: ";
             string basisText = string.IsNullOrEmpty(suppliesStr)
                 ? basisPrefix
-                : (string.IsNullOrEmpty(basisPrefix) ? "сборочные задания №: " + suppliesStr : basisPrefix + ", сборочные задания №: " + suppliesStr);
+                : (string.IsNullOrEmpty(basisPrefix) ? supplyLabel + suppliesStr : basisPrefix + ", " + supplyLabel + suppliesStr);
 
             bool hasVat = ParseVatRate(profile != null ? profile.VatMode : "") > 0m || data.TotalVat > 0m;
             double topIn = Math.Max(0.0, profile != null ? profile.TopMarginMm : 10.0) / 25.4;
@@ -2197,6 +2747,139 @@ namespace GovPortalsApp
                     sb.Append(InlineCell("E" + rn, 3, (string)row[4]));
                     sb.Append(NumericCell("F" + rn, 4, ((decimal)row[5]).ToString("0.00", CultureInfo.InvariantCulture)));
                     sb.Append(NumericCell("G" + rn, 3, ((int)row[6]).ToString(CultureInfo.InvariantCulture)));
+                    sb.Append("</row>");
+                }
+                sb.Append("</sheetData></worksheet>");
+                WriteZipText(zip, "xl/worksheets/sheet1.xml", sb.ToString());
+            }
+        }
+
+        private static string EscapeCsvField(string value)
+        {
+            string s = value ?? "";
+            if (s.IndexOfAny(new char[] { ';', ',', '"', '\r', '\n' }) >= 0)
+                return "\"" + s.Replace("\"", "\"\"") + "\"";
+            return s;
+        }
+
+        public static void CreateDemoOzonSupplyCsv(string outputPath)
+        {
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            if (File.Exists(outputPath)) File.Delete(outputPath);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Номер поставки;Номер отправления;Offer ID;Ozon SKU;Штрихкод;Наименование товара;Количество;Цена с НДС;Вес, г;Грузовых мест");
+
+            string[][] demoRows = new string[][]
+            {
+                new string[] { "OZ-2026-77410", "48120394-0001-1", "OZ-PAD-8030", "145001101", "4810000100014", "Коврик для мыши, тканевый 80x30 см", "2", "22.50", "650", "1" },
+                new string[] { "OZ-2026-77410", "48120394-0002-1", "OZ-HOLD-CAR", "145001102", "4810000100021", "Держатель магнитный \"ProMount\" для телефона в авто", "4", "16.80", "480", "1" },
+                new string[] { "OZ-2026-77410", "48120394-0003-1", "OZ-HDMI-21", "145001103", "4810000100038", "Кабель HDMI 2.1 высокоскоростной 2 м", "3", "19.90", "360", "1" },
+                new string[] { "OZ-2026-77410", "48120394-0004-1", "OZ-ORG-DESK", "145001104", "4810000100045", "Органайзер настольный для канцелярии", "2", "28.00", "920", "1" },
+                new string[] { "OZ-2026-77410", "48120394-0005-1", "OZ-STAND-AL", "145001105", "4810000100052", "Подставка алюминиевая для ноутбука", "1", "45.00", "540", "1" }
+            };
+
+            for (int i = 0; i < demoRows.Length; i++)
+            {
+                var r = demoRows[i];
+                for (int c = 0; c < r.Length; c++)
+                {
+                    if (c > 0) sb.Append(';');
+                    sb.Append(EscapeCsvField(r[c]));
+                }
+                sb.AppendLine();
+            }
+
+            File.WriteAllText(outputPath, sb.ToString(), new UTF8Encoding(true));
+        }
+
+        public static void CreateDemoOzonSupplyXlsx(string outputPath)
+        {
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            if (File.Exists(outputPath)) File.Delete(outputPath);
+
+            using (var fs = new FileStream(outputPath, FileMode.Create, FileAccess.ReadWrite))
+            using (var zip = new ZipArchive(fs, ZipArchiveMode.Create))
+            {
+                WriteZipText(zip, "[Content_Types].xml",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+                    "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+                    "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+                    "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>" +
+                    "<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>" +
+                    "<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>" +
+                    "</Types>");
+
+                WriteZipText(zip, "_rels/.rels",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>" +
+                    "</Relationships>");
+
+                WriteZipText(zip, "xl/workbook.xml",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
+                    "<sheets><sheet name=\"Поставка Ozon\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>");
+
+                WriteZipText(zip, "xl/_rels/workbook.xml.rels",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
+                    "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>" +
+                    "</Relationships>");
+
+                WriteZipText(zip, "xl/styles.xml",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+                    "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">" +
+                    "<numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"0.00\"/></numFmts>" +
+                    "<fonts count=\"2\"><font><sz val=\"10\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"10\"/><name val=\"Calibri\"/></font></fonts>" +
+                    "<fills count=\"2\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill></fills>" +
+                    "<borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders>" +
+                    "<cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>" +
+                    "<cellXfs count=\"5\">" +
+                    "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>" +
+                    "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>" +
+                    "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>" +
+                    "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>" +
+                    "<xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>" +
+                    "</cellXfs></styleSheet>");
+
+                var sb = new StringBuilder();
+                sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>");
+                sb.Append("<row r=\"1\">").Append(InlineCell("A1", 1, "Заявка на поставку Ozon FBO № OZ-2026-77410 (ООО «ОЗОН Маркет Бел»)")).Append("</row>");
+
+                string[] hdr = { "Номер поставки", "Артикул", "Ozon ID", "Штрихкод", "Наименование товара", "Заявлено", "Цена с НДС", "Вес, кг", "Коробов" };
+                string[] cols = { "A", "B", "C", "D", "E", "F", "G", "H", "I" };
+                sb.Append("<row r=\"3\">");
+                for (int c = 0; c < hdr.Length; c++) sb.Append(InlineCell(cols[c] + "3", 2, hdr[c]));
+                sb.Append("</row>");
+
+                object[][] demoRows = new object[][]
+                {
+                    new object[] { "OZ-2026-77410", "OZ-PAD-8030", "145001101", "4810000100014", "Коврик для мыши, тканевый 80x30 см", 2, 22.50m, 0.65m, 1 },
+                    new object[] { "OZ-2026-77410", "OZ-HOLD-CAR", "145001102", "4810000100021", "Держатель магнитный ProMount для телефона в авто", 4, 16.80m, 0.48m, 1 },
+                    new object[] { "OZ-2026-77410", "OZ-HDMI-21", "145001103", "4810000100038", "Кабель HDMI 2.1 высокоскоростной 2 м", 3, 19.90m, 0.36m, 1 },
+                    new object[] { "OZ-2026-77410", "OZ-ORG-DESK", "145001104", "4810000100045", "Органайзер настольный для канцелярии", 2, 28.00m, 0.92m, 1 },
+                    new object[] { "OZ-2026-77410", "OZ-STAND-AL", "145001105", "4810000100052", "Подставка алюминиевая для ноутбука", 1, 45.00m, 0.54m, 1 }
+                };
+
+                for (int i = 0; i < demoRows.Length; i++)
+                {
+                    int rn = i + 4;
+                    var row = demoRows[i];
+                    sb.Append("<row r=\"" + rn + "\">");
+                    sb.Append(InlineCell("A" + rn, 3, (string)row[0]));
+                    sb.Append(InlineCell("B" + rn, 3, (string)row[1]));
+                    sb.Append(InlineCell("C" + rn, 3, (string)row[2]));
+                    sb.Append(InlineCell("D" + rn, 3, (string)row[3]));
+                    sb.Append(InlineCell("E" + rn, 3, (string)row[4]));
+                    sb.Append(NumericCell("F" + rn, 3, ((int)row[5]).ToString(CultureInfo.InvariantCulture)));
+                    sb.Append(NumericCell("G" + rn, 4, ((decimal)row[6]).ToString("0.00", CultureInfo.InvariantCulture)));
+                    sb.Append(NumericCell("H" + rn, 4, ((decimal)row[7]).ToString("0.00", CultureInfo.InvariantCulture)));
+                    sb.Append(NumericCell("I" + rn, 3, ((int)row[8]).ToString(CultureInfo.InvariantCulture)));
                     sb.Append("</row>");
                 }
                 sb.Append("</sheetData></worksheet>");

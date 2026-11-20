@@ -12,7 +12,7 @@ on:
       tag_name:
         description: 'Release tag (for example v3.1.1) when triggered manually'
         required: false
-        default: 'v3.1.1'
+        default: 'v3.2.0'
 
 permissions:
   contents: read

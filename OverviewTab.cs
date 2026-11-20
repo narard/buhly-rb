@@ -95,15 +95,17 @@ namespace GovPortalsApp
             ovUpdateBanner.Child = updGrid;
             container.Children.Add(ovUpdateBanner);
 
-            UpdateChecker.CheckForUpdatesAsync(delegate(string tagName, string htmlUrl)
+            bool disableUpdateChecks = companyStore != null && companyStore.DisableUpdateChecks;
+            UpdateChecker.CheckForUpdatesAsync(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version, disableUpdateChecks, delegate(UpdateCheckResult updRes)
             {
+                if (updRes == null || !updRes.UpdateAvailable || string.IsNullOrEmpty(updRes.ReleaseUrl)) return;
                 Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (ovUpdateBanner == null || ovUpdateBannerText == null) return;
-                    string cleanTag = (tagName ?? "").Trim();
+                    string cleanTag = (updRes.TagName ?? "").Trim();
                     if (!cleanTag.StartsWith("v", StringComparison.OrdinalIgnoreCase) && cleanTag.Length > 0)
                         cleanTag = "v" + cleanTag;
-                    ovUpdateReleaseUrl = htmlUrl;
+                    ovUpdateReleaseUrl = updRes.ReleaseUrl;
                     ovUpdateBannerText.Text = "🚀 Доступна новая версия Buhly " + cleanTag + " — с исправлениями и обновлениями РБ.";
                     ovUpdateBanner.Visibility = Visibility.Visible;
                 }));

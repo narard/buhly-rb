@@ -8,7 +8,7 @@
   Для локального теста/развёртывания передайте -PfxPath и -PfxPassword, чтобы подписать .msix через signtool.exe.
 #>
 param(
-    [string]$Version = "3.1.1.0",
+    [string]$Version = "3.2.0.0",
     [string]$PfxPath = "",
     [string]$PfxPassword = ""
 )

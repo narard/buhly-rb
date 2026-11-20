@@ -177,6 +177,15 @@ namespace GovPortalsApp
         public decimal EstimatedTaxByRealization { get; set; }
         public decimal EstimatedNetProfitBeforeFixed { get; set; }
 
+        // USN 6% Cash Basis (ст. 328 НК РБ) vs Realization parallel breakdown
+        public string UsnMethodUsed { get; set; }
+        public decimal UsnRealizationBase { get; set; }
+        public decimal UsnRealizationTax { get; set; }
+        public decimal UsnCashMpBankCredits { get; set; }
+        public decimal UsnCashMpOffset { get; set; }
+        public decimal UsnCashBasisIncome { get; set; }
+        public decimal UsnCashBasisTax { get; set; }
+
         // IP (Подоходный 20%/30% + ФСЗН 35%) breakdown
         public decimal IpExpenseNormPercent { get; set; }
         public decimal IpGrossIncome { get; set; }
@@ -234,6 +243,7 @@ namespace GovPortalsApp
             TaxRegimeTitle = "ООО • УСН 6% (без НДС)";
             TaxRatePercent = 6.0m;
             EffectiveTaxRateApplied = 6.0m;
+            UsnMethodUsed = CompanyProfilesManager.UsnMethodRealization;
             IpExpenseNormPercent = 30m;
             Reports = new List<WbReportSummary>();
             Skus = new List<SkuUnitStats>();
@@ -482,18 +492,26 @@ namespace GovPortalsApp
 
         public static AnalyticsSnapshot AnalyzeFiles(IEnumerable<string> paths, decimal taxRatePercent, Dictionary<string, decimal> skuCosts)
         {
-            return AnalyzeFiles(paths, CompanyProfilesManager.RegimeUsn6, taxRatePercent, skuCosts, 30m);
+            return AnalyzeFiles(paths, CompanyProfilesManager.RegimeUsn6, taxRatePercent, skuCosts, 30m, CompanyProfilesManager.UsnMethodCashBasis);
         }
 
         public static AnalyticsSnapshot AnalyzeFiles(IEnumerable<string> paths, string taxRegime, decimal taxRatePercent, Dictionary<string, decimal> skuCosts)
         {
-            return AnalyzeFiles(paths, taxRegime, taxRatePercent, skuCosts, 30m);
+            return AnalyzeFiles(paths, taxRegime, taxRatePercent, skuCosts, 30m, CompanyProfilesManager.UsnMethodCashBasis);
         }
 
         public static AnalyticsSnapshot AnalyzeFiles(IEnumerable<string> paths, string taxRegime, decimal taxRatePercent, Dictionary<string, decimal> skuCosts, decimal ipExpenseNormPercent)
         {
+            return AnalyzeFiles(paths, taxRegime, taxRatePercent, skuCosts, ipExpenseNormPercent, CompanyProfilesManager.UsnMethodCashBasis);
+        }
+
+        public static AnalyticsSnapshot AnalyzeFiles(IEnumerable<string> paths, string taxRegime, decimal taxRatePercent, Dictionary<string, decimal> skuCosts, decimal ipExpenseNormPercent, string usnMethod)
+        {
             string normRegime = string.IsNullOrWhiteSpace(taxRegime) ? CompanyProfilesManager.RegimeUsn6 : taxRegime;
             decimal normIpPercent = (ipExpenseNormPercent == 20m || ipExpenseNormPercent == 30m) ? ipExpenseNormPercent : 30m;
+            string normUsnMethod = string.Equals(usnMethod, CompanyProfilesManager.UsnMethodRealization, StringComparison.OrdinalIgnoreCase)
+                ? CompanyProfilesManager.UsnMethodRealization
+                : CompanyProfilesManager.UsnMethodCashBasis;
             var snap = new AnalyticsSnapshot
             {
                 TaxRegime = normRegime,
@@ -784,15 +802,72 @@ namespace GovPortalsApp
                 // ООО • УСН 6% (без НДС) or CUSTOM
                 decimal rate = Math.Max(0m, taxRatePercent);
                 snap.EffectiveTaxRateApplied = rate;
-                snap.TaxBaseAmount = grossTaxableIncome;
-                snap.EstimatedTaxByRealization = Math.Round(snap.TaxBaseAmount * (rate / 100m), 2, MidpointRounding.AwayFromZero);
-                snap.EstimatedNetProfitBeforeFixed = snap.TotalExpectedPayout - snap.TotalCostOfGoods - snap.EstimatedTaxByRealization;
 
-                if (normRegime == CompanyProfilesManager.RegimeUsn6 &&
-                    snap.BankTransactions.Count > 0 && snap.Reports.Count > 0 &&
-                    Math.Abs(snap.BankMarketplaceCredits - snap.TotalExpectedPayout) >= 1.0m)
+                // Always compute realization base & tax in parallel
+                snap.UsnRealizationBase = grossTaxableIncome;
+                snap.UsnRealizationTax = Math.Round(snap.UsnRealizationBase * (rate / 100m), 2, MidpointRounding.AwayFromZero);
+
+                if (normRegime == CompanyProfilesManager.RegimeUsn6)
                 {
-                    AddWarningUnique(snap, string.Format("УСН 6%: поступления от МП на р/с ({0} BYN) отличаются от ожидаемой выплаты по отчётам ({1} BYN). Официальная база УСН по ст. 328 НК РБ определяется по дате оплаты и зачёта.", FmtAudit(snap.BankMarketplaceCredits), FmtAudit(snap.TotalExpectedPayout)));
+                    bool hasBankMpCash = (snap.BankTransactions.Count > 0 && snap.BankMarketplaceCredits > 0m);
+                    snap.UsnCashMpBankCredits = snap.BankMarketplaceCredits;
+                    snap.UsnCashMpOffset = Math.Max(0m, snap.MpServicesExpenses);
+
+                    if (hasBankMpCash)
+                    {
+                        snap.UsnCashBasisIncome = snap.UsnCashMpBankCredits + snap.UsnCashMpOffset + snap.BankOtherCredits;
+                        snap.UsnCashBasisTax = Math.Round(snap.UsnCashBasisIncome * (rate / 100m), 2, MidpointRounding.AwayFromZero);
+                    }
+                    else if (snap.BankTransactions.Count > 0 && snap.Reports.Count == 0)
+                    {
+                        snap.UsnCashBasisIncome = snap.BankMarketplaceCredits + snap.BankOtherCredits;
+                        snap.UsnCashBasisTax = Math.Round(snap.UsnCashBasisIncome * (rate / 100m), 2, MidpointRounding.AwayFromZero);
+                    }
+                    else
+                    {
+                        snap.UsnCashBasisIncome = 0m;
+                        snap.UsnCashBasisTax = 0m;
+                    }
+
+                    bool wantCash = (normUsnMethod == CompanyProfilesManager.UsnMethodCashBasis);
+                    if (wantCash && hasBankMpCash)
+                    {
+                        snap.UsnMethodUsed = CompanyProfilesManager.UsnMethodCashBasis;
+                        snap.TaxBaseAmount = snap.UsnCashBasisIncome;
+                        snap.EstimatedTaxByRealization = snap.UsnCashBasisTax;
+                    }
+                    else
+                    {
+                        snap.UsnMethodUsed = CompanyProfilesManager.UsnMethodRealization;
+                        snap.TaxBaseAmount = snap.UsnRealizationBase;
+                        snap.EstimatedTaxByRealization = snap.UsnRealizationTax;
+
+                        if (wantCash && !hasBankMpCash && snap.Reports.Count > 0)
+                        {
+                            AddWarningUnique(snap, "УСН 6% (ст. 328 НК РБ): выписка банка с зачислениями от МП не загружена — выполнен автоматический откат на расчёт по реализации отчётов МП. Загрузите выписку банка для кассового метода (р/с + взаимозачёт).");
+                        }
+                    }
+
+                    snap.EstimatedNetProfitBeforeFixed = snap.TotalExpectedPayout - snap.TotalCostOfGoods - snap.EstimatedTaxByRealization;
+
+                    if (snap.BankTransactions.Count > 0 && snap.Reports.Count > 0 &&
+                        Math.Abs(snap.BankMarketplaceCredits - snap.TotalExpectedPayout) >= 1.0m)
+                    {
+                        decimal baseDelta = snap.UsnCashBasisIncome - snap.UsnRealizationBase;
+                        string deltaSign = baseDelta > 0m ? "+" : "";
+                        AddWarningUnique(snap, string.Format(
+                            "УСН 6% (ст. 328 НК РБ): поступления от МП на р/с ({0} BYN) отличаются от ожидаемой выплаты по отчётам ({1} BYN) — переходящая разница {2}{3} BYN (налог по кассовому методу {4} BYN vs по реализации {5} BYN).",
+                            FmtAudit(snap.BankMarketplaceCredits), FmtAudit(snap.TotalExpectedPayout),
+                            deltaSign, FmtAudit(baseDelta),
+                            FmtAudit(snap.UsnCashBasisTax), FmtAudit(snap.UsnRealizationTax)));
+                    }
+                }
+                else
+                {
+                    snap.UsnMethodUsed = CompanyProfilesManager.UsnMethodRealization;
+                    snap.TaxBaseAmount = snap.UsnRealizationBase;
+                    snap.EstimatedTaxByRealization = snap.UsnRealizationTax;
+                    snap.EstimatedNetProfitBeforeFixed = snap.TotalExpectedPayout - snap.TotalCostOfGoods - snap.EstimatedTaxByRealization;
                 }
             }
 
@@ -1175,20 +1250,52 @@ namespace GovPortalsApp
                     FmtAudit(snap.OsnProfitTaxBase), snap.EffectiveTaxRateApplied, FmtAudit(snap.OsnProfitTax20),
                     FmtAudit(snap.EstimatedTaxByRealization)));
             }
+            else if (snap.TaxRegime == CompanyProfilesManager.RegimeUsn6)
+            {
+                decimal baseDelta = snap.UsnCashBasisIncome - snap.UsnRealizationBase;
+                decimal taxDelta = snap.UsnCashBasisTax - snap.UsnRealizationTax;
+                string signBase = baseDelta > 0m ? "+" : "";
+                string signTax = taxDelta > 0m ? "+" : "";
+
+                if (snap.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis)
+                {
+                    snap.CalculationAuditDetails.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "4) Налог (ООО • УСН {0:0.##}% — кассовый метод по ст. 328 НК РБ):\r\n    • ОСНОВНОЙ (кассовый метод: р/с + взаимозачёт): Зачисления МП на р/с ({1}) + Взаимозачёт удержаний МП ({2}) + Облаг. прочие р/с ({3}) = {4} BYN → Налог УСН = {4} × {0:0.##}% = {5} BYN.\r\n    • СПРАВОЧНО (по реализации отчётов МП): Реализация МП ({6}) + Компенсации ({7}) + Облаг. р/с ({3}){8} = {9} BYN → Налог = {10} BYN.\r\n    • Дельта переходящих выплат на стыке периода/квартала (кассовый − реализация): база {11}{12} BYN, налог {13}{14} BYN.",
+                        snap.EffectiveTaxRateApplied,
+                        FmtAudit(snap.UsnCashMpBankCredits), FmtAudit(snap.UsnCashMpOffset), FmtAudit(snap.BankOtherCredits),
+                        FmtAudit(snap.UsnCashBasisIncome), FmtAudit(snap.UsnCashBasisTax),
+                        FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), noReportsBankIncomeNote,
+                        FmtAudit(snap.UsnRealizationBase), FmtAudit(snap.UsnRealizationTax),
+                        signBase, FmtAudit(baseDelta), signTax, FmtAudit(taxDelta)));
+                }
+                else
+                {
+                    string cashRefNote = snap.UsnCashBasisIncome > 0m
+                        ? string.Format(
+                            CultureInfo.InvariantCulture,
+                            "\r\n    • СПРАВОЧНО (кассовый метод по ст. 328 НК РБ: р/с + взаимозачёт): Зачисления МП ({0}) + Взаимозачёт удержаний ({1}) + Облаг. р/с ({2}) = {3} BYN → Налог = {4} BYN (дельта переходящих выплат: база {5}{6} BYN, налог {7}{8} BYN).",
+                            FmtAudit(snap.UsnCashMpBankCredits), FmtAudit(snap.UsnCashMpOffset), FmtAudit(snap.BankOtherCredits),
+                            FmtAudit(snap.UsnCashBasisIncome), FmtAudit(snap.UsnCashBasisTax),
+                            signBase, FmtAudit(baseDelta), signTax, FmtAudit(taxDelta))
+                        : "\r\n    • Примечание (ст. 328 НК РБ): выписка банка с зачислениями от МП не загружена — выполнен расчёт по реализации; для кассового метода (оплата на р/с + зачёт встречных требований МП) загрузите банковскую выписку.";
+
+                    snap.CalculationAuditDetails.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "4) Налог (ООО • УСН {0:0.##}% — по реализации отчётов МП):\r\n    • ОСНОВНОЙ (по реализации): Реализация МП ({1}) + Компенсации МП ({2}) + Облагаемые поступления р/с ({3}){4} = {5} BYN → Налог УСН = {5} × {0:0.##}% = {6} BYN.{7}",
+                        snap.EffectiveTaxRateApplied,
+                        FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), FmtAudit(snap.BankOtherCredits),
+                        noReportsBankIncomeNote, FmtAudit(snap.UsnRealizationBase), FmtAudit(snap.UsnRealizationTax), cashRefNote));
+                }
+            }
             else
             {
-                string regimePrefix = snap.TaxRegime == CompanyProfilesManager.RegimeCustom
-                    ? "Особый режим"
-                    : "ООО • УСН";
-                string usnDisclaimer = snap.TaxRegime == CompanyProfilesManager.RegimeUsn6
-                    ? "\r\n    • Важно (ст. 328 НК РБ): данный расчёт сделан по реализации из отчётов МП как быстрый ориентир; официальная налоговая база при УСН определяется по дате оплаты и зачёта встречных требований (сверяйте с поступлениями на р/с и актами зачёта)."
-                    : "";
                 snap.CalculationAuditDetails.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "4) Налог ({0} {1:0.##}%): База = Реализация МП ({2}) + Компенсации МП ({3}) + Облагаемые поступления р/с ({4}){5} = {6} BYN → Налог = {6} × {1:0.##}% = {7} BYN.{8}",
-                    regimePrefix, snap.EffectiveTaxRateApplied,
+                    "4) Налог (Особый режим {0:0.##}%): База = Реализация МП ({1}) + Компенсации МП ({2}) + Облагаемые поступления р/с ({3}){4} = {5} BYN → Налог = {5} × {0:0.##}% = {6} BYN.",
+                    snap.EffectiveTaxRateApplied,
                     FmtAudit(snap.TotalRealizedP), FmtAudit(snap.TotalCompensations), FmtAudit(snap.BankOtherCredits),
-                    noReportsBankIncomeNote, FmtAudit(snap.TaxBaseAmount), FmtAudit(snap.EstimatedTaxByRealization), usnDisclaimer));
+                    noReportsBankIncomeNote, FmtAudit(snap.TaxBaseAmount), FmtAudit(snap.EstimatedTaxByRealization)));
             }
 
             string fsznSubtractNote = snap.TaxRegime == CompanyProfilesManager.RegimeIpPn20
@@ -3372,6 +3479,38 @@ namespace GovPortalsApp
                 AddKvMoney(sb, r++, string.Format(CultureInfo.InvariantCulture, "Налог на прибыль ({0:0.##}%), ориентир", snap.EffectiveTaxRateApplied), snap.OsnProfitTax20, "");
                 AddKvBoldMoney(sb, r++, "Итого ориентир налоговой нагрузки ОСН (НДС + Прибыль)", snap.EstimatedTaxByRealization, "[ЭКСПЕРИМЕНТАЛЬНЫЙ РЕЖИМ]");
             }
+            else if (snap.TaxRegime == CompanyProfilesManager.RegimeUsn6)
+            {
+                decimal baseDelta = snap.UsnCashBasisIncome - snap.UsnRealizationBase;
+                decimal taxDelta = snap.UsnCashBasisTax - snap.UsnRealizationTax;
+                string signBase = baseDelta > 0m ? "+" : "";
+                string signTax = taxDelta > 0m ? "+" : "";
+
+                if (snap.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis)
+                {
+                    AddKvMoney(sb, r++, "Налоговая база УСН — кассовый метод (ст. 328 НК РБ)", snap.UsnCashBasisIncome,
+                        string.Format("Зачисления МП на р/с ({0}) + взаимозачёт удержаний МП ({1}) + облаг. р/с ({2}) BYN",
+                            FmtInv(snap.UsnCashMpBankCredits), FmtInv(snap.UsnCashMpOffset), FmtInv(snap.BankOtherCredits)));
+                    AddKvBoldMoney(sb, r++, string.Format(CultureInfo.InvariantCulture, "Налог УСН ({0:0.##}%) — кассовый метод (ст. 328 НК РБ)", snap.EffectiveTaxRateApplied), snap.UsnCashBasisTax,
+                        "Основной расчёт по дате оплаты на р/с и взаимозачёта МП");
+                    AddKvMoney(sb, r++, "Справочно: база УСН по реализации отчётов МП", snap.UsnRealizationBase,
+                        string.Format("Налог по реализации: {0} BYN | Дельта переходящих выплат: {1}{2} BYN (налог {3}{4} BYN)",
+                            FmtInv(snap.UsnRealizationTax), signBase, FmtInv(baseDelta), signTax, FmtInv(taxDelta)));
+                }
+                else
+                {
+                    AddKvMoney(sb, r++, "Налоговая база УСН — по реализации отчётов МП", snap.UsnRealizationBase,
+                        string.Format("Компенсации МП: {0} | Прочие облаг. поступления р/с: {1} BYN", FmtInv(snap.TotalCompensations), FmtInv(snap.BankOtherCredits)));
+                    AddKvBoldMoney(sb, r++, string.Format(CultureInfo.InvariantCulture, "Ориентир налога УСН ({0:0.##}%) — по реализации", snap.EffectiveTaxRateApplied), snap.UsnRealizationTax,
+                        "По реализации отчётов МП (ст. 328 НК РБ — для кассового метода сверяйте с р/с и взаимозачётом)");
+                    if (snap.UsnCashBasisIncome > 0m)
+                    {
+                        AddKvMoney(sb, r++, "Справочно: кассовый метод УСН (ст. 328 НК РБ: р/с + зачёт)", snap.UsnCashBasisIncome,
+                            string.Format("Налог по кассовому методу: {0} BYN | Дельта переходящих выплат: {1}{2} BYN (налог {3}{4} BYN)",
+                                FmtInv(snap.UsnCashBasisTax), signBase, FmtInv(baseDelta), signTax, FmtInv(taxDelta)));
+                    }
+                }
+            }
             else
             {
                 AddKvMoney(sb, r++, "Налоговая база (Реализация Пр + комп. + облаг. р/с)", snap.TaxBaseAmount, string.Format("Компенсации МП: {0} | Прочие облаг. поступления р/с: {1} BYN", FmtInv(snap.TotalCompensations), FmtInv(snap.BankOtherCredits)));
@@ -3520,6 +3659,39 @@ namespace GovPortalsApp
             sb.Append("<row r=\"2\">").Append(SC("A2", 0, "Плательщик: " + orgLine + "   |   Сформировано: " + DateTime.Now.ToString("dd.MM.yyyy"))).Append("</row>");
             sb.Append("<row r=\"3\">").Append(SC("A3", 6, "Черновик / аналитический регистр, сверяйте с официальной формой МНС")).Append("</row>");
 
+            bool isUsnCashBasis = (snap.TaxRegime == CompanyProfilesManager.RegimeUsn6 &&
+                                   snap.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis);
+            if (snap.TaxRegime == CompanyProfilesManager.RegimeUsn6)
+            {
+                decimal baseDelta = snap.UsnCashBasisIncome - snap.UsnRealizationBase;
+                string signDelta = baseDelta > 0m ? "+" : "";
+                string usnMethodLine;
+                if (isUsnCashBasis)
+                {
+                    usnMethodLine = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Метод УСН (ст. 328 НК РБ): Кассовый метод (р/с + взаимозачёт МП). База = {0} BYN (налог {1:0.##}% = {2} BYN)  |  Справочно по реализации МП: база = {3} BYN (налог = {4} BYN), дельта переходящих выплат = {5}{6} BYN",
+                        FmtInv(snap.UsnCashBasisIncome), snap.EffectiveTaxRateApplied, FmtInv(snap.UsnCashBasisTax),
+                        FmtInv(snap.UsnRealizationBase), FmtInv(snap.UsnRealizationTax), signDelta, FmtInv(baseDelta));
+                }
+                else if (snap.UsnCashBasisIncome > 0m)
+                {
+                    usnMethodLine = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Метод УСН: По реализации отчётов МП. База = {0} BYN (налог {1:0.##}% = {2} BYN)  |  Справочно кассовый метод (ст. 328 НК РБ: р/с + взаимозачёт): база = {3} BYN (налог = {4} BYN), дельта = {5}{6} BYN",
+                        FmtInv(snap.UsnRealizationBase), snap.EffectiveTaxRateApplied, FmtInv(snap.UsnRealizationTax),
+                        FmtInv(snap.UsnCashBasisIncome), FmtInv(snap.UsnCashBasisTax), signDelta, FmtInv(baseDelta));
+                }
+                else
+                {
+                    usnMethodLine = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Метод УСН: По реализации отчётов МП (выписка банка с поступлениями МП не загружена). База = {0} BYN (налог {1:0.##}% = {2} BYN)",
+                        FmtInv(snap.UsnRealizationBase), snap.EffectiveTaxRateApplied, FmtInv(snap.UsnRealizationTax));
+                }
+                sb.Append("<row r=\"4\">").Append(SC("A4", 0, usnMethodLine)).Append("</row>");
+            }
+
             string[] h = { "№", "Дата записи", "Документ (наим., №, дата)", "Содержание операции", "Выручка от реализации, BYN", "Внереализационные / комп., BYN", "Итого доходов (база), BYN" };
             sb.Append("<row r=\"5\" ht=\"28\" customHeight=\"1\">");
             for (int c = 0; c < h.Length; c++) sb.Append(SC(ColName(c + 1) + "5", 2, h[c]));
@@ -3529,64 +3701,178 @@ namespace GovPortalsApp
             int seq = 1;
             decimal totalRev = 0m, totalNonOp = 0m, totalBase = 0m;
 
-            foreach (var rep in snap.Reports)
+            if (isUsnCashBasis)
             {
-                string docInfo = string.Format("Отчёт {0} № {1} ({2}..{3})", rep.Marketplace, rep.ReportNumber, rep.DateFrom, rep.DateTo);
-                string recDate = !string.IsNullOrEmpty(rep.DateTo) ? rep.DateTo : rep.DateFrom;
-                decimal rev = rep.RealizedP;
-                decimal comp = rep.Compensations;
-                decimal rowSum = rev + comp;
+                // 1. Actual bank credits from marketplaces (date of receipt on bank account — Art. 328 NK RB)
+                foreach (var tx in snap.BankTransactions)
+                {
+                    if (tx.Credit <= 0m) continue;
+                    if (tx.Category == "Необлагаемые поступления") continue;
 
-                sb.Append("<row r=\"" + rowIdx + "\">");
-                sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
-                sb.Append(SC("B" + rowIdx, 3, recDate));
-                sb.Append(SC("C" + rowIdx, 3, docInfo));
-                sb.Append(SC("D" + rowIdx, 3, string.Format("Реализация товаров через {0} (прод. {1} шт, возвр. {2} шт)", rep.Marketplace, rep.SaleQty, rep.ReturnQty)));
-                sb.Append(MC("E" + rowIdx, 4, rev));
-                sb.Append(MC("F" + rowIdx, 4, comp));
-                sb.Append(MC("G" + rowIdx, 7, rowSum));
-                sb.Append("</row>");
+                    string docInfo = string.IsNullOrEmpty(tx.DocNum) ? ("Выписка от " + tx.Date) : ("Плат. док. № " + tx.DocNum + " от " + tx.Date);
+                    string prefix = tx.Category == "WB / Маркетплейсы" ? "Поступление выручки МП на р/с (кассовый метод): " : "Поступление на р/с: ";
+                    sb.Append("<row r=\"" + rowIdx + "\">");
+                    sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
+                    sb.Append(SC("B" + rowIdx, 3, tx.Date));
+                    sb.Append(SC("C" + rowIdx, 3, docInfo));
+                    sb.Append(SC("D" + rowIdx, 3, prefix + tx.Counterparty + (string.IsNullOrEmpty(tx.Purpose) ? "" : (" — " + tx.Purpose))));
+                    sb.Append(MC("E" + rowIdx, 4, tx.Credit));
+                    sb.Append(MC("F" + rowIdx, 4, 0m));
+                    sb.Append(MC("G" + rowIdx, 7, tx.Credit));
+                    sb.Append("</row>");
 
-                totalRev += rev;
-                totalNonOp += comp;
-                totalBase += rowSum;
-                rowIdx++;
-                seq++;
+                    totalRev += tx.Credit;
+                    totalBase += tx.Credit;
+                    rowIdx++;
+                    seq++;
+                }
+
+                // 2. Marketplace withheld fees/services settled by mutual offset (ст. 328 НК РБ)
+                if (snap.UsnCashMpOffset > 0m)
+                {
+                    decimal sumRepOffsets = 0m;
+                    bool anyNegativeOffset = false;
+                    foreach (var rep in snap.Reports)
+                    {
+                        decimal repOff = rep.RealizedP + rep.Compensations - rep.ExpectedPayout;
+                        if (repOff < 0m) anyNegativeOffset = true;
+                        else sumRepOffsets += repOff;
+                    }
+
+                    if (!anyNegativeOffset && snap.Reports.Count > 0 && Math.Abs(sumRepOffsets - snap.UsnCashMpOffset) < 0.01m)
+                    {
+                        foreach (var rep in snap.Reports)
+                        {
+                            decimal repOff = rep.RealizedP + rep.Compensations - rep.ExpectedPayout;
+                            if (repOff <= 0m) continue;
+                            string docInfo = string.Format("Отчёт {0} № {1} ({2}..{3})", rep.Marketplace, rep.ReportNumber, rep.DateFrom, rep.DateTo);
+                            string recDate = !string.IsNullOrEmpty(rep.DateTo) ? rep.DateTo : rep.DateFrom;
+                            sb.Append("<row r=\"" + rowIdx + "\">");
+                            sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
+                            sb.Append(SC("B" + rowIdx, 3, recDate));
+                            sb.Append(SC("C" + rowIdx, 3, docInfo));
+                            sb.Append(SC("D" + rowIdx, 3, string.Format("Взаимозачёт удержаний {0} (комиссия, логистика, хранение, штрафы) по ст. 328 НК РБ", rep.Marketplace)));
+                            sb.Append(MC("E" + rowIdx, 4, repOff));
+                            sb.Append(MC("F" + rowIdx, 4, 0m));
+                            sb.Append(MC("G" + rowIdx, 7, repOff));
+                            sb.Append("</row>");
+
+                            totalRev += repOff;
+                            totalBase += repOff;
+                            rowIdx++;
+                            seq++;
+                        }
+                    }
+                    else
+                    {
+                        string recDate = !string.IsNullOrEmpty(snap.PeriodEndDate) ? snap.PeriodEndDate : DateTime.Today.ToString("dd.MM.yyyy");
+                        sb.Append("<row r=\"" + rowIdx + "\">");
+                        sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
+                        sb.Append(SC("B" + rowIdx, 3, recDate));
+                        sb.Append(SC("C" + rowIdx, 3, "Сводно по отчётам МП"));
+                        sb.Append(SC("D" + rowIdx, 3, "Взаимозачёт удержаний маркетплейсов (комиссия, логистика, хранение, штрафы) по ст. 328 НК РБ"));
+                        sb.Append(MC("E" + rowIdx, 4, snap.UsnCashMpOffset));
+                        sb.Append(MC("F" + rowIdx, 4, 0m));
+                        sb.Append(MC("G" + rowIdx, 7, snap.UsnCashMpOffset));
+                        sb.Append("</row>");
+
+                        totalRev += snap.UsnCashMpOffset;
+                        totalBase += snap.UsnCashMpOffset;
+                        rowIdx++;
+                        seq++;
+                    }
+                }
             }
-
-            foreach (var tx in snap.BankTransactions)
+            else
             {
-                if (tx.Credit <= 0m) continue;
-                if (tx.Category == "Необлагаемые поступления") continue;
-                // Avoid double-counting marketplace bank payouts when marketplace realization reports are loaded
-                if (tx.Category == "WB / Маркетплейсы" && snap.Reports.Count > 0) continue;
+                foreach (var rep in snap.Reports)
+                {
+                    string docInfo = string.Format("Отчёт {0} № {1} ({2}..{3})", rep.Marketplace, rep.ReportNumber, rep.DateFrom, rep.DateTo);
+                    string recDate = !string.IsNullOrEmpty(rep.DateTo) ? rep.DateTo : rep.DateFrom;
+                    decimal rev = rep.RealizedP;
+                    decimal comp = rep.Compensations;
+                    decimal rowSum = rev + comp;
 
-                string docInfo = string.IsNullOrEmpty(tx.DocNum) ? ("Выписка от " + tx.Date) : ("Плат. док. № " + tx.DocNum + " от " + tx.Date);
-                sb.Append("<row r=\"" + rowIdx + "\">");
-                sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
-                sb.Append(SC("B" + rowIdx, 3, tx.Date));
-                sb.Append(SC("C" + rowIdx, 3, docInfo));
-                sb.Append(SC("D" + rowIdx, 3, tx.Counterparty + (string.IsNullOrEmpty(tx.Purpose) ? "" : (" — " + tx.Purpose))));
-                sb.Append(MC("E" + rowIdx, 4, tx.Credit));
-                sb.Append(MC("F" + rowIdx, 4, 0m));
-                sb.Append(MC("G" + rowIdx, 7, tx.Credit));
-                sb.Append("</row>");
+                    sb.Append("<row r=\"" + rowIdx + "\">");
+                    sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
+                    sb.Append(SC("B" + rowIdx, 3, recDate));
+                    sb.Append(SC("C" + rowIdx, 3, docInfo));
+                    sb.Append(SC("D" + rowIdx, 3, string.Format("Реализация товаров через {0} (прод. {1} шт, возвр. {2} шт)", rep.Marketplace, rep.SaleQty, rep.ReturnQty)));
+                    sb.Append(MC("E" + rowIdx, 4, rev));
+                    sb.Append(MC("F" + rowIdx, 4, comp));
+                    sb.Append(MC("G" + rowIdx, 7, rowSum));
+                    sb.Append("</row>");
 
-                totalRev += tx.Credit;
-                totalBase += tx.Credit;
-                rowIdx++;
-                seq++;
+                    totalRev += rev;
+                    totalNonOp += comp;
+                    totalBase += rowSum;
+                    rowIdx++;
+                    seq++;
+                }
+
+                foreach (var tx in snap.BankTransactions)
+                {
+                    if (tx.Credit <= 0m) continue;
+                    if (tx.Category == "Необлагаемые поступления") continue;
+                    // Avoid double-counting marketplace bank payouts when marketplace realization reports are loaded
+                    if (tx.Category == "WB / Маркетплейсы" && snap.Reports.Count > 0) continue;
+
+                    string docInfo = string.IsNullOrEmpty(tx.DocNum) ? ("Выписка от " + tx.Date) : ("Плат. док. № " + tx.DocNum + " от " + tx.Date);
+                    sb.Append("<row r=\"" + rowIdx + "\">");
+                    sb.Append(NC("A" + rowIdx, 5, seq.ToString(CultureInfo.InvariantCulture)));
+                    sb.Append(SC("B" + rowIdx, 3, tx.Date));
+                    sb.Append(SC("C" + rowIdx, 3, docInfo));
+                    sb.Append(SC("D" + rowIdx, 3, tx.Counterparty + (string.IsNullOrEmpty(tx.Purpose) ? "" : (" — " + tx.Purpose))));
+                    sb.Append(MC("E" + rowIdx, 4, tx.Credit));
+                    sb.Append(MC("F" + rowIdx, 4, 0m));
+                    sb.Append(MC("G" + rowIdx, 7, tx.Credit));
+                    sb.Append("</row>");
+
+                    totalRev += tx.Credit;
+                    totalBase += tx.Credit;
+                    rowIdx++;
+                    seq++;
+                }
             }
 
             sb.Append("<row r=\"" + rowIdx + "\">");
             sb.Append(SC("A" + rowIdx, 6, ""));
             sb.Append(SC("B" + rowIdx, 6, ""));
             sb.Append(SC("C" + rowIdx, 6, ""));
-            sb.Append(SC("D" + rowIdx, 6, "ИТОГО ЗА ПЕРИОД:"));
+            sb.Append(SC("D" + rowIdx, 6, isUsnCashBasis ? "ИТОГО ЗА ПЕРИОД (КАССОВЫЙ МЕТОД, СТ. 328 НК РБ):" : "ИТОГО ЗА ПЕРИОД:"));
             sb.Append(MC("E" + rowIdx, 7, totalRev));
             sb.Append(MC("F" + rowIdx, 7, totalNonOp));
             sb.Append(MC("G" + rowIdx, 7, totalBase));
             sb.Append("</row>");
+
+            if (snap.TaxRegime == CompanyProfilesManager.RegimeUsn6 && (isUsnCashBasis || snap.UsnCashBasisIncome > 0m))
+            {
+                rowIdx++;
+                decimal baseDelta = snap.UsnCashBasisIncome - snap.UsnRealizationBase;
+                decimal taxDelta = snap.UsnCashBasisTax - snap.UsnRealizationTax;
+                string signBase = baseDelta > 0m ? "+" : "";
+                string signTax = taxDelta > 0m ? "+" : "";
+                string refLabel = isUsnCashBasis
+                    ? string.Format(
+                        CultureInfo.InvariantCulture,
+                        "СПРАВОЧНО (по реализации отчётов МП): налог {0:0.##}% = {1} BYN | Дельта переходящих выплат: {2}{3} BYN (налог {4}{5} BYN)",
+                        snap.EffectiveTaxRateApplied, FmtInv(snap.UsnRealizationTax), signBase, FmtInv(baseDelta), signTax, FmtInv(taxDelta))
+                    : string.Format(
+                        CultureInfo.InvariantCulture,
+                        "СПРАВОЧНО (кассовый метод ст. 328 НК РБ: р/с + взаимозачёт): налог {0:0.##}% = {1} BYN | Дельта: {2}{3} BYN (налог {4}{5} BYN)",
+                        snap.EffectiveTaxRateApplied, FmtInv(snap.UsnCashBasisTax), signBase, FmtInv(baseDelta), signTax, FmtInv(taxDelta));
+                decimal refBase = isUsnCashBasis ? snap.UsnRealizationBase : snap.UsnCashBasisIncome;
+
+                sb.Append("<row r=\"" + rowIdx + "\">");
+                sb.Append(SC("A" + rowIdx, 3, ""));
+                sb.Append(SC("B" + rowIdx, 3, ""));
+                sb.Append(SC("C" + rowIdx, 3, "Сравнение методов УСН"));
+                sb.Append(SC("D" + rowIdx, 3, refLabel));
+                sb.Append(MC("E" + rowIdx, 4, refBase));
+                sb.Append(MC("F" + rowIdx, 4, 0m));
+                sb.Append(MC("G" + rowIdx, 4, refBase));
+                sb.Append("</row>");
+            }
 
             sb.Append("</sheetData></worksheet>");
             return sb.ToString();
@@ -4573,7 +4859,7 @@ namespace GovPortalsApp
             Directory.CreateDirectory(tempRoot);
 
             int passed = 0;
-            int total = 16;
+            int total = 20;
 
             try
             {
@@ -4589,8 +4875,20 @@ namespace GovPortalsApp
                     AssertEqDec(usn.TotalExpectedPayout, 988.27m, "USN TotalExpectedPayout");
                     AssertEqDec(usn.MpServicesExpenses, 328.93m, "USN MpServicesExpenses");
                     AssertEqDec(usn.TotalCostOfGoods, 469.30m, "USN TotalCostOfGoods");
-                    AssertEqDec(usn.TaxBaseAmount, 1317.20m, "USN TaxBaseAmount");
-                    AssertEqDec(usn.EstimatedTaxByRealization, 79.03m, "USN Tax 6%");
+                    AssertTrue(usn.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis, "USN default uses CashBasis when bank loaded");
+                    AssertEqDec(usn.UsnCashMpBankCredits, 986.47m, "USN CashMpBankCredits");
+                    AssertEqDec(usn.UsnCashMpOffset, 328.93m, "USN CashMpOffset");
+                    AssertEqDec(usn.UsnCashBasisIncome, 1315.40m, "USN CashBasisIncome");
+                    AssertEqDec(usn.UsnCashBasisTax, 78.92m, "USN CashBasisTax 6%");
+                    AssertEqDec(usn.UsnRealizationBase, 1317.20m, "USN RealizationBase");
+                    AssertEqDec(usn.UsnRealizationTax, 79.03m, "USN RealizationTax 6%");
+                    AssertEqDec(usn.TaxBaseAmount, 1315.40m, "USN TaxBaseAmount (CashBasis)");
+                    AssertEqDec(usn.EstimatedTaxByRealization, 78.92m, "USN Tax 6% (CashBasis)");
+
+                    var usnReal = AnalyzeFiles(files, CompanyProfilesManager.RegimeUsn6, 6m, demoCosts, 30m, CompanyProfilesManager.UsnMethodRealization);
+                    AssertTrue(usnReal.UsnMethodUsed == CompanyProfilesManager.UsnMethodRealization, "USN explicit Realization");
+                    AssertEqDec(usnReal.TaxBaseAmount, 1317.20m, "USN Realization TaxBaseAmount");
+                    AssertEqDec(usnReal.EstimatedTaxByRealization, 79.03m, "USN Realization Tax 6%");
 
                     var ip = AnalyzeFiles(files, CompanyProfilesManager.RegimeIpPn20, 20m, demoCosts);
                     AssertTrue(ip.IpHasPotentialDoubleGoodsCost, "IP double-goods guard active on demo");
@@ -5193,6 +5491,193 @@ namespace GovPortalsApp
                     AssertTrue(File.Exists(profPath + ".corrupt.bak"), "Corrupt backup created");
                     AssertTrue(File.ReadAllText(profPath, Encoding.UTF8) == corruptBody, "Original corrupt profiles.xml NOT overwritten");
                     AssertTrue(recovered != null && recovered.Profiles.Count > 0, "Fallback store returned in memory");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "17. USN 6% Cash Basis (Art. 328 NK RB: bank + MP offset vs realization, quarter boundary, no-bank fallback)", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t17");
+                    Directory.CreateDirectory(dir);
+
+                    // WB report: RealizedP=2000, ToPayGoods=1600, Logistics=100 -> ExpectedPayout=1500, MpServicesExpenses=500
+                    string wbPath = Path.Combine(dir, "wb_q3.xlsx");
+                    WriteMinimalWbXlsx(wbPath, 2000.00m, 1600.00m, 100.00m);
+
+                    // Bank 1C statement: WB credit = 1100 (400 BYN carry-over into Q4!), other taxable = 200, non-taxable own funds = 500
+                    string bankPath = Path.Combine(dir, "bank_q3.txt");
+                    string bankText =
+                        "1CClientBankExchange\r\nКодировка=UTF-8\r\nРасчСчет=BY00TEST00000000000000000017\r\n" +
+                        "СекцияДокумент=Платежное поручение\r\nНомер=701\r\nДата=30.09.2026\r\nДатаПоступило=30.09.2026\r\nСумма=1100.00\r\n" +
+                        "Плательщик=ООО \"ИМВБРБ\"\r\nПлательщикИНН=193630204\r\nПолучательСчет=BY00TEST00000000000000000017\r\n" +
+                        "НазначениеПлатежа=Перечисление денежных средств по оферте Wildberries\r\nКонецДокумента\r\n" +
+                        "СекцияДокумент=Платежное поручение\r\nНомер=702\r\nДата=30.09.2026\r\nДатаПоступило=30.09.2026\r\nСумма=200.00\r\n" +
+                        "Плательщик=ООО \"Клиент\"\r\nПлательщикИНН=190000077\r\nПолучательСчет=BY00TEST00000000000000000017\r\n" +
+                        "НазначениеПлатежа=Оплата по договору поставки № 12\r\nКонецДокумента\r\n" +
+                        "СекцияДокумент=Платежное поручение\r\nНомер=703\r\nДата=30.09.2026\r\nДатаПоступило=30.09.2026\r\nСумма=500.00\r\n" +
+                        "Плательщик=ОАО \"Банк\"\r\nПлательщикИНН=807000028\r\nПолучательСчет=BY00TEST00000000000000000017\r\n" +
+                        "НазначениеПлатежа=Возврат депозита со своего счета\r\nКонецДокумента\r\nКонецФайла\r\n";
+                    File.WriteAllText(bankPath, bankText, new UTF8Encoding(false));
+
+                    // 17a. CashBasis mode
+                    var cashSnap = AnalyzeFiles(new string[] { wbPath, bankPath }, CompanyProfilesManager.RegimeUsn6, 6m, null, 30m, CompanyProfilesManager.UsnMethodCashBasis);
+                    AssertTrue(cashSnap.UsnMethodUsed == CompanyProfilesManager.UsnMethodCashBasis, "UsnMethodUsed == CashBasis");
+                    AssertEqDec(cashSnap.UsnCashMpBankCredits, 1100.00m, "UsnCashMpBankCredits == 1100");
+                    AssertEqDec(cashSnap.UsnCashMpOffset, 500.00m, "UsnCashMpOffset == 500");
+                    AssertEqDec(cashSnap.BankOtherCredits, 200.00m, "BankOtherCredits == 200");
+                    AssertEqDec(cashSnap.UsnCashBasisIncome, 1800.00m, "UsnCashBasisIncome == 1800 (1100+500+200)");
+                    AssertEqDec(cashSnap.UsnCashBasisTax, 108.00m, "UsnCashBasisTax == 108");
+                    AssertEqDec(cashSnap.UsnRealizationBase, 2200.00m, "UsnRealizationBase == 2200 (2000+200)");
+                    AssertEqDec(cashSnap.UsnRealizationTax, 132.00m, "UsnRealizationTax == 132");
+                    AssertEqDec(cashSnap.TaxBaseAmount, 1800.00m, "Primary TaxBaseAmount == CashBasisIncome");
+                    AssertEqDec(cashSnap.EstimatedTaxByRealization, 108.00m, "Primary Tax == CashBasisTax");
+                    AssertEqDec(cashSnap.UsnCashBasisIncome - cashSnap.UsnRealizationBase, -400.00m, "Carry-over delta == -400");
+                    string cashAudit = string.Join("\n", cashSnap.CalculationAuditDetails);
+                    AssertTrue(cashAudit.Contains("328") && cashAudit.Contains("взаимозачёт"), "Audit explains Art. 328 cash basis + offset");
+
+                    // 17b. Realization mode still computes CashBasis in parallel
+                    var realSnap = AnalyzeFiles(new string[] { wbPath, bankPath }, CompanyProfilesManager.RegimeUsn6, 6m, null, 30m, CompanyProfilesManager.UsnMethodRealization);
+                    AssertTrue(realSnap.UsnMethodUsed == CompanyProfilesManager.UsnMethodRealization, "UsnMethodUsed == Realization");
+                    AssertEqDec(realSnap.TaxBaseAmount, 2200.00m, "Realization TaxBaseAmount == 2200");
+                    AssertEqDec(realSnap.EstimatedTaxByRealization, 132.00m, "Realization Tax == 132");
+                    AssertEqDec(realSnap.UsnCashBasisIncome, 1800.00m, "Parallel UsnCashBasisIncome == 1800");
+                    AssertEqDec(realSnap.UsnCashBasisTax, 108.00m, "Parallel UsnCashBasisTax == 108");
+
+                    // 17c. Automatic fallback to Realization when bank statement not loaded
+                    var noBankSnap = AnalyzeFiles(new string[] { wbPath }, CompanyProfilesManager.RegimeUsn6, 6m, null, 30m, CompanyProfilesManager.UsnMethodCashBasis);
+                    AssertTrue(noBankSnap.UsnMethodUsed == CompanyProfilesManager.UsnMethodRealization, "No-bank auto-fallback to Realization");
+                    AssertEqDec(noBankSnap.TaxBaseAmount, 2000.00m, "No-bank TaxBaseAmount == 2000");
+                    AssertEqDec(noBankSnap.EstimatedTaxByRealization, 120.00m, "No-bank Tax == 120");
+                    AssertTrue(string.Join("\n", noBankSnap.Warnings).Contains("328"), "No-bank fallback emits Art. 328 warning");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "18. Multi-currency NbrbRateOnDateResult (RUB/USD/EUR) + UpdateChecker chain/offline + DisableUpdateChecks XML", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t18");
+                    Directory.CreateDirectory(dir);
+
+                    // 18a. Multi-currency NBRB rate parsing & import VAT (20% / 10%)
+                    DateTime onDt = new DateTime(2026, 9, 15);
+                    var rubRes = NbrbRatesHelper.ParseRateOnDateJson(456, onDt, "{\"Cur_ID\":456,\"Cur_Abbreviation\":\"RUB\",\"Cur_Scale\":100,\"Cur_OfficialRate\":3.4500}");
+                    AssertTrue(rubRes.Success && rubRes.CurScale == 100 && rubRes.CurAbbreviation == "RUB", "RUB 100 parsed");
+                    AssertEqDec(rubRes.ConvertToByn(100000m), 3450.00m, "100000 RUB -> 3450.00 BYN");
+                    AssertEqDec(rubRes.CalculateImportVat(100000m, 20m), 690.00m, "RUB VAT 20% == 690.00");
+                    AssertEqDec(rubRes.CalculateImportVat(100000m, 10m), 345.00m, "RUB VAT 10% == 345.00");
+
+                    var usdRes = NbrbRatesHelper.ParseRateOnDateJson(431, onDt, "{\"Cur_ID\":431,\"Cur_Abbreviation\":\"USD\",\"Cur_Scale\":1,\"Cur_OfficialRate\":3.2500}");
+                    AssertTrue(usdRes.Success && usdRes.CurScale == 1 && usdRes.CurAbbreviation == "USD", "USD 1 parsed");
+                    AssertEqDec(usdRes.ConvertToByn(1000m), 3250.00m, "1000 USD -> 3250.00 BYN");
+                    AssertEqDec(usdRes.CalculateImportVat(1000m, 20m), 650.00m, "USD VAT 20% == 650.00");
+                    AssertEqDec(usdRes.CalculateImportVat(1000m, 10m), 325.00m, "USD VAT 10% == 325.00");
+
+                    var eurRes = NbrbRatesHelper.ParseRateOnDateJson(451, onDt, "{\"Cur_ID\":451,\"Cur_Abbreviation\":\"EUR\",\"Cur_Scale\":1,\"Cur_OfficialRate\":3.5200}");
+                    AssertTrue(eurRes.Success && eurRes.CurScale == 1 && eurRes.CurAbbreviation == "EUR", "EUR 1 parsed");
+                    AssertEqDec(eurRes.ConvertToByn(500m), 1760.00m, "500 EUR -> 1760.00 BYN");
+                    AssertEqDec(eurRes.CalculateImportVat(500m, 20m), 352.00m, "EUR VAT 20% == 352.00");
+                    AssertEqDec(eurRes.CalculateImportVat(500m, 10m), 176.00m, "EUR VAT 10% == 176.00");
+
+                    // 18b. UpdateChecker endpoint fallback chain + disableChecks offline short-circuit
+                    string[] chain = UpdateChecker.GetVersionEndpointChain();
+                    AssertEqInt(chain.Length, 4, "UpdateChecker fallback chain has 4 URLs");
+                    AssertTrue(chain[0] == "https://api.buhly.by/api/version", "Primary URL is api.buhly.by");
+                    AssertTrue(chain[1] == "https://buhly-stats.repinm911.workers.dev/api/version", "Fallback #1 is workers.dev");
+                    AssertTrue(chain[2] == "https://buhly.by/version.json", "Fallback #2 is buhly.by/version.json");
+                    AssertTrue(chain[3] == "https://api.github.com/repos/narard/buhly-rb/releases/latest", "Fallback #3 is GitHub releases");
+
+                    UpdateCheckResult offlineRes = null;
+                    UpdateChecker.CheckForUpdatesAsync(new Version(3, 1, 0, 0), true, delegate(UpdateCheckResult r) { offlineRes = r; });
+                    AssertTrue(offlineRes != null && offlineRes.SkippedOffline && !offlineRes.Checked && !offlineRes.UpdateAvailable, "disableChecks=true skips network immediately");
+
+                    // 18c. CompanyProfileStore.DisableUpdateChecks XML serialization
+                    var store = new CompanyProfileStore();
+                    AssertTrue(!store.DisableUpdateChecks, "Default DisableUpdateChecks == false");
+                    store.Profiles.Add(new CompanyProfile { DisplayName = "Offline Co" });
+                    store.ActiveProfileId = store.Profiles[0].Id;
+                    store.DisableUpdateChecks = true;
+
+                    string xmlPath = Path.Combine(dir, "store_offline.xml");
+                    var ser = new System.Xml.Serialization.XmlSerializer(typeof(CompanyProfileStore));
+                    using (var fs = File.Create(xmlPath)) ser.Serialize(fs, store);
+                    CompanyProfileStore loaded;
+                    using (var fs = File.OpenRead(xmlPath)) loaded = ser.Deserialize(fs) as CompanyProfileStore;
+                    AssertTrue(loaded != null && loaded.DisableUpdateChecks, "DisableUpdateChecks=true round-trip preserved");
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "19. ExportKudirXlsx USN Cash Basis (Art. 328) + CompanyProfile.UsnMethod XML serialization", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t19");
+                    Directory.CreateDirectory(dir);
+
+                    // 19a. CompanyProfile.UsnMethod default, XML round-trip & NormalizeStore
+                    var store = new CompanyProfileStore();
+                    var pDef = new CompanyProfile { DisplayName = "ООО Альфа", Unp = "190000111" };
+                    AssertTrue(pDef.UsnMethod == CompanyProfilesManager.UsnMethodCashBasis, "Default UsnMethod == CashBasis");
+                    pDef.UsnMethod = CompanyProfilesManager.UsnMethodRealization;
+                    store.Profiles.Add(pDef);
+                    store.ActiveProfileId = pDef.Id;
+
+                    string profXml = Path.Combine(dir, "profiles_usn.xml");
+                    var ser = new System.Xml.Serialization.XmlSerializer(typeof(CompanyProfileStore));
+                    using (var fs = File.Create(profXml)) ser.Serialize(fs, store);
+                    CompanyProfileStore loaded;
+                    using (var fs = File.OpenRead(profXml)) loaded = ser.Deserialize(fs) as CompanyProfileStore;
+                    AssertTrue(loaded != null && loaded.Profiles.Count == 1 && loaded.Profiles[0].UsnMethod == CompanyProfilesManager.UsnMethodRealization, "UsnMethod=Realization preserved in XML");
+
+                    loaded.Profiles[0].UsnMethod = "";
+                    CompanyProfilesManager.NormalizeStore(loaded);
+                    AssertTrue(loaded.Profiles[0].UsnMethod == CompanyProfilesManager.UsnMethodCashBasis, "Empty UsnMethod normalized to CashBasis");
+
+                    // 19b. ExportKudirXlsx with USN Cash Basis (Art. 328)
+                    Dictionary<string, decimal> demoCosts;
+                    var files = GenerateDemoAnalyticsFiles(dir, out demoCosts);
+                    var cashSnap = AnalyzeFiles(files, CompanyProfilesManager.RegimeUsn6, 6m, demoCosts, 30m, CompanyProfilesManager.UsnMethodCashBasis);
+                    string kudirCashPath = Path.Combine(dir, "kudir_usn_cash.xlsx");
+                    ExportKudirXlsx(cashSnap, loaded.Profiles[0], kudirCashPath);
+                    ValidateXlsxXmlEntries(kudirCashPath);
+
+                    using (var kfs = File.OpenRead(kudirCashPath))
+                    {
+                        var kRows = ReadXlsxFirstSheet(kfs);
+                        string kFlat = string.Join(" ", kRows.SelectMany(row => row.Values).ToArray());
+                        AssertTrue(kFlat.Contains("Черновик / аналитический регистр"), "KUDIR CashBasis keeps draft disclaimer");
+                        AssertTrue(kFlat.Contains("328") && kFlat.Contains("Кассовый метод") && kFlat.Contains("Взаимозачёт"), "KUDIR CashBasis contains Art. 328, Cash method & offset rows");
+                        AssertTrue(kFlat.Contains("1315.40") && kFlat.Contains("1317.20"), "KUDIR CashBasis includes both CashBasis (1315.40) and reference Realization (1317.20)");
+                    }
+                })) passed++;
+
+                if (RunSingleSelfTest(output, "20. Ozon FBO/FBS Waybills (CSV + XLSX -> 11-Col TTN-1 + Ozon Preset)", delegate
+                {
+                    string dir = Path.Combine(tempRoot, "t20");
+                    Directory.CreateDirectory(dir);
+
+                    string ozCsv = Path.Combine(dir, "ozon_demo.csv");
+                    WaybillEngine.CreateDemoOzonSupplyCsv(ozCsv);
+                    var prof = new WaybillProfile
+                    {
+                        SenderUnp = "190000001",
+                        SenderInfo = "ООО «ТестСеллер», г. Минск",
+                        Signer = "Директор Тест И.И.",
+                        DocType = WaybillEngine.DocTypeTtn1,
+                        PrintMode = WaybillEngine.PrintModeFull,
+                        VehicleInfo = "МАЗ 4370 АА 1234-7",
+                        DriverInfo = "Водитель В.В.",
+                        TransportCustomer = "ООО «ТестСеллер»"
+                    };
+                    WaybillEngine.ApplyOzonPreset(prof);
+                    var csvRes = WaybillEngine.ParseSupplyExcelFiles(new string[] { ozCsv }, prof);
+                    AssertTrue(csvRes.SourceMarketplace == WaybillEngine.MarketplaceOzon, "Ozon CSV marketplace detected");
+                    AssertEqInt(csvRes.TotalQty, 12, "Ozon CSV TotalQty");
+                    AssertEqInt(csvRes.TotalCargoPlaces, 5, "Ozon CSV TotalCargoPlaces");
+                    AssertEqDec(csvRes.TotalCargoMassKg, 2.95m, "Ozon CSV TotalCargoMassKg (grams->kg)");
+
+                    string ttnCsvOut = Path.Combine(dir, "ozon_ttn1_csv.xlsx");
+                    WaybillEngine.GenerateWaybillXlsx(csvRes, prof, new DateTime(2026, 11, 20), ttnCsvOut);
+                    ValidateXlsxXmlEntries(ttnCsvOut);
+
+                    string ozXlsx = Path.Combine(dir, "ozon_demo_fbo.xlsx");
+                    WaybillEngine.CreateDemoOzonSupplyXlsx(ozXlsx);
+                    var xlsxRes = WaybillEngine.ParseSupplyExcelFiles(new string[] { ozXlsx }, prof);
+                    AssertTrue(xlsxRes.SourceMarketplace == WaybillEngine.MarketplaceOzon, "Ozon XLSX marketplace detected");
+                    AssertEqInt(xlsxRes.TotalCargoPlaces, 5, "Ozon XLSX TotalCargoPlaces");
+                    AssertEqDec(xlsxRes.TotalCargoMassKg, 2.95m, "Ozon XLSX TotalCargoMassKg");
                 })) passed++;
             }
             finally

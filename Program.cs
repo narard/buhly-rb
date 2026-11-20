@@ -20,8 +20,8 @@ using System.Windows.Threading;
 [assembly: AssemblyCompany("Maxim Repin (@narard)")]
 [assembly: AssemblyProduct("Buhly Desktop Assistant")]
 [assembly: AssemblyCopyright("Copyright © 2026 Maxim Repin (@narard)")]
-[assembly: AssemblyVersion("3.1.1.0")]
-[assembly: AssemblyFileVersion("3.1.1.0")]
+[assembly: AssemblyVersion("3.2.0.0")]
+[assembly: AssemblyFileVersion("3.2.0.0")]
 
 namespace GovPortalsApp
 {
@@ -289,7 +289,7 @@ namespace GovPortalsApp
             };
             verBadge.Child = new TextBlock
             {
-                Text = "BY 3.1",
+                Text = "BY 3.2",
                 FontSize = 10.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#007AFF")
@@ -782,9 +782,9 @@ namespace GovPortalsApp
         {
             var win = new Window
             {
-                Title = "О программе Buhly v3.1.1",
+                Title = "О программе Buhly v3.2.0",
                 Width = 520,
-                Height = 410,
+                Height = 420,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = this,
                 ResizeMode = ResizeMode.NoResize,
@@ -802,7 +802,7 @@ namespace GovPortalsApp
             var stack = new StackPanel();
             stack.Children.Add(new TextBlock
             {
-                Text = "Buhly v3.1.1 — открытая локальная утилита (MIT)",
+                Text = "Buhly v3.2.0 — открытая локальная утилита (MIT)",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E"),
@@ -810,14 +810,14 @@ namespace GovPortalsApp
             });
             stack.Children.Add(new TextBlock
             {
-                Text = "Автор: Максим Репин (@narard / @max_repin), г. Минск.\n" +
+                Text = "Автор: Максим Репин (@narard / @max_repin), г. Минск. Почта: support@buhly.by\n" +
                        "Лицензия: MIT Open Source (Copyright © 2026 Maxim Repin).\n\n" +
                        "Отказ от ответственности (дисклеймер):\n" +
                        "• Программа предоставляется «как есть» (AS IS) без каких-либо гарантий.\n" +
                        "• Все расчёты налогов, ФСЗН, КУДиР, 1С-выгрузки и печатные формы ТН-2/ТТН-1 носят справочный характер. Перед подачей деклараций и отгрузкой товара сверяйте цифры с первичными документами, НК РБ и актуальным перечнем ЭТН (Пост. № 250 / № 528).\n\n" +
                        "Приватность и сеть:\n" +
                        "• Ваши отчёты, выписки и PIN ЭЦП не покидают компьютер.\n" +
-                       "• 1 раз в сутки выполняется анонимная проверка новой версии (без ПДн/УНП/сумм), а также загрузка курсов НБРБ и пинг доступности госпорталов.",
+                       "• 1 раз в сутки выполняется анонимная проверка новой версии (api.buhly.by, можно отключить во вкладке «УНП и ПК»), а также загрузка курсов НБРБ и пинг доступности госпорталов.",
                 FontSize = 12,
                 Foreground = GetBrush("#3A3A3C"),
                 TextWrapping = TextWrapping.Wrap,

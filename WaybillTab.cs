@@ -24,6 +24,8 @@ namespace GovPortalsApp
         private int _wbLoadSeq = 0;
         private bool _wbIsGenerating = false;
         private bool _wbIsDemoLoaded = false;
+        private bool _wbReceiverAutoSwitchedToOzon = false;
+        private string _wbSavedBasisBeforeOzonAuto = null;
 
         // UI controls for Waybills tab
         private ComboBox wbDocTypeCombo;
@@ -47,6 +49,8 @@ namespace GovPortalsApp
         private Border wbLoadingBanner;
         private TextBlock wbLoadingText;
         private Border wbPreviewCard;
+        private Border wbMarketplaceBadge;
+        private TextBlock wbMarketplaceBadgeText;
         private TextBlock wbSummaryText;
         private DataGrid wbPreviewGrid;
         private DataGridTextColumn wbColCargoPlaces;
@@ -102,14 +106,14 @@ namespace GovPortalsApp
             var stack = new StackPanel();
             stack.Children.Add(new TextBlock
             {
-                Text = "📦  Накладные ТН-2 / ТТН-1 (WB FBS, WB FBO, БСО и Приложение)",
+                Text = "📦  Накладные ТН-2 / ТТН-1 (WB, Ozon, БСО и Приложение)",
                 FontSize = 15,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E")
             });
             stack.Children.Add(new TextBlock
             {
-                Text = "Перетащите файлы поставки WB FBS/FBO (.xlsx) — проверьте или поправьте цены и названия прямо в предпросмотре, выберите режим бланка и сформируйте накладную.",
+                Text = "Перетащите файлы поставки WB или Ozon (.xlsx / .csv) — проверьте или поправьте цены и названия прямо в предпросмотре, выберите режим бланка и сформируйте накладную.",
                 FontSize = 11.5,
                 Foreground = GetBrush("#636366"),
                 TextWrapping = TextWrapping.Wrap,
@@ -378,7 +382,7 @@ namespace GovPortalsApp
             var dropStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
             wbDropTitle = new TextBlock
             {
-                Text = "📥  Перетащите файлы wb-gi-*.xlsx или отгрузку WB FBO сюда",
+                Text = "📥  Перетащите файлы поставок WB или Ozon (.xlsx / .csv)",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = GetBrush("#007AFF"),
@@ -386,7 +390,7 @@ namespace GovPortalsApp
             };
             wbDropSubtitle = new TextBlock
             {
-                Text = "или нажмите здесь, чтобы выбрать файлы .xlsx на компьютере",
+                Text = "или нажмите здесь, чтобы выбрать файлы .xlsx / .csv на компьютере",
                 FontSize = 11.5,
                 Foreground = GetBrush("#636366"),
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -404,14 +408,16 @@ namespace GovPortalsApp
 
             stack.Children.Add(wbDropZone);
 
-            // File action row (Choose / Demo / Folder / Clear)
+            // File action row (Choose / Demo WB / Demo Ozon / Folder / Clear)
             var fileBtnRow = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
             fileBtnRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var btnSelectFiles = CreateCompactActionButton("📂  Выбрать файлы", "#EBF5FF", "#007AFF");
@@ -419,15 +425,22 @@ namespace GovPortalsApp
             Grid.SetColumn(btnSelectFiles, 0);
             fileBtnRow.Children.Add(btnSelectFiles);
 
-            var btnDemoSupply = CreateCompactActionButton("⚡ Попробовать на демо-данных", "#FFFBEB", "#B45309");
-            btnDemoSupply.Padding = new Thickness(11, 0, 11, 0);
-            btnDemoSupply.ToolTip = "Загрузить синтетический пример поставки WB FBS (без личных данных)";
+            var btnDemoSupply = CreateCompactActionButton("⚡ Демо WB", "#FFFBEB", "#B45309");
+            btnDemoSupply.Padding = new Thickness(10, 0, 10, 0);
+            btnDemoSupply.ToolTip = "Загрузить синтетический пример поставки WB FBS (.xlsx, без личных данных)";
             btnDemoSupply.Click += delegate { LoadDemoSupplyFile(); };
             Grid.SetColumn(btnDemoSupply, 2);
             fileBtnRow.Children.Add(btnDemoSupply);
 
+            var btnDemoOzon = CreateCompactActionButton("⚡ Демо Ozon", "#EFF6FF", "#1D4ED8");
+            btnDemoOzon.Padding = new Thickness(10, 0, 10, 0);
+            btnDemoOzon.ToolTip = "Загрузить синтетический пример поставки Ozon (.csv с весом и грузовыми местами)";
+            btnDemoOzon.Click += delegate { LoadDemoOzonSupplyFile(); };
+            Grid.SetColumn(btnDemoOzon, 4);
+            fileBtnRow.Children.Add(btnDemoOzon);
+
             var btnOpenFolder = CreateCompactActionButton("📁 Папка с ТН", "#F2F2F7", "#1C1C1E");
-            btnOpenFolder.Padding = new Thickness(12, 0, 12, 0);
+            btnOpenFolder.Padding = new Thickness(10, 0, 10, 0);
             btnOpenFolder.Click += delegate
             {
                 try
@@ -443,13 +456,13 @@ namespace GovPortalsApp
                     ShowToast("Ошибка открытия папки: " + ex.Message);
                 }
             };
-            Grid.SetColumn(btnOpenFolder, 4);
+            Grid.SetColumn(btnOpenFolder, 6);
             fileBtnRow.Children.Add(btnOpenFolder);
 
             var btnClearFiles = CreateCompactActionButton("✕ Очистить", "#F2F2F7", "#636366");
-            btnClearFiles.Padding = new Thickness(12, 0, 12, 0);
+            btnClearFiles.Padding = new Thickness(10, 0, 10, 0);
             btnClearFiles.Click += delegate { ClearSupplyFiles(); };
-            Grid.SetColumn(btnClearFiles, 6);
+            Grid.SetColumn(btnClearFiles, 8);
             fileBtnRow.Children.Add(btnClearFiles);
             stack.Children.Add(fileBtnRow);
 
@@ -501,15 +514,37 @@ namespace GovPortalsApp
 
             var prevHeaderStack = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
 
+            var summaryRow = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            wbMarketplaceBadge = new Border
+            {
+                Background = GetBrush("#F3E8FF"),
+                BorderBrush = GetBrush("#D8B4FE"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(7, 2, 7, 2),
+                Margin = new Thickness(0, 0, 8, 2),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            wbMarketplaceBadgeText = new TextBlock
+            {
+                Text = "Площадка: Wildberries",
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = GetBrush("#7C3AED")
+            };
+            wbMarketplaceBadge.Child = wbMarketplaceBadgeText;
+            summaryRow.Children.Add(wbMarketplaceBadge);
+
             wbSummaryText = new TextBlock
             {
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetBrush("#1C1C1E"),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 6)
+                VerticalAlignment = VerticalAlignment.Center
             };
-            prevHeaderStack.Children.Add(wbSummaryText);
+            summaryRow.Children.Add(wbSummaryText);
+            prevHeaderStack.Children.Add(summaryRow);
 
             var prevActions = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
             var btnApplyCat = CreateSmallPillButton("📖 Подставить цены", "#EBF3FF", "#007AFF");
@@ -1036,17 +1071,36 @@ namespace GovPortalsApp
             recTop.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             recTop.Children.Add(CreateFieldLabel("Грузополучатель"));
 
+            var presetBtns = new StackPanel { Orientation = Orientation.Horizontal };
             var btnWbPreset = CreateSmallPillButton("WB • ИМВБРБ", "#F3E8FF", "#7C3AED");
+            btnWbPreset.Margin = new Thickness(0, 0, 6, 0);
             btnWbPreset.Click += delegate
             {
+                _wbReceiverAutoSwitchedToOzon = false;
+                _wbSavedBasisBeforeOzonAuto = null;
                 WaybillEngine.ApplyWbPreset(wbProfile);
                 wbReceiverUnpBox.Text = wbProfile.ReceiverUnp;
                 wbReceiverInfoBox.Text = wbProfile.ReceiverInfo;
                 wbBasisBox.Text = wbProfile.BasisPrefix;
                 ShowToast("✓ Подставлены реквизиты WB (ООО «ИМВБРБ»)");
             };
-            Grid.SetColumn(btnWbPreset, 1);
-            recTop.Children.Add(btnWbPreset);
+            presetBtns.Children.Add(btnWbPreset);
+
+            var btnOzonPreset = CreateSmallPillButton("Ozon • Маркет Бел", "#EFF6FF", "#1D4ED8");
+            btnOzonPreset.Click += delegate
+            {
+                _wbReceiverAutoSwitchedToOzon = false;
+                _wbSavedBasisBeforeOzonAuto = null;
+                WaybillEngine.ApplyOzonPreset(wbProfile);
+                wbReceiverUnpBox.Text = wbProfile.ReceiverUnp;
+                wbReceiverInfoBox.Text = wbProfile.ReceiverInfo;
+                wbBasisBox.Text = wbProfile.BasisPrefix;
+                ShowToast("✓ Подставлены реквизиты Ozon (ООО «ОЗОН Маркет Бел»)");
+            };
+            presetBtns.Children.Add(btnOzonPreset);
+
+            Grid.SetColumn(presetBtns, 1);
+            recTop.Children.Add(presetBtns);
             body.Children.Add(recTop);
 
             var recUnpGrid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
@@ -1510,10 +1564,12 @@ namespace GovPortalsApp
             var dropped = e.Data.GetData(DataFormats.FileDrop) as string[];
             if (dropped == null || dropped.Length == 0) return;
 
-            var valid = dropped.Where(f => f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)).ToList();
+            var valid = dropped.Where(f =>
+                f.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                f.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)).ToList();
             if (valid.Count == 0)
             {
-                ShowToast("⚠️ Нужен файл формата .xlsx (выгрузка поставки WB FBS/FBO)");
+                ShowToast("⚠️ Нужен файл формата .xlsx или .csv (выгрузка поставки WB или Ozon)");
                 return;
             }
             _wbIsDemoLoaded = false;
@@ -1524,8 +1580,8 @@ namespace GovPortalsApp
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Выберите файлы поставки Excel (.xlsx)",
-                Filter = "Файлы Excel (*.xlsx)|*.xlsx",
+                Title = "Выберите файлы поставки WB или Ozon (.xlsx / .csv)",
+                Filter = "Файлы поставок (*.xlsx;*.csv)|*.xlsx;*.csv|Файлы Excel (*.xlsx)|*.xlsx|Файлы CSV (*.csv)|*.csv",
                 Multiselect = true
             };
             if (dlg.ShowDialog() == true && dlg.FileNames.Length > 0)
@@ -1543,11 +1599,27 @@ namespace GovPortalsApp
                 string demoPath = Path.Combine(demoDir, "wb-gi-demo-9900123.xlsx");
                 WaybillEngine.GenerateDemoSupplyFile(demoPath);
                 _wbIsDemoLoaded = true;
-                LoadSupplyFiles(new string[] { demoPath }, "⚡ Загружена демо-поставка (5 позиций) — можно редактировать таблицу и создать ТН-2");
+                LoadSupplyFiles(new string[] { demoPath }, "⚡ Загружена демо-поставка WB (5 позиций) — можно редактировать таблицу и создать ТН-2");
             }
             catch (Exception ex)
             {
                 ShowToast("⚠️ Не удалось создать демо-файл: " + ex.Message);
+            }
+        }
+
+        private void LoadDemoOzonSupplyFile()
+        {
+            try
+            {
+                string demoDir = Path.Combine(Path.GetTempPath(), "Buhly_Demo");
+                string demoPath = Path.Combine(demoDir, "ozon-supply-demo-77410.csv");
+                WaybillEngine.CreateDemoOzonSupplyCsv(demoPath);
+                _wbIsDemoLoaded = true;
+                LoadSupplyFiles(new string[] { demoPath }, "⚡ Загружена демо-поставка Ozon (5 позиций, вес и места) — можно создать ТН-2 или ТТН-1");
+            }
+            catch (Exception ex)
+            {
+                ShowToast("⚠️ Не удалось создать демо-файл Ozon: " + ex.Message);
             }
         }
 
@@ -1561,9 +1633,9 @@ namespace GovPortalsApp
             wbPreviewCard.Visibility = Visibility.Collapsed;
             if (wbLoadingBanner != null && !_wbIsGenerating)
                 wbLoadingBanner.Visibility = Visibility.Collapsed;
-            wbDropTitle.Text = "📥  Перетащите файлы wb-gi-*.xlsx или отгрузку WB FBO сюда";
+            wbDropTitle.Text = "📥  Перетащите файлы поставок WB или Ozon (.xlsx / .csv)";
             wbDropTitle.Foreground = GetBrush("#007AFF");
-            wbDropSubtitle.Text = "или нажмите здесь, чтобы выбрать файлы .xlsx на компьютере";
+            wbDropSubtitle.Text = "или нажмите здесь, чтобы выбрать файлы .xlsx / .csv на компьютере";
             ResetDropZoneVisual(false);
             UpdateExportButtonsState();
         }
@@ -1626,11 +1698,76 @@ namespace GovPortalsApp
                     }
 
                     wbCurrentResult = parsed;
+                    bool isOzon = string.Equals(wbCurrentResult.SourceMarketplace, WaybillEngine.MarketplaceOzon, StringComparison.OrdinalIgnoreCase);
+
+                    string autoReceiverToast = null;
+                    if (isOzon)
+                    {
+                        string curUnp = wbReceiverUnpBox != null ? (wbReceiverUnpBox.Text ?? "").Trim() : (wbProfile.ReceiverUnp ?? "").Trim();
+                        string curInfo = wbReceiverInfoBox != null ? (wbReceiverInfoBox.Text ?? "").Trim() : (wbProfile.ReceiverInfo ?? "").Trim();
+                        if (WaybillEngine.IsEmptyOrStandardWbReceiver(curUnp, curInfo))
+                        {
+                            string curBasis = wbBasisBox != null ? (wbBasisBox.Text ?? "").Trim() : (wbProfile.BasisPrefix ?? "").Trim();
+                            if (string.Equals(curBasis, WaybillEngine.DefaultWbBasisPrefix, StringComparison.OrdinalIgnoreCase))
+                                _wbSavedBasisBeforeOzonAuto = curBasis;
+                            WaybillEngine.ApplyOzonPreset(wbProfile);
+                            _suppressWaybillEvents = true;
+                            try
+                            {
+                                if (wbReceiverUnpBox != null) wbReceiverUnpBox.Text = wbProfile.ReceiverUnp;
+                                if (wbReceiverInfoBox != null) wbReceiverInfoBox.Text = wbProfile.ReceiverInfo;
+                                if (wbBasisBox != null) wbBasisBox.Text = wbProfile.BasisPrefix;
+                            }
+                            finally
+                            {
+                                _suppressWaybillEvents = false;
+                            }
+                            _wbReceiverAutoSwitchedToOzon = true;
+                            autoReceiverToast = "✓ Поставка Ozon: подставлен получатель ООО «ОЗОН Маркет Бел»";
+                        }
+                    }
+                    else if (_wbReceiverAutoSwitchedToOzon)
+                    {
+                        string curUnp = wbReceiverUnpBox != null ? (wbReceiverUnpBox.Text ?? "").Trim() : (wbProfile.ReceiverUnp ?? "").Trim();
+                        string curInfo = wbReceiverInfoBox != null ? (wbReceiverInfoBox.Text ?? "").Trim() : (wbProfile.ReceiverInfo ?? "").Trim();
+                        if (WaybillEngine.IsStandardOzonReceiver(curUnp, curInfo))
+                        {
+                            WaybillEngine.ApplyWbPreset(wbProfile);
+                            if (!string.IsNullOrEmpty(_wbSavedBasisBeforeOzonAuto) &&
+                                string.Equals((wbProfile.BasisPrefix ?? "").Trim(), WaybillEngine.DefaultOzonBasisPrefix, StringComparison.OrdinalIgnoreCase))
+                            {
+                                wbProfile.BasisPrefix = _wbSavedBasisBeforeOzonAuto;
+                            }
+                            _suppressWaybillEvents = true;
+                            try
+                            {
+                                if (wbReceiverUnpBox != null) wbReceiverUnpBox.Text = wbProfile.ReceiverUnp;
+                                if (wbReceiverInfoBox != null) wbReceiverInfoBox.Text = wbProfile.ReceiverInfo;
+                                if (wbBasisBox != null) wbBasisBox.Text = wbProfile.BasisPrefix;
+                            }
+                            finally
+                            {
+                                _suppressWaybillEvents = false;
+                            }
+                        }
+                        _wbReceiverAutoSwitchedToOzon = false;
+                        _wbSavedBasisBeforeOzonAuto = null;
+                    }
+
                     ResetDropZoneVisual(true);
-                    string supplies = wbCurrentResult.SupplyIds.Count > 0 ? string.Join(", ", wbCurrentResult.SupplyIds) : "из файла";
-                    string fboTag = wbCurrentResult.IsFboDetected ? "  [WB FBO]" : "";
+                    string supplies;
+                    if (wbCurrentResult.SupplyIds.Count > 3)
+                        supplies = string.Join(", ", wbCurrentResult.SupplyIds.Take(3)) + " ...";
+                    else if (wbCurrentResult.SupplyIds.Count > 0)
+                        supplies = string.Join(", ", wbCurrentResult.SupplyIds);
+                    else
+                        supplies = "из файла";
+
+                    string modeTag = isOzon
+                        ? (wbCurrentResult.IsFboDetected ? "  [Ozon FBO]" : "  [Ozon FBS]")
+                        : (wbCurrentResult.IsFboDetected ? "  [WB FBO]" : "");
                     string demoPrefix = isDemoRun ? "[ДЕМО] " : "";
-                    wbDropTitle.Text = "✓  " + demoPrefix + "Загружено файлов: " + filesCopy.Count + "  (" + supplies + ")" + fboTag;
+                    wbDropTitle.Text = "✓  " + demoPrefix + "Загружено файлов: " + filesCopy.Count + "  (" + supplies + ")" + modeTag;
                     wbDropTitle.Foreground = GetBrush("#16A34A");
                     wbDropSubtitle.Text = string.Join(", ", filesCopy.Select(f => Path.GetFileName(f)));
 
@@ -1639,7 +1776,9 @@ namespace GovPortalsApp
                     wbPreviewCard.Visibility = Visibility.Visible;
                     UpdateExportButtonsState();
 
-                    if (!string.IsNullOrEmpty(completionToast))
+                    if (!string.IsNullOrEmpty(autoReceiverToast))
+                        ShowToast(autoReceiverToast);
+                    else if (!string.IsNullOrEmpty(completionToast))
                         ShowToast(completionToast);
                 }));
             });
@@ -1667,6 +1806,25 @@ namespace GovPortalsApp
             bool isTtn1 = wbProfile != null && string.Equals(wbProfile.DocType, WaybillEngine.DocTypeTtn1, StringComparison.OrdinalIgnoreCase);
             bool isBso = wbProfile != null && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeBso, StringComparison.OrdinalIgnoreCase);
             bool isAppendix = wbProfile != null && string.Equals(wbProfile.PrintMode, WaybillEngine.PrintModeAppendix, StringComparison.OrdinalIgnoreCase);
+            bool isOzon = string.Equals(wbCurrentResult.SourceMarketplace, WaybillEngine.MarketplaceOzon, StringComparison.OrdinalIgnoreCase);
+
+            if (wbMarketplaceBadge != null && wbMarketplaceBadgeText != null)
+            {
+                if (isOzon)
+                {
+                    wbMarketplaceBadgeText.Text = "Площадка: Ozon";
+                    wbMarketplaceBadge.Background = GetBrush("#DBEAFE");
+                    wbMarketplaceBadge.BorderBrush = GetBrush("#93C5FD");
+                    wbMarketplaceBadgeText.Foreground = GetBrush("#1D4ED8");
+                }
+                else
+                {
+                    wbMarketplaceBadgeText.Text = "Площадка: Wildberries";
+                    wbMarketplaceBadge.Background = GetBrush("#F3E8FF");
+                    wbMarketplaceBadge.BorderBrush = GetBrush("#D8B4FE");
+                    wbMarketplaceBadgeText.Foreground = GetBrush("#7C3AED");
+                }
+            }
 
             string cargoSummary = isTtn1
                 ? string.Format(CultureInfo.InvariantCulture, "  •  Мест: {0}  •  Масса: {1:0.00} кг", wbCurrentResult.TotalCargoPlaces, wbCurrentResult.TotalCargoMassKg)
@@ -1691,6 +1849,14 @@ namespace GovPortalsApp
             }
 
             var notes = new List<string>();
+            if (isOzon && !isTtn1 && (wbCurrentResult.TotalCargoPlaces > 0 || wbCurrentResult.TotalCargoMassKg > 0m))
+            {
+                notes.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "🚚 В файле Ozon найдены вес ({0:0.00} кг) и грузовые места ({1}) — при переключении на ТТН-1 они подставятся автоматически.",
+                    wbCurrentResult.TotalCargoMassKg,
+                    wbCurrentResult.TotalCargoPlaces));
+            }
             if (wbCurrentResult.CatalogFilledCount > 0)
             {
                 notes.Add(string.Format("📖 Автоподставлено цен из справочника: {0} поз. (синий фон).", wbCurrentResult.CatalogFilledCount));
@@ -1769,7 +1935,7 @@ namespace GovPortalsApp
             if (_wbIsGenerating) return;
             if (wbLoadedFiles.Count == 0 || wbCurrentResult == null || wbCurrentResult.GroupedItems.Count == 0)
             {
-                ShowToast("⚠️ Сначала перетащите или выберите файл поставки .xlsx");
+                ShowToast("⚠️ Сначала перетащите или выберите файл поставки .xlsx или .csv");
                 return;
             }
 
@@ -1784,8 +1950,10 @@ namespace GovPortalsApp
                 RefreshPreviewVisualsOnly();
 
                 var exportProfile = CloneWaybillProfile(wbProfile);
-                bool isDemo = _wbIsDemoLoaded || (wbLoadedFiles.Count == 1 &&
-                    string.Equals(Path.GetFileName(wbLoadedFiles[0]), "wb-gi-demo-9900123.xlsx", StringComparison.OrdinalIgnoreCase));
+                bool isDemo = _wbIsDemoLoaded || (wbLoadedFiles.Count == 1 && (
+                    string.Equals(Path.GetFileName(wbLoadedFiles[0]), "wb-gi-demo-9900123.xlsx", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileName(wbLoadedFiles[0]), "ozon-supply-demo-77410.csv", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(Path.GetFileName(wbLoadedFiles[0]), "ozon-supply-demo-77410.xlsx", StringComparison.OrdinalIgnoreCase)));
 
                 if (isDemo && (string.IsNullOrWhiteSpace(exportProfile.SenderUnp) || string.IsNullOrWhiteSpace(exportProfile.SenderInfo)))
                 {
@@ -2049,7 +2217,8 @@ namespace GovPortalsApp
                 IsFboDetected = src.IsFboDetected,
                 MissingPriceCount = src.MissingPriceCount,
                 RoundingWarningCount = src.RoundingWarningCount,
-                CatalogFilledCount = src.CatalogFilledCount
+                CatalogFilledCount = src.CatalogFilledCount,
+                SourceMarketplace = src.SourceMarketplace
             };
             if (src.InputFiles != null) copy.InputFiles.AddRange(src.InputFiles);
             if (src.SupplyIds != null) copy.SupplyIds.AddRange(src.SupplyIds);

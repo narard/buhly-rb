@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>УСН 6% для ООО на Wildberries и Ozon в Беларуси (2026): кассовый метод и расчёт базы | Buhly</title>
+  <meta name="description" content="Как правильно считать УСН 6% без НДС для ООО на Wildberries и Ozon в РБ в 2026 году: почему база — полная реализация, а не сумма к перечислению, кассовый метод по ст. 328 НК РБ, возвраты и сверка в Buhly v3.2.">
+  <meta name="keywords" content="усн 6 wildberries беларусь, налоги ооо ozon рб 2026, кассовый метод усн ст 328 нк рб, взаимозачет удержаний wb, база усн маркетплейс беларусь">
+  <link rel="canonical" href="https://buhly.by/usn-wb-ozon-rb.html">
+  <link rel="icon" href="favicon.ico">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="УСН 6% для ООО на Wildberries и Ozon в Беларуси (2026): кассовый метод и расчёт базы | Buhly">
+  <meta property="og:description" content="Разбор на реальных цифрах: почему при УСН 6% налог считают с полной розничной цены, как работает кассовый метод ст. 328 НК РБ с взаимозачётом удержаний и как сверить отчёт за минуту.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://buhly.by/usn-wb-ozon-rb.html">
+  <meta property="og:image" content="https://buhly.by/screenshots/buhly_v3_analytics.png">
+  <meta property="og:locale" content="ru_RU">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="УСН 6% для ООО на Wildberries и Ozon в Беларуси (2026) | Buhly">
+  <meta name="twitter:description" content="Полная розничная база, кассовый метод ст. 328 НК РБ, взаимозачёт комиссий, возвраты и быстрая сверка в Buhly v3.2.">
+  <meta name="twitter:image" content="https://buhly.by/screenshots/buhly_v3_analytics.png">
+  <link rel="stylesheet" href="styles.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Главная",
+            "item": "https://buhly.by/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "УСН 6% для ООО на WB и Ozon в РБ (2026)",
+            "item": "https://buhly.by/usn-wb-ozon-rb.html"
+          }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Может ли ИП в Беларуси применять УСН 6% при торговле на WB и Ozon?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Нет. С 2023 года индивидуальные предприниматели в Республике Беларусь не имеют права применять УСН. Упрощёнка 6% без НДС доступна только организациям (ООО, ЧУП и др.). ИП на маркетплейсах работают на подоходном налоге 20% (или 30% при превышении 500 000 BYN)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Почему нельзя платить 6% только с денег, пришедших от WB на расчётный счёт?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Маркетплейс выступает посредником и перед переводом удерживает комиссию, логистику, хранение и штрафы путём взаимозачёта. По ст. 328 НК РБ в валовую выручку при УСН включается вся стоимость реализованного товара — и сумма на расчётный счёт, и сумма удержанного вознаграждения площадки."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Как учитывать отчёт WB, закрытый 31 марта, если деньги пришли на счёт 3 апреля?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "По кассовому методу ст. 328 НК РБ выручка признаётся на дату оплаты. Удержанные площадкой комиссия и логистика считаются оплаченными на дату взаимозачёта (отчёт 31 марта — I квартал), а остаток денег, поступивший на р/с 3 апреля, попадает в базу II квартала. Важно не потерять и не задвоить эту стыковую сумму."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Нужно ли платить 6% с компенсаций WB за утерянный или испорченный товар?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Да. Компенсации ущерба, подмен и потерь от маркетплейса включаются в налоговую базу УСН как внереализационные доходы (или в составе расчётов по отчёту) на дату поступления денег или взаимозачёта и облагаются по той же ставке 6%."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body class="bg-[#F2F2F7] text-neutral-900 min-h-screen antialiased flex flex-col justify-between">
+
+  <!-- Navigation -->
+  <nav class="max-w-5xl mx-auto w-full px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+    <a href="https://buhly.by/" class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-blue-500/20">
+        B
+      </div>
+      <div class="min-w-0">
+        <span class="font-extrabold text-xl tracking-tight text-neutral-900">Buhly</span>
+        <span class="text-xs text-neutral-600 block font-medium">Помощник селлеров и бухгалтеров РБ</span>
+      </div>
+    </a>
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+      <a href="https://buhly.by/" class="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition px-3 py-1.5 rounded-lg hover:bg-neutral-200/50">
+        Главная
+      </a>
+      <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition px-4 py-2 rounded-xl shadow-sm">
+        Чат помощи
+      </a>
+    </div>
+  </nav>
+
+  <!-- Article Main -->
+  <main class="max-w-3xl mx-auto w-full px-6 pt-6 pb-16">
+    <nav aria-label="Хлебные крошки" class="text-xs text-neutral-600 mb-4 flex flex-wrap items-center gap-1.5">
+      <a href="https://buhly.by/" class="hover:text-blue-600 transition">Главная</a>
+      <span>/</span>
+      <span class="text-neutral-800 font-medium">УСН 6% для ООО на WB и Ozon (2026)</span>
+    </nav>
+
+    <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+      <span>Налоги РБ 2026 • ООО на УСН 6%</span>
+    </div>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-900 leading-tight break-words">
+      УСН 6% без НДС для ООО на <span class="text-blue-600">WB и Ozon</span> в Беларуси: как не ошибиться с базой
+    </h1>
+
+    <p class="text-base md:text-lg text-neutral-600 mt-4 leading-relaxed">
+      Самая дорогая ошибка начинающих директоров ООО на маркетплейсах — заплатить 6% с того, что упало на расчётный счёт. На камеральной проверке налоговая просто складывает полную розничную реализацию и выставляет доначисление с пенёй. Разбираем по делу, как работает кассовый метод по ст. 328 НК РБ.
+    </p>
+
+    <!-- Download CTA Banner -->
+    <div class="mt-8 bg-white rounded-3xl p-6 shadow-md border border-neutral-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <div class="font-bold text-neutral-900 text-base">Сверить УСН 6% по отчётам WB/Ozon и банку в Buhly v3.2</div>
+        <div class="text-xs text-neutral-600 mt-1">Бесплатно, локально на вашем ПК. Считает кассовый метод ст. 328 НК РБ и показывает формулу по строчкам.</div>
+      </div>
+      <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="w-full sm:w-auto shrink-0 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-md shadow-blue-600/20 transition text-center">
+        Скачать Buhly v3.2 (ZIP)
+      </a>
+    </div>
+
+    <!-- Important Note: Only LLC -->
+    <div class="mt-6 p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200/80 text-sm text-amber-900 leading-relaxed">
+      <b>Важно для ИП:</b> индивидуальные предприниматели в Беларуси с 2023 года применять УСН <b>не могут</b>. Эта статья — для организаций (ООО, ЧУП). Если вы работаете как ИП, смотрите разбор: <a href="ip-nalogi-fszn-2026-rb.html" class="font-semibold underline">ИП на WB/Ozon в 2026: подоходный 20%/30%, вычет 30% и ФСЗН</a>.
+    </div>
+
+    <!-- Section 1: Base -->
+    <section class="mt-8 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">1. Почему налог считается с полной реализации, а не с «К перечислению»</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        Когда покупатель забирает ваш товар на ПВЗ Wildberries или Ozon, он платит полную цену. Площадка забирает свою комиссию, логистику, хранение, приёмку, рекламу и штрафы, а остаток отправляет вам на счёт в банке.
+      </p>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        Для налоговой эти удержания — <b>ваш расход</b>, а при УСН 6% расходы базу не уменьшают. Выручка ООО состоит из двух кусков: того, что дошло до банка, и того, что маркетплейс удержал взаимозачётом.
+      </p>
+
+      <div class="overflow-x-auto mt-4">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-neutral-50 border-b border-neutral-200 text-left">
+              <th class="py-2.5 px-3 font-bold text-neutral-900">Строка отчёта маркетплейса</th>
+              <th class="py-2.5 px-3 font-bold text-neutral-900 text-right">Пример, BYN</th>
+              <th class="py-2.5 px-3 font-bold text-neutral-900">Входит в базу УСН 6%?</th>
+            </tr>
+          </thead>
+          <tbody class="text-neutral-700">
+            <tr class="border-b border-neutral-100">
+              <td class="py-2.5 px-3">Продано товара (реализация продавца)</td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap font-semibold">30 000,00</td>
+              <td class="py-2.5 px-3"><b class="text-emerald-700">Да</b> — основная выручка</td>
+            </tr>
+            <tr class="border-b border-neutral-100">
+              <td class="py-2.5 px-3">Возвраты покупателей (сторно)</td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap">−2 000,00</td>
+              <td class="py-2.5 px-3"><b class="text-blue-700">Уменьшают базу</b> в периоде возврата</td>
+            </tr>
+            <tr class="border-b border-neutral-100">
+              <td class="py-2.5 px-3">Удержания (комиссия, логистика, хранение, штрафы)</td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap">−8 500,00</td>
+              <td class="py-2.5 px-3"><b class="text-rose-700">Не вычитаются</b> (это взаимозачёт)</td>
+            </tr>
+            <tr class="border-b border-neutral-100">
+              <td class="py-2.5 px-3">Пришло на расчётный счёт в банке</td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap">19 500,00</td>
+              <td class="py-2.5 px-3">Только часть выручки (без удержаний)</td>
+            </tr>
+            <tr class="bg-blue-50/70">
+              <td class="py-2.5 px-3 font-bold text-neutral-900">Итого база УСН / Налог 6%</td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap font-bold text-blue-700">28 000 / 1 680</td>
+              <td class="py-2.5 px-3 text-neutral-800"><code>19 500 (банк) + 8 500 (зачёт)</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-neutral-600 mt-2">
+        Если заплатить 6% только с 19 500 BYN (1 170 BYN), недоплата за один месяц составит 510 BYN — за год набежит больше 6 000 BYN плюс пеня и штраф.
+      </p>
+    </section>
+
+    <!-- Section 2: Cash method -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">2. Кассовый метод по ст. 328 НК РБ: стык кварталов</h2>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        С 2023 года организации на УСН ведут учёт выручки строго <b>по принципу оплаты (кассовый метод)</b>, закреплённому в ст. 328 НК РБ. Выручка попадает в декларацию того квартала, в котором фактически получена оплата — деньгами на счёт или зачётом встречных требований.
+      </p>
+      <p class="text-sm md:text-base text-neutral-700 leading-relaxed">
+        На маркетплейсах это создаёт классическую ловушку в конце марта, июня, сентября и декабря:
+      </p>
+      <ul class="list-disc pl-5 space-y-2.5 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li><b>Деньги на расчётный счёт</b> — признаются выручкой на дату зачисления по банковской выписке. Если недельный отчёт WB закрыт 31 марта, а деньги банк зачислил 2 апреля, сумма к перечислению идёт во <b>II квартал</b>.</li>
+        <li><b>Удержанная комиссия, логистика и реклама</b> — это неденежная оплата (взаимозачёт). Она признаётся на дату проведения взаимозачёта по отчёту/акту маркетплейса (например, 31 марта — <b>I квартал</b>).</li>
+        <li><b>Почему опасно просто сложить все отчёты WB за квартал:</b> если в конце квартала переходящий отчёт не оплачен деньгами, вы либо переплатите налог раньше срока, либо потом задвоите сумму при сверке с выпиской банка.</li>
+      </ul>
+    </section>
+
+    <!-- Section 3: Returns, SPP, Compensations -->
+    <section class="mt-6 bg-white rounded-2xl p-6 md:p-8 border border-neutral-200 shadow-sm space-y-4">
+      <h2 class="text-xl font-extrabold text-neutral-900 break-words">3. Возвраты, СПП, компенсации и ввозной НДС</h2>
+      <ul class="space-y-3 text-sm md:text-base text-neutral-700 leading-relaxed">
+        <li>• <b>Возвраты товара:</b> уменьшают налоговую базу в том периоде, когда прошёл возврат денег покупателю и корректировка в отчёте площадки. Если возврат «отминусовал» сумму перечисления, не забудьте проверить, что он учтён и в базе.</li>
+        <li>• <b>СПП (скидка постоянного покупателя за счёт WB):</b> ориентируйтесь на графу реализации продавца (цена, по которой товар продан от вашего имени до скидки за счёт площадки, либо фактически сформированная выручка по отчёту агента/комиссионера в зависимости от редакции оферты и УПД/отчёта WB).</li>
+        <li>• <b>Компенсации и возмещение ущерба:</b> если WB потерял коробку на складе или скомпенсировал подмену — это внереализационный доход, с него тоже платится 6%.</li>
+        <li>• <b>УСН без НДС не спасает от ввозного НДС:</b> если ваше ООО закупает товар в России или ЕАЭС, вы всё равно обязаны подавать заявление о ввозе и платить <a href="vvoznoi-nds-rf-rb.html" class="text-blue-600 font-semibold hover:underline">ввозной НДС 20% до 20-го числа</a>. Плюс при договоре с российской площадкой возникает НДС налогового агента 20% на рекламные/электронные услуги.</li>
+      </ul>
+      <div class="p-4 rounded-2xl bg-[#F2F2F7] text-xs sm:text-sm text-neutral-700">
+        <b>Сроки по УСН в 2026 году:</b> декларация подаётся поквартально до <b>20-го числа</b> (апреля, июля, октября, января), уплата налога — до <b>22-го числа</b>. Если дата выпадает на выходной, срок переносится на ближайший рабочий день.
+      </div>
+    </section>
+
+    <!-- Auto Solution -->
+    <section class="mt-6 bg-emerald-50/70 rounded-2xl p-6 md:p-8 border border-emerald-200/80">
+      <h2 class="text-xl font-extrabold text-neutral-900 mb-4">Как сверить УСН 6% за 1 минуту в Buhly v3.2</h2>
+      <ul class="space-y-3 text-sm md:text-base text-neutral-800 leading-relaxed">
+        <li>✓ Загружаете детализацию WB (<code>.zip</code>/<code>.xlsx</code>/<code>.csv</code>) или отчёт Ozon и выписку вашего банка РБ (<code>1CClientBankExchange</code> или Excel).</li>
+        <li>✓ В профиле ООО стоит режим <b>«ООО • УСН 6% (кассовый метод)»</b> — программа отдельно показывает поступления на р/с, взаимозачёт удержаний маркетплейса, возвраты и компенсации.</li>
+        <li>✓ Нажимаете кнопку <b><code>❓ Как посчитано?</code></b> — открывается прозрачная расшифровка формулы по каждой строчке, чтобы перепроверить цифру перед подачей декларации в МНС.</li>
+        <li>✓ Все расчёты идут локально на вашем ПК — файлы отчётов и выписок никуда не загружаются.</li>
+      </ul>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://github.com/narard/buhly-rb/releases/latest/download/Buhly.zip" data-goal="download_zip" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition">
+          Скачать Buhly v3.2 (ZIP)
+        </a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="px-5 py-3 bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-sm rounded-xl border border-neutral-300 transition">
+          Спросить в Telegram-чате
+        </a>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mt-10">
+      <h2 class="text-2xl font-extrabold text-neutral-900 mb-5">Частые вопросы</h2>
+      <div class="space-y-3">
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Может ли ИП в Беларуси применять УСН 6% при торговле на WB и Ozon?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Нет. С 2023 года индивидуальные предприниматели в Республике Беларусь не имеют права применять УСН. Упрощёнка 6% без НДС доступна только организациям (ООО, ЧУП и др.). ИП на маркетплейсах работают на подоходном налоге 20% (или 30% при превышении 500 000 BYN).</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Почему нельзя платить 6% только с денег, пришедших от WB на расчётный счёт?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Маркетплейс выступает посредником и перед переводом удерживает комиссию, логистику, хранение и штрафы путём взаимозачёта. По ст. 328 НК РБ в валовую выручку при УСН включается вся стоимость реализованного товара — и сумма на расчётный счёт, и сумма удержанного вознаграждения площадки.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Как учитывать отчёт WB, закрытый 31 марта, если деньги пришли на счёт 3 апреля?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">По кассовому методу ст. 328 НК РБ выручка признаётся на дату оплаты. Удержанные площадкой комиссия и логистика считаются оплаченными на дату взаимозачёта (отчёт 31 марта — I квартал), а остаток денег, поступивший на р/с 3 апреля, попадает в базу II квартала. Важно не потерять и не задвоить эту стыковую сумму.</p>
+        </details>
+        <details class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm cursor-pointer">
+          <summary class="font-bold text-neutral-900 text-base">Нужно ли платить 6% с компенсаций WB за утерянный или испорченный товар?</summary>
+          <p class="text-sm text-neutral-600 mt-3 leading-relaxed">Да. Компенсации ущерба, подмен и потерь от маркетплейса включаются в налоговую базу УСН как внереализационные доходы (или в составе расчётов по отчёту) на дату поступления денег или взаимозачёта и облагаются по той же ставке 6%.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Other Guides -->
+    <section class="mt-10 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+      <h2 class="font-bold text-base text-neutral-900 mb-3">Другие разборы для селлеров РБ</h2>
+      <div class="grid sm:grid-cols-2 gap-2.5 text-sm">
+        <a href="ip-nalogi-fszn-2026-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">👤 ИП на WB/Ozon 2026: подоходный 20%/30%, вычет 30% и ФСЗН →</a>
+        <a href="vvoznoi-nds-rf-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🚚 Ввозной НДС 20% при закупке в РФ/ЕАЭС и статдекларация →</a>
+        <a href="tn2-bso-etn-wb-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">📦 Накладные ТН-2, 11-графная ТТН-1 (БСО) и обязательные ЭТН →</a>
+        <a href="sverka-wb-bank-rb.html" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">🏦 Сверка отчётов WB/Ozon с банком РБ, КУДиР и 1С →</a>
+        <a href="https://buhly.by/" class="p-3 rounded-xl bg-[#F2F2F7] hover:bg-blue-50 text-neutral-800 hover:text-blue-700 font-medium transition block">⚡ Главная страница Buhly v3.2 →</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-neutral-900 text-neutral-400 py-10 border-t border-neutral-800 text-sm">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <a href="https://buhly.by/" class="text-white font-bold text-base hover:underline">Buhly</a> • Бесплатный помощник продавцов и бухгалтеров РБ
+      </div>
+      <div class="flex items-center flex-wrap gap-5">
+        <a href="privacy.html" class="hover:text-white transition">Политика приватности</a>
+        <a href="https://github.com/narard/buhly-rb" target="_blank" rel="noopener" data-goal="github_click" class="hover:text-white transition">GitHub Repo</a>
+        <a href="https://t.me/buhly_by" target="_blank" rel="noopener" data-goal="tg_channel" class="hover:text-white transition">Канал @buhly_by</a>
+        <a href="https://t.me/buhly_by_chat" target="_blank" rel="noopener" data-goal="tg_chat" class="hover:text-white transition">Чат помощи</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Cookie-free Click & UTM Helper (0% cookies, 0% localStorage, Закон РБ № 99-З) -->
+  <script>
+    (function () {
+      var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      var params = new URLSearchParams(window.location.search || '');
+      var activeUtm = {};
+      var hasUtm = false;
+      utmKeys.forEach(function (k) {
+        var v = params.get(k);
+        if (v) { activeUtm[k] = v; hasUtm = true; }
+      });
+
+      window.buhlyEvents = window.buhlyEvents || [];
+      window.buhlyTrack = function (goal, url) {
+        var payload = { goal: goal, url: url || '', path: window.location.pathname, utm: activeUtm, ts: Date.now() };
+        window.buhlyEvents.push(payload);
+        try {
+          window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
+        } catch (e) {}
+        if (goal === 'download_zip' || goal === 'download_exe') {
+          var pingUrl = 'https://api.buhly.by/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          try {
+            if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
+              return;
+            }
+            if (window.fetch) {
+              window.fetch(pingUrl, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(function () {});
+            }
+          } catch (e) {}
+        }
+      };
+
+      var links = document.querySelectorAll('a[href]');
+      for (var i = 0; i < links.length; i++) {
+        (function (a) {
+          var href = a.getAttribute('href') || '';
+          var goal = a.getAttribute('data-goal');
+          if (!goal) {
+            if (href.indexOf('releases/latest/download/Buhly.zip') !== -1 || href.indexOf('Buhly.zip') !== -1) {
+              goal = 'download_zip';
+            } else if (href.indexOf('releases/latest/download/Buhly.exe') !== -1 || href.indexOf('Buhly.exe') !== -1) {
+              goal = 'download_exe';
+            } else if (href.indexOf('t.me/buhly_by_chat') !== -1) {
+              goal = 'tg_chat';
+            } else if (href.indexOf('t.me/buhly_by') !== -1) {
+              goal = 'tg_channel';
+            } else if (href.indexOf('github.com/narard/buhly-rb') !== -1) {
+              goal = 'github_click';
+            }
+            if (goal) a.setAttribute('data-goal', goal);
+          }
+
+          if (hasUtm && href && href.charAt(0) !== '#' && href.indexOf('mailto:') !== 0) {
+            var isInternal = href.indexOf('http') !== 0 || href.indexOf('https://buhly.by/') === 0;
+            var isGithubPage = href.indexOf('https://github.com/narard/buhly-rb') === 0 && href.indexOf('.zip') === -1 && href.indexOf('.exe') === -1;
+            if (isInternal || isGithubPage) {
+              try {
+                var base = window.location.protocol.indexOf('http') === 0 ? window.location.href : 'https://buhly.by/';
+                var u = new URL(href, base);
+                utmKeys.forEach(function (k) {
+                  if (activeUtm[k] && !u.searchParams.has(k)) u.searchParams.set(k, activeUtm[k]);
+                });
+                if (href.indexOf('http') !== 0) {
+                  a.setAttribute('href', href.split('?')[0].split('#')[0] + u.search + u.hash);
+                } else {
+                  a.setAttribute('href', u.toString());
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (goal) {
+            a.addEventListener('click', function () {
+              window.buhlyTrack(goal, a.href);
+            });
+          }
+        })(links[i]);
+      }
+    })();
+  </script>
+  <!-- Cloudflare Web Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "41c6c66b6e064606a506e2577db47e59"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

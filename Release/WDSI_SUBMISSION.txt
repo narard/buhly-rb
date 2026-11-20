@@ -9,9 +9,9 @@
    Software developer
 
 3. Прикрепите файл:
-   GitHub\Buhly\Buhly.exe  (размер: 742 400 байт / ~725 КБ; архив Buhly.zip: ~268 КБ)
-   SHA-256: D657E1703B80B5E8ACC5B366167A6E7CF3343045B400FCC6CBC975FA50A585BA
-   Версия:  3.1.1.0
+   GitHub\Buhly\Buhly.exe  (размер: 799 232 байт / ~780 КБ; архив Buhly.zip: ~283 КБ)
+   SHA-256: 26A02B2BE194A6AE92FAF1BECD08DFEAE0BB6BE82909BE42FC3CCD434F32492F
+   Версия:  3.2.0.0
 
 4. Выберите тип обращения:
    "Incorrectly detected as malware/PUA" / "SmartScreen false positive (Clean file)"
@@ -19,13 +19,13 @@
 5. Скопируйте в поле описания (Additional information / Comments) текст ниже:
 
 ------------------------------------------------------------------------
-Product Name: Buhly Desktop Assistant (v3.1.1.0)
+Product Name: Buhly Desktop Assistant (v3.2.0.0)
 License: MIT Open Source
 Official Website: https://buhly.by
 Public Source Repository: https://github.com/narard/buhly-rb
 Build Script: https://github.com/narard/buhly-rb/blob/main/build.bat
 GitHub Actions CI/CD: https://github.com/narard/buhly-rb/blob/main/.github/workflows/release.yml
-File SHA-256 (Buhly.exe): D657E1703B80B5E8ACC5B366167A6E7CF3343045B400FCC6CBC975FA50A585BA
+File SHA-256 (Buhly.exe): 26A02B2BE194A6AE92FAF1BECD08DFEAE0BB6BE82909BE42FC3CCD434F32492F
 
 Description:
 Buhly is a free, open-source (MIT) Windows WPF utility (.NET Framework 4.8, compiled reproducibly from public C# source files using standard csc.exe with zero third-party binaries) designed for small businesses and accountants in the Republic of Belarus.
@@ -33,8 +33,8 @@ Buhly is a free, open-source (MIT) Windows WPF utility (.NET Framework 4.8, comp
 Core legitimate functions:
 1. One-click configuration and diagnostics for official Belarusian government portals (nalog.gov.by, portal2.ssf.gov.by, vat.gov.by, e-pasluga.by), including Edge Enterprise IE Mode policy XML and local hosts/proxy backup & rollback.
 2. Local parsing of Wildberries / Ozon marketplace financial reports (.zip/.xlsx/.csv) and bank statements (1CClientBankExchange / .xlsx/.csv) for tax calculation and 1C/KUDiR Excel export.
-3. Generation of official Belarusian TN-2 / TTN-1 waybill .xlsx documents from Wildberries supply files using embedded templates.
-4. Read-only inspection of Avest USB digital signature certificates, NBRB official currency rates (nbrb.by), on-demand UNN registry lookup (portal.nalog.gov.by), and once-per-day anonymous update check against buhly-stats.repinm911.workers.dev/api/version (or api.github.com) with no PII or local files transmitted.
+3. Generation of official Belarusian TN-2 / 11-column TTN-1 waybill .xlsx documents from Wildberries and Ozon supply files using embedded templates.
+4. Read-only inspection of Avest USB digital signature certificates, NBRB official currency rates (nbrb.by), on-demand UNN registry lookup (portal.nalog.gov.by), and optional once-per-day anonymous update check against api.buhly.by/api/version (can be disabled in settings) with no PII or local files transmitted.
 
 Security & privacy properties:
 - 100% local data processing, zero PII telemetry, no remote code execution, no credential harvesting.

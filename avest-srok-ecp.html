@@ -203,7 +203,7 @@
           window.dispatchEvent(new CustomEvent('buhly:goal', { detail: payload }));
         } catch (e) {}
         if (goal === 'download_zip' || goal === 'download_exe') {
-          var pingUrl = 'https://buhly-stats.repinm911.workers.dev/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
+          var pingUrl = 'https://api.buhly.by/api/download/' + (goal === 'download_exe' ? 'exe' : 'zip') + '?ping=1';
           try {
             if (navigator.sendBeacon && navigator.sendBeacon(pingUrl)) {
               return;

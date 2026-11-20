@@ -45,6 +45,7 @@ namespace GovPortalsApp
             container.Children.Add(CreateUnpCheckerCard());
             container.Children.Add(CreateFirstRunWizardCard());
             container.Children.Add(CreateNetworkRollbackCard());
+            container.Children.Add(CreatePrivacyOfflineCard());
         }
 
         private Border CreateUnpCheckerCard()
@@ -637,6 +638,69 @@ namespace GovPortalsApp
             bodyStack.Children.Add(rollbackBtn);
 
             stack.Children.Add(bodyStack);
+            border.Child = stack;
+            return border;
+        }
+
+        private Border CreatePrivacyOfflineCard()
+        {
+            var border = new Border
+            {
+                Background = Brushes.White,
+                CornerRadius = new CornerRadius(16),
+                Padding = new Thickness(18, 14, 18, 14),
+                Margin = new Thickness(0, 0, 0, 14),
+                BorderBrush = GetBrush("#E5E5EA"),
+                BorderThickness = new Thickness(1)
+            };
+
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock
+            {
+                Text = "🔒  Приватность и офлайн-режим",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = GetBrush("#1C1C1E"),
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+
+            var cbOffline = new CheckBox
+            {
+                Content = "Отключить ежедневную проверку обновлений (api.buhly.by / GitHub)",
+                IsChecked = companyStore != null && companyStore.DisableUpdateChecks,
+                FontSize = 12.5,
+                Foreground = GetBrush("#1C1C1E"),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 2, 0, 4)
+            };
+            cbOffline.Checked += delegate
+            {
+                if (companyStore != null)
+                {
+                    companyStore.DisableUpdateChecks = true;
+                    CompanyProfilesManager.Save(companyStore);
+                    ShowToast("✓ Проверка обновлений отключена (полный офлайн для api.buhly.by)");
+                }
+            };
+            cbOffline.Unchecked += delegate
+            {
+                if (companyStore != null)
+                {
+                    companyStore.DisableUpdateChecks = false;
+                    CompanyProfilesManager.Save(companyStore);
+                    ShowToast("✓ Ежедневная анонимная проверка обновлений включена");
+                }
+            };
+            stack.Children.Add(cbOffline);
+
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Подходит для закрытых рабочих ПК без доступа к внешним сервисам. На работу с локальными файлами, накладными и ЭЦП не влияет.",
+                FontSize = 11,
+                Foreground = GetBrush("#8E8E93"),
+                TextWrapping = TextWrapping.Wrap
+            });
+
             border.Child = stack;
             return border;
         }
