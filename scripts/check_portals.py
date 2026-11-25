@@ -59,16 +59,29 @@ PORTALS = [
         "url": "https://e-pasluga.by",
         "fallback_urls": [],
         "stb_http_fallback": None,
+        "timeout": 15,
+        "confirm_runs": 3,
     },
 ]
 
 
+def now_msk_dt():
+    return datetime.datetime.now(MSK_TZ)
+
+
 def now_msk_iso():
-    return datetime.datetime.now(MSK_TZ).replace(microsecond=0).isoformat()
+    return now_msk_dt().replace(microsecond=0).isoformat()
 
 
 def now_msk_hhmm():
-    return datetime.datetime.now(MSK_TZ).strftime("%H:%M")
+    return now_msk_dt().strftime("%H:%M")
+
+
+def is_quiet_hours(dt_msk=None):
+    """Suppress Telegram alerts at night (22:00-08:30 MSK/BY) to avoid waking subscribers."""
+    dt = dt_msk or now_msk_dt()
+    minutes = dt.hour * 60 + dt.minute
+    return minutes >= (22 * 60) or minutes < (8 * 60 + 30)
 
 
 def classify_ssl_error(exc):
@@ -281,6 +294,17 @@ def parse_args(argv):
         default=10,
         help="Extra confirmation wait in seconds before marking a portal DOWN (default: 10)",
     )
+    parser.add_argument(
+        "--confirm-runs",
+        type=int,
+        default=2,
+        help="Consecutive failed workflow runs required before alerting DOWN (default: 2)",
+    )
+    parser.add_argument(
+        "--no-quiet-hours",
+        action="store_true",
+        help="Disable 22:00-08:30 MSK/BY quiet hours suppression",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Do not send Telegram messages")
     return parser.parse_args(argv)
 
@@ -294,34 +318,41 @@ def main(argv=None):
     new_portals = {}
     alerts = []
 
-    hhmm = now_msk_hhmm()
-    checked_iso = now_msk_iso()
+    now_dt = now_msk_dt()
+    hhmm = now_dt.strftime("%H:%M")
+    checked_iso = now_dt.replace(microsecond=0).isoformat()
+    quiet_now = (not args.no_quiet_hours) and is_quiet_hours(now_dt)
 
-    print("Buhly RB GovPortals Radar @ {0}".format(checked_iso))
+    print("Buhly RB GovPortals Radar @ {0} (quiet_hours={1})".format(checked_iso, quiet_now))
 
     for portal in PORTALS:
         pid = portal["id"]
         prev_entry = prev_portals.get(pid) or {}
         prev_status = prev_entry.get("status")
+        prev_streak = int(prev_entry.get("down_streak", 0) or 0)
+        prev_alert_sent = bool(prev_entry.get("down_alert_sent", prev_status == "DOWN"))
         last_transition = prev_entry.get("last_transition_msk")
+
+        portal_timeout = int(portal.get("timeout") or args.timeout)
+        required_runs = max(1, int(portal.get("confirm_runs") or args.confirm_runs))
 
         result = check_portal_with_retries(
             portal,
             retries=args.retries,
             backoff=args.backoff,
-            timeout=args.timeout,
+            timeout=portal_timeout,
             strict_ctx=strict_ctx,
         )
 
-        # Confirming retry before switching status to DOWN (filters out single Azure/GitHub IP glitches)
+        # Confirming retry before counting a failed run (filters out single Azure/GitHub IP glitches)
         if not result["up"] and prev_status != "DOWN" and args.confirm_delay > 0:
             print(
-                "  [{0}] initial retries failed; waiting {1}s for confirming check before marking DOWN...".format(
+                "  [{0}] initial retries failed; waiting {1}s for confirming check...".format(
                     portal["host"], args.confirm_delay
                 )
             )
             time.sleep(args.confirm_delay)
-            confirm_result = probe_portal_once(portal, args.timeout, strict_ctx)
+            confirm_result = probe_portal_once(portal, portal_timeout, strict_ctx)
             confirm_result["attempts"] = result["attempts"] + 1
             if confirm_result["up"]:
                 print(
@@ -332,39 +363,70 @@ def main(argv=None):
                 result = confirm_result
             else:
                 print(
-                    "  [{0}] confirming check failed ({1}); DOWN confirmed.".format(
+                    "  [{0}] confirming check failed ({1}); failed run recorded.".format(
                         portal["host"], confirm_result["error"]
                     )
                 )
                 result = confirm_result
 
-        new_status = "UP" if result["up"] else "DOWN"
+        if result["up"]:
+            down_streak = 0
+            new_status = "UP"
+        else:
+            down_streak = prev_streak + 1
+            if prev_status == "DOWN" or down_streak >= required_runs:
+                new_status = "DOWN"
+            elif prev_status is None:
+                new_status = "DOWN"
+            else:
+                # Hold UP until consecutive runs across separate runners confirm real outage
+                new_status = "UP"
+
+        down_alert_sent = prev_alert_sent
 
         print(
-            "- {0} ({1}): {2} | latency={3}ms | ssl={4} | prev={5}".format(
+            "- {0} ({1}): {2} (raw={3}, streak={4}/{5}) | latency={6}ms | ssl={7} | prev={8}".format(
                 portal["name"],
                 portal["host"],
                 new_status,
+                "UP" if result["up"] else "DOWN",
+                down_streak,
+                required_runs,
                 result["latency_ms"],
                 result["ssl_status"],
                 prev_status or "NONE",
             )
         )
 
-        if prev_status == "UP" and new_status == "DOWN":
-            alerts.append((portal, "DOWN", format_down_message(portal, hhmm)))
-            last_transition = checked_iso
-        elif prev_status == "DOWN" and new_status == "UP":
-            alerts.append((portal, "UP", format_up_message(portal, hhmm, result["latency_ms"])))
-            last_transition = checked_iso
-        elif prev_status is None:
+        if prev_status is None:
+            down_alert_sent = False
             print("  [INIT] Baseline state recorded for {0} ({1}). No alert sent.".format(portal["name"], new_status))
+        elif new_status == "DOWN":
+            if prev_status != "DOWN":
+                last_transition = checked_iso
+            if not down_alert_sent:
+                if quiet_now:
+                    print("  [QUIET] Suppressing DOWN alert for {0} during quiet hours.".format(portal["host"]))
+                else:
+                    alerts.append((portal, "DOWN", format_down_message(portal, hhmm)))
+                    down_alert_sent = True
+        elif new_status == "UP":
+            if prev_status == "DOWN":
+                last_transition = checked_iso
+            if down_alert_sent:
+                if quiet_now:
+                    print("  [QUIET] Suppressing UP recovery alert for {0} during quiet hours.".format(portal["host"]))
+                else:
+                    alerts.append((portal, "UP", format_up_message(portal, hhmm, result["latency_ms"])))
+                down_alert_sent = False
 
         new_portals[pid] = {
             "name": portal["name"],
             "host": portal["host"],
             "url": portal["url"],
             "status": new_status,
+            "down_streak": down_streak,
+            "down_alert_sent": down_alert_sent,
             "latency_ms": result["latency_ms"],
             "http_status": result["http_status"],
             "ssl_status": result["ssl_status"],

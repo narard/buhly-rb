@@ -5,7 +5,7 @@ const CACHE_TTL_SEC = 600;
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Stats-Token",
     "Cache-Control": "no-store"
   };
@@ -152,11 +152,14 @@ export default {
     const kv = env && env.STATS_KV ? env.STATS_KV : null;
     const today = getMinskDateKey(0);
     const isGet = request.method === "GET";
+    const isPingPost = request.method === "POST" && url.searchParams.get("ping") === "1";
+    const userAgent = request.headers.get("User-Agent") || "";
 
-    // 1. Daily version check + anonymous launch counter (0% PII, no IP/device stored; 1 KV write/req)
+    // 1. Daily version check + anonymous desktop launch counter (0% PII; filters out "/" & scanner bots)
     if (path === "/api/version" || path === "/version" || path === "/") {
       const oneYear = 365 * 86400;
-      if (isGet && kv && ctx && typeof ctx.waitUntil === "function") {
+      const isDesktopClient = path === "/api/version" && userAgent.indexOf("Buhly-Desktop") === 0;
+      if (isGet && isDesktopClient && kv && ctx && typeof ctx.waitUntil === "function") {
         ctx.waitUntil(incrementCounter(kv, "opens:" + today, oneYear));
       }
       const rel = await getLatestRelease(kv);
@@ -171,7 +174,7 @@ export default {
     // 2. Counted download tracking (?ping=1 returns 204 No Content with CORS) or 302 redirect (1 KV write/req)
     if (path === "/api/download/zip" || path === "/api/download/exe") {
       const oneYear = 365 * 86400;
-      if (isGet && kv && ctx && typeof ctx.waitUntil === "function") {
+      if ((isGet || isPingPost) && kv && ctx && typeof ctx.waitUntil === "function") {
         ctx.waitUntil(incrementCounter(kv, "dl:" + today, oneYear));
       }
       if (url.searchParams.get("ping") === "1") {
